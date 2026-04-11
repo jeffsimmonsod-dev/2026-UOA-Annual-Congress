@@ -86,7 +86,7 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.heroSection}>
-        <Pressable onPress={handleLogoTap} hitSlop={8}>
+        <Pressable onPress={handleLogoTap} hitSlop={8} style={styles.logoWrapper}>
           <Image
             source={require("../../assets/images/uoa-logo.png")}
             style={styles.logo}
@@ -307,9 +307,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     alignItems: "center",
   },
+  logoWrapper: {
+    width: "100%",
+  },
   logo: {
-    width: 320,
-    height: 120,
+    width: "100%",
+    height: 200,
   },
   badge: {
     flexDirection: "row",
