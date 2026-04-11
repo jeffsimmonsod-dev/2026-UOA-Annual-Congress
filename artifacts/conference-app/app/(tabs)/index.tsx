@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -15,15 +16,17 @@ import { useColors } from "@/hooks/useColors";
 import { CONFERENCE, SESSIONS, SPEAKERS } from "@/services/data";
 
 const TRACK_COLORS: Record<string, string> = {
-  Architecture: "#6366f1",
-  Frontend: "#ec4899",
-  Backend: "#14b8a6",
-  "AI & ML": "#f59e0b",
-  Keynote: "#ef4444",
-  DevOps: "#10b981",
-  Workshops: "#8b5cf6",
-  "Open Source": "#3b82f6",
-  "Data & AI": "#f59e0b",
+  "Retinal Disease": "#6366f1",
+  "Neuro-Optometry": "#ec4899",
+  Glaucoma: "#14b8a6",
+  Pharmacology: "#f59e0b",
+  "Practice Management": "#10b981",
+  "Pediatrics & BV": "#8b5cf6",
+  "ABO/CPC": "#3b82f6",
+  General: "#64748b",
+  Optical: "#f97316",
+  "Contact Lenses": "#06b6d4",
+  "Clinical Knowledge": "#84cc16",
 };
 
 export default function HomeScreen() {
@@ -47,7 +50,7 @@ export default function HomeScreen() {
     >
       <View style={styles.heroSection}>
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-          <Ionicons name="mic-outline" size={13} color={colors.primary} />
+          <Ionicons name="eye-outline" size={13} color={colors.primary} />
           <Text style={[styles.badgeText, { color: colors.primary }]}>
             {CONFERENCE.dates}
           </Text>
@@ -85,33 +88,33 @@ export default function HomeScreen() {
       </Text>
       <View style={styles.quickActions}>
         <QuickActionButton
-          label="Schedule"
+          label="Dr. Schedule"
           icon="calendar-outline"
           color={colors.primary}
           onPress={() => router.push("/(tabs)/schedule")}
         />
         <QuickActionButton
+          label="Para"
+          icon="people-outline"
+          color="#8b5cf6"
+          onPress={() => router.push("/(tabs)/para")}
+        />
+        <QuickActionButton
           label="My Schedule"
           icon="bookmark-outline"
-          color="#8b5cf6"
-          onPress={() => router.push("/my-schedule")}
-        />
-        <QuickActionButton
-          label="Updates"
-          icon="notifications-outline"
-          color="#f59e0b"
-          onPress={() => router.push("/updates")}
-        />
-        <QuickActionButton
-          label="Venue"
-          icon="map-outline"
           color="#10b981"
-          onPress={() => router.push("/(tabs)/venue")}
+          onPress={() => router.push("/(tabs)/my-schedule")}
+        />
+        <QuickActionButton
+          label="Register"
+          icon="open-outline"
+          color="#f59e0b"
+          onPress={() => Linking.openURL(CONFERENCE.registrationUrl)}
         />
       </View>
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        Opening Session
+        First Session
       </Text>
       <Pressable
         onPress={() =>
@@ -138,15 +141,54 @@ export default function HomeScreen() {
         <View style={styles.featuredMeta}>
           <Ionicons name="time-outline" size={13} color={colors.mutedForeground} />
           <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
-            {upcomingSession.startTime} · {upcomingSession.room}
+            {upcomingSession.startTime} – {upcomingSession.endTime} · {upcomingSession.room}
           </Text>
         </View>
+        {upcomingSession.copeId && (
+          <View style={styles.featuredMeta}>
+            <Ionicons name="school-outline" size={13} color={colors.mutedForeground} />
+            <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
+              COPE: {upcomingSession.copeId}
+            </Text>
+          </View>
+        )}
       </Pressable>
+
+      <View
+        style={[styles.hotelCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
+        <View style={styles.hotelHeader}>
+          <Ionicons name="business-outline" size={18} color={colors.primary} />
+          <Text style={[styles.hotelTitle, { color: colors.foreground }]}>
+            Hotel Reservations
+          </Text>
+        </View>
+        <Text style={[styles.hotelText, { color: colors.mutedForeground }]}>
+          Rooms blocked at special UOA pricing at the Grand Hyatt Deer Valley.
+        </Text>
+        <Pressable
+          onPress={() => Linking.openURL(CONFERENCE.hotelBookingUrl)}
+          style={[styles.hotelButton, { backgroundColor: colors.primary }]}
+        >
+          <Text style={styles.hotelButtonText}>Book Online</Text>
+          <Ionicons name="open-outline" size={14} color="#fff" />
+        </Pressable>
+        <Text style={[styles.hotelPhone, { color: colors.mutedForeground }]}>
+          Or call:{" "}
+          <Text
+            style={{ color: colors.primary }}
+            onPress={() => Linking.openURL(`tel:${CONFERENCE.hotelPhone}`)}
+          >
+            {CONFERENCE.hotelPhone}
+          </Text>
+          {" "}(ask for UOA convention block)
+        </Text>
+      </View>
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         Featured Speakers
       </Text>
-      {SPEAKERS.slice(0, 3).map((speaker) => (
+      {SPEAKERS.slice(0, 4).map((speaker) => (
         <Pressable
           key={speaker.id}
           onPress={() =>
@@ -168,7 +210,7 @@ export default function HomeScreen() {
               {speaker.name}
             </Text>
             <Text style={[styles.speakerRole, { color: colors.mutedForeground }]}>
-              {speaker.title} · {speaker.company}
+              {speaker.company}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
@@ -202,10 +244,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   conferenceName: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
     letterSpacing: -0.5,
-    lineHeight: 38,
+    lineHeight: 34,
   },
   tagline: {
     fontSize: 15,
@@ -277,6 +319,44 @@ const styles = StyleSheet.create({
   },
   featuredMetaText: {
     fontSize: 13,
+  },
+  hotelCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  hotelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  hotelTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  hotelText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  hotelButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  hotelButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  hotelPhone: {
+    fontSize: 12,
+    textAlign: "center",
   },
   speakerRow: {
     flexDirection: "row",

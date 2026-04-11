@@ -23,6 +23,7 @@ export interface Session {
   track: string;
   speakerIds: string[];
   tags?: string[];
+  copeId?: string;
 }
 
 export interface Sponsor {

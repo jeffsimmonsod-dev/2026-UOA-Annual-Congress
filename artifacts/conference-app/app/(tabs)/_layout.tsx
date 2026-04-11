@@ -20,13 +20,13 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar.fill" }} />
         <Label>Schedule</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="speakers">
-        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-        <Label>Speakers</Label>
+      <NativeTabs.Trigger name="my-schedule">
+        <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
+        <Label>My Schedule</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="venue">
-        <Icon sf={{ default: "mappin.and.ellipse", selected: "mappin.and.ellipse" }} />
-        <Label>Venue</Label>
+      <NativeTabs.Trigger name="para">
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Para</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
@@ -103,26 +103,26 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="speakers"
+        name="my-schedule"
         options={{
-          title: "Speakers",
+          title: "My Schedule",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bookmark" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="bookmark-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="para"
+        options={{
+          title: "Para",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="person.2" tintColor={color} size={24} />
             ) : (
               <Ionicons name="people-outline" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="venue"
-        options={{
-          title: "Venue",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="mappin.and.ellipse" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="location-outline" size={22} color={color} />
             ),
         }}
       />
@@ -136,6 +136,20 @@ function ClassicTabLayout() {
             ) : (
               <Ionicons name="ellipsis-horizontal" size={22} color={color} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="speakers"
+        options={{
+          href: null,
+          title: "Speakers",
+        }}
+      />
+      <Tabs.Screen
+        name="venue"
+        options={{
+          href: null,
+          title: "Venue",
         }}
       />
     </Tabs>

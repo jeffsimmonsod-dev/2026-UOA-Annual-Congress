@@ -10,15 +10,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
-import { getSessionsByDay } from "@/services/data";
+import { getParaSessionsByDay } from "@/services/data";
 
 const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 
-export default function ScheduleScreen() {
+export default function ParaScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [activeDay, setActiveDay] = useState("Thu, June 4");
-  const sessionsByDay = getSessionsByDay();
+  const sessionsByDay = getParaSessionsByDay();
   const sessions = sessionsByDay[activeDay] ?? [];
   const isWeb = Platform.OS === "web";
 
@@ -31,10 +31,10 @@ export default function ScheduleScreen() {
         ]}
       >
         <Text style={[styles.headerTitle, { color: colors.primary }]}>
-          Doctor Education Schedule
+          Paraoptometric Education
         </Text>
         <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
-          2026 UOA Annual Congress · COPE CE Credit
+          2026 UOA Annual Congress · ABO/CPC Credit Available
         </Text>
       </View>
 
@@ -49,6 +49,7 @@ export default function ScheduleScreen() {
       >
         {DAYS.map((day) => {
           const shortDay = day.split(",")[0];
+          const count = sessionsByDay[day]?.length ?? 0;
           return (
             <Pressable
               key={day}
@@ -84,7 +85,7 @@ export default function ScheduleScreen() {
                   },
                 ]}
               >
-                {sessionsByDay[day]?.length ?? 0} sessions
+                {count} {count === 1 ? "session" : "sessions"}
               </Text>
             </Pressable>
           );
@@ -106,7 +107,7 @@ export default function ScheduleScreen() {
         {sessions.length === 0 && (
           <View style={styles.empty}>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No sessions scheduled
+              No sessions scheduled for this day
             </Text>
           </View>
         )}

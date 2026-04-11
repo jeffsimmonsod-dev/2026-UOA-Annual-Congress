@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,45 +18,63 @@ interface MenuItem {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
-  route: string;
+  route?: string;
+  action?: () => void;
   description: string;
 }
 
-const MENU_ITEMS: MenuItem[] = [
-  {
-    label: "My Schedule",
-    icon: "bookmark",
-    color: "#8b5cf6",
-    route: "/my-schedule",
-    description: "Your saved sessions",
-  },
-  {
-    label: "Sponsors",
-    icon: "ribbon-outline",
-    color: "#f59e0b",
-    route: "/sponsors",
-    description: "Our amazing sponsors",
-  },
-  {
-    label: "Updates",
-    icon: "notifications-outline",
-    color: "#ef4444",
-    route: "/updates",
-    description: "Announcements & alerts",
-  },
-  {
-    label: "FAQ",
-    icon: "help-circle-outline",
-    color: "#10b981",
-    route: "/faq",
-    description: "Frequently asked questions",
-  },
-];
+const useMenuItems = (): MenuItem[] => {
+  return [
+    {
+      label: "Speakers",
+      icon: "person-circle-outline",
+      color: "#6366f1",
+      route: "/(tabs)/speakers",
+      description: "Faculty & course presenters",
+    },
+    {
+      label: "Venue & Hotel",
+      icon: "location-outline",
+      color: "#14b8a6",
+      route: "/(tabs)/venue",
+      description: "Grand Hyatt Deer Valley",
+    },
+    {
+      label: "Sponsors & Exhibitors",
+      icon: "ribbon-outline",
+      color: "#f59e0b",
+      route: "/sponsors",
+      description: "Partners & exhibitor hall",
+    },
+    {
+      label: "Updates",
+      icon: "notifications-outline",
+      color: "#ef4444",
+      route: "/updates",
+      description: "Announcements & alerts",
+    },
+    {
+      label: "FAQ",
+      icon: "help-circle-outline",
+      color: "#10b981",
+      route: "/faq",
+      description: "Frequently asked questions",
+    },
+    {
+      label: "Register Online",
+      icon: "open-outline",
+      color: "#8b5cf6",
+      action: () => Linking.openURL("https://www.utaheyedoc.org/2026_uoa_annual_congress.php"),
+      description: "Open UOA registration website",
+    },
+  ];
+};
 
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
+  const menuItems = useMenuItems();
 
   return (
     <ScrollView
@@ -70,20 +89,26 @@ export default function MoreScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={[styles.conferenceTag, { backgroundColor: colors.accent }]}>
-        <Ionicons name="mic-outline" size={14} color={colors.primary} />
+        <Ionicons name="eye-outline" size={14} color={colors.primary} />
         <Text style={[styles.conferenceTagText, { color: colors.primary }]}>
           {CONFERENCE.name} · {CONFERENCE.dates}
         </Text>
       </View>
 
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {MENU_ITEMS.map((item, index) => (
+        {menuItems.map((item, index) => (
           <Pressable
-            key={item.route}
-            onPress={() => router.push(item.route as any)}
+            key={item.label}
+            onPress={() => {
+              if (item.action) {
+                item.action();
+              } else if (item.route) {
+                router.push(item.route as any);
+              }
+            }}
             style={({ pressed }) => [
               styles.menuItem,
-              index < MENU_ITEMS.length - 1 && {
+              index < menuItems.length - 1 && {
                 borderBottomWidth: StyleSheet.hairlineWidth,
                 borderBottomColor: colors.border,
               },
@@ -104,7 +129,7 @@ export default function MoreScreen() {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name={item.action ? "open-outline" : "chevron-forward"}
               size={16}
               color={colors.mutedForeground}
             />
@@ -119,8 +144,20 @@ export default function MoreScreen() {
           Need Help?
         </Text>
         <Text style={[styles.contactText, { color: colors.mutedForeground }]}>
-          Visit the info desk at the Registration area (Level 1), or email us at{" "}
-          <Text style={{ color: colors.primary }}>help@devsummit.io</Text>
+          Contact {CONFERENCE.contactName} at the Utah Optometric Association:{"\n"}
+          <Text
+            style={{ color: colors.primary }}
+            onPress={() => Linking.openURL(`tel:${CONFERENCE.contactPhone}`)}
+          >
+            {CONFERENCE.contactPhone}
+          </Text>
+          {" · "}
+          <Text
+            style={{ color: colors.primary }}
+            onPress={() => Linking.openURL(`mailto:${CONFERENCE.contactEmail}`)}
+          >
+            {CONFERENCE.contactEmail}
+          </Text>
         </Text>
       </View>
     </ScrollView>
@@ -184,6 +221,6 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 22,
   },
 });

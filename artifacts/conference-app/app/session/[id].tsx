@@ -16,15 +16,17 @@ import { useColors } from "@/hooks/useColors";
 import { getSessionById, getSpeakersForSession } from "@/services/data";
 
 const TRACK_COLORS: Record<string, string> = {
-  Architecture: "#6366f1",
-  Frontend: "#ec4899",
-  Backend: "#14b8a6",
-  "AI & ML": "#f59e0b",
-  "Data & AI": "#f59e0b",
-  DevOps: "#10b981",
-  Workshops: "#8b5cf6",
-  "Open Source": "#3b82f6",
-  Keynote: "#ef4444",
+  "Retinal Disease": "#6366f1",
+  "Neuro-Optometry": "#ec4899",
+  Glaucoma: "#14b8a6",
+  Pharmacology: "#f59e0b",
+  "Practice Management": "#10b981",
+  "Pediatrics & BV": "#8b5cf6",
+  "ABO/CPC": "#3b82f6",
+  General: "#64748b",
+  Optical: "#f97316",
+  "Contact Lenses": "#06b6d4",
+  "Clinical Knowledge": "#84cc16",
 };
 
 export default function SessionDetailScreen() {
@@ -102,6 +104,14 @@ export default function SessionDetailScreen() {
           value={session.day}
           colors={colors}
         />
+        {session.copeId && (
+          <MetaRow
+            icon="school-outline"
+            label="COPE"
+            value={session.copeId}
+            colors={colors}
+          />
+        )}
       </View>
 
       {session.tags && session.tags.length > 0 && (
