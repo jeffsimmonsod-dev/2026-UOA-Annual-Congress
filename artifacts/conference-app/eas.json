@@ -6,6 +6,12 @@
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "YOUR_DEPLOYED_API_DOMAIN_HERE"
       }
     }
   },
