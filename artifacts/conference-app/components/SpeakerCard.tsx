@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { getSpeakerImage } from "@/services/speakerImages";
 import type { Speaker } from "@/types";
 
 interface Props {
@@ -25,7 +26,7 @@ export default function SpeakerCard({ speaker }: Props) {
       ]}
     >
       <Image
-        source={{ uri: speaker.photo }}
+        source={getSpeakerImage(speaker.id) ?? { uri: speaker.photo }}
         style={[styles.photo, { backgroundColor: colors.muted }]}
       />
       <View style={styles.info}>

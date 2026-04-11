@@ -13,17 +13,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { getSessionsForSpeaker, getSpeakerById } from "@/services/data";
+import { getSpeakerImage } from "@/services/speakerImages";
 
 const TRACK_COLORS: Record<string, string> = {
-  Architecture: "#6366f1",
-  Frontend: "#ec4899",
-  Backend: "#14b8a6",
-  "AI & ML": "#f59e0b",
-  "Data & AI": "#f59e0b",
-  DevOps: "#10b981",
-  Workshops: "#8b5cf6",
-  "Open Source": "#3b82f6",
-  Keynote: "#ef4444",
+  "Retinal Disease": "#ef4444",
+  "Neuro-Optometry": "#8b5cf6",
+  Glaucoma: "#10b981",
+  Pharmacology: "#f59e0b",
+  "Practice Management": "#3b82f6",
+  "Pediatrics & BV": "#ec4899",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  "ABO/CPC": "#0ea5e9",
+  General: "#6b7280",
+  Optical: "#a855f7",
+  "Clinical Knowledge": "#84cc16",
+  "Contact Lenses": "#06b6d4",
 };
 
 export default function SpeakerDetailScreen() {
@@ -59,7 +65,7 @@ export default function SpeakerDetailScreen() {
     >
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: speaker.photo }}
+          source={getSpeakerImage(speaker.id) ?? { uri: speaker.photo }}
           style={[styles.photo, { backgroundColor: colors.muted }]}
         />
         <Text style={[styles.name, { color: colors.foreground }]}>

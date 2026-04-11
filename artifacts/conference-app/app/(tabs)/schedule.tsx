@@ -12,7 +12,7 @@ import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
 import { getSessionsByDay } from "@/services/data";
 
-const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
+const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
 
 export default function ScheduleScreen() {
   const colors = useColors();
