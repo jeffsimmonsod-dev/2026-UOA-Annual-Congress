@@ -29,7 +29,7 @@ export default function AdminScreen() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
 
-  const CORRECT_PIN = "UOA2026";
+  const CORRECT_PIN = "Chanae2026!";
 
   const handlePinSubmit = () => {
     if (pin === CORRECT_PIN) {

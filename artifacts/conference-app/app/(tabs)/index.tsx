@@ -318,11 +318,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 8,
     marginBottom: 4,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   logo: {
-    width: 160,
-    height: 60,
+    width: 240,
+    height: 90,
   },
   tapDots: {
     flexDirection: "row",
@@ -340,7 +340,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -354,10 +353,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.5,
     lineHeight: 34,
+    textAlign: "center",
   },
   tagline: {
     fontSize: 15,
     fontWeight: "500",
+    textAlign: "center",
   },
   locationRow: {
     flexDirection: "row",

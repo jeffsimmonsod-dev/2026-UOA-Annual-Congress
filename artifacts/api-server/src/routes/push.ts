@@ -3,7 +3,7 @@ import { Router } from "express";
 const router = Router();
 
 const pushTokens = new Set<string>();
-const ADMIN_PIN = "UOA2026";
+const ADMIN_PIN = "Chanae2026!";
 
 router.post("/push/register", (req, res) => {
   const { token } = req.body as { token?: string };
