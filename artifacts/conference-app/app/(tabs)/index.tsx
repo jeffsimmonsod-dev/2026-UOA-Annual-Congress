@@ -92,19 +92,6 @@ export default function HomeScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          {logoTapCount > 0 && (
-            <View style={styles.tapDots}>
-              {Array.from({ length: LOGO_TAPS_REQUIRED }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.tapDot,
-                    { backgroundColor: i < logoTapCount ? colors.primary : colors.border },
-                  ]}
-                />
-              ))}
-            </View>
-          )}
         </Pressable>
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
           <Ionicons name="eye-outline" size={13} color={colors.primary} />
@@ -321,20 +308,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logo: {
-    width: 240,
-    height: 90,
-  },
-  tapDots: {
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "center",
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  tapDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+    width: 320,
+    height: 120,
   },
   badge: {
     flexDirection: "row",
