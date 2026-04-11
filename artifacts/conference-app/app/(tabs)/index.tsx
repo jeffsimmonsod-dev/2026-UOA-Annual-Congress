@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -46,6 +46,24 @@ export default function HomeScreen() {
   const trackColor = TRACK_COLORS[upcomingSession.track] ?? colors.primary;
   const isWeb = Platform.OS === "web";
   const [enlargedPhoto, setEnlargedPhoto] = useState<{ src: any; name: string } | null>(null);
+  const [logoTapCount, setLogoTapCount] = useState(0);
+  const logoTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LOGO_TAPS_REQUIRED = 7;
+
+  const handleLogoTap = () => {
+    setLogoTapCount((prev) => {
+      const next = prev + 1;
+      if (logoTapTimerRef.current) clearTimeout(logoTapTimerRef.current);
+      if (next >= LOGO_TAPS_REQUIRED) {
+        setLogoTapCount(0);
+        router.push("/admin");
+        return 0;
+      }
+      logoTapTimerRef.current = setTimeout(() => setLogoTapCount(0), 3000);
+      return next;
+    });
+  };
+
   const latestUpdate = [...UPDATES].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   )[0];
@@ -68,11 +86,26 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.heroSection}>
-        <Image
-          source={require("../../assets/images/uoa-logo.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <Pressable onPress={handleLogoTap} hitSlop={8}>
+          <Image
+            source={require("../../assets/images/uoa-logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          {logoTapCount > 0 && (
+            <View style={styles.tapDots}>
+              {Array.from({ length: LOGO_TAPS_REQUIRED }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.tapDot,
+                    { backgroundColor: i < logoTapCount ? colors.primary : colors.border },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </Pressable>
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
           <Ionicons name="eye-outline" size={13} color={colors.primary} />
           <Text style={[styles.badgeText, { color: colors.primary }]}>
@@ -290,7 +323,18 @@ const styles = StyleSheet.create({
   logo: {
     width: 160,
     height: 60,
-    marginBottom: 4,
+  },
+  tapDots: {
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  tapDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
   },
   badge: {
     flexDirection: "row",
