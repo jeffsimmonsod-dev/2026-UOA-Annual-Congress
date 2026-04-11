@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
+  Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,20 +15,24 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import QuickActionButton from "@/components/QuickActionButton";
 import { useColors } from "@/hooks/useColors";
+import { getSpeakerImage } from "@/services/speakerImages";
 import { CONFERENCE, SESSIONS, SPEAKERS } from "@/services/data";
 
 const TRACK_COLORS: Record<string, string> = {
-  "Retinal Disease": "#6366f1",
-  "Neuro-Optometry": "#ec4899",
-  Glaucoma: "#14b8a6",
+  "Retinal Disease": "#ef4444",
+  "Neuro-Optometry": "#8b5cf6",
+  Glaucoma: "#10b981",
   Pharmacology: "#f59e0b",
-  "Practice Management": "#10b981",
-  "Pediatrics & BV": "#8b5cf6",
-  "ABO/CPC": "#3b82f6",
-  General: "#64748b",
-  Optical: "#f97316",
-  "Contact Lenses": "#06b6d4",
+  "Practice Management": "#3b82f6",
+  "Pediatrics & BV": "#ec4899",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  "ABO/CPC": "#0ea5e9",
+  General: "#6b7280",
+  Optical: "#a855f7",
   "Clinical Knowledge": "#84cc16",
+  "Contact Lenses": "#06b6d4",
 };
 
 export default function HomeScreen() {
@@ -35,6 +41,7 @@ export default function HomeScreen() {
   const upcomingSession = SESSIONS[0];
   const trackColor = TRACK_COLORS[upcomingSession.track] ?? colors.primary;
   const isWeb = Platform.OS === "web";
+  const [enlargedPhoto, setEnlargedPhoto] = useState<{ src: any; name: string } | null>(null);
 
   return (
     <ScrollView
@@ -43,12 +50,17 @@ export default function HomeScreen() {
         styles.container,
         {
           paddingTop: isWeb ? insets.top + 20 : 16,
-          paddingBottom: isWeb ? insets.bottom + 20 : 32,
+          paddingBottom: isWeb ? insets.bottom + 80 : 100,
         },
       ]}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.heroSection}>
+        <Image
+          source={require("../../assets/images/uoa-logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
           <Ionicons name="eye-outline" size={13} color={colors.primary} />
           <Text style={[styles.badgeText, { color: colors.primary }]}>
@@ -106,10 +118,10 @@ export default function HomeScreen() {
           onPress={() => router.push("/(tabs)/my-schedule")}
         />
         <QuickActionButton
-          label="Register"
-          icon="open-outline"
+          label="Speakers"
+          icon="mic-outline"
           color="#f59e0b"
-          onPress={() => Linking.openURL(CONFERENCE.registrationUrl)}
+          onPress={() => router.push("/(tabs)/speakers")}
         />
       </View>
 
@@ -154,68 +166,84 @@ export default function HomeScreen() {
         )}
       </Pressable>
 
-      <View
-        style={[styles.hotelCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        <View style={styles.hotelHeader}>
-          <Ionicons name="business-outline" size={18} color={colors.primary} />
-          <Text style={[styles.hotelTitle, { color: colors.foreground }]}>
-            Hotel Reservations
-          </Text>
-        </View>
-        <Text style={[styles.hotelText, { color: colors.mutedForeground }]}>
-          Rooms blocked at special UOA pricing at the Grand Hyatt Deer Valley.
-        </Text>
-        <Pressable
-          onPress={() => Linking.openURL(CONFERENCE.hotelBookingUrl)}
-          style={[styles.hotelButton, { backgroundColor: colors.primary }]}
-        >
-          <Text style={styles.hotelButtonText}>Book Online</Text>
-          <Ionicons name="open-outline" size={14} color="#fff" />
-        </Pressable>
-        <Text style={[styles.hotelPhone, { color: colors.mutedForeground }]}>
-          Or call:{" "}
-          <Text
-            style={{ color: colors.primary }}
-            onPress={() => Linking.openURL(`tel:${CONFERENCE.hotelPhone}`)}
-          >
-            {CONFERENCE.hotelPhone}
-          </Text>
-          {" "}(ask for UOA convention block)
-        </Text>
-      </View>
-
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         Featured Speakers
       </Text>
-      {SPEAKERS.slice(0, 4).map((speaker) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.speakersScroll}
+      >
+        {SPEAKERS.map((speaker) => {
+          const localImg = getSpeakerImage(speaker.id);
+          const imgSource = localImg ?? { uri: speaker.photo };
+          return (
+            <Pressable
+              key={speaker.id}
+              onPress={() =>
+                router.push({ pathname: "/speaker/[id]", params: { id: speaker.id } })
+              }
+              style={({ pressed }) => [
+                styles.speakerCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Pressable
+                onPress={() => setEnlargedPhoto({ src: imgSource, name: speaker.name })}
+                hitSlop={4}
+              >
+                <Image
+                  source={imgSource}
+                  style={[styles.speakerPhoto, { backgroundColor: colors.muted }]}
+                />
+              </Pressable>
+              <Text
+                style={[styles.speakerName, { color: colors.foreground }]}
+                numberOfLines={2}
+              >
+                {speaker.name}
+              </Text>
+              <Text
+                style={[styles.speakerRole, { color: colors.mutedForeground }]}
+                numberOfLines={2}
+              >
+                {speaker.company}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Modal
+        visible={!!enlargedPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEnlargedPhoto(null)}
+      >
         <Pressable
-          key={speaker.id}
-          onPress={() =>
-            router.push({ pathname: "/speaker/[id]", params: { id: speaker.id } })
-          }
-          style={({ pressed }) => [
-            styles.speakerRow,
-            { borderBottomColor: colors.border },
-            pressed && { opacity: 0.75 },
-          ]}
+          style={styles.modalOverlay}
+          onPress={() => setEnlargedPhoto(null)}
         >
-          <View style={[styles.speakerAvatar, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.speakerInitial, { color: colors.primary }]}>
-              {speaker.name[0]}
-            </Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            {enlargedPhoto && (
+              <>
+                <Image
+                  source={enlargedPhoto.src}
+                  style={styles.enlargedPhoto}
+                  resizeMode="cover"
+                />
+                <Text style={[styles.enlargedName, { color: colors.foreground }]}>
+                  {enlargedPhoto.name}
+                </Text>
+                <Text style={[styles.modalDismiss, { color: colors.mutedForeground }]}>
+                  Tap anywhere to close
+                </Text>
+              </>
+            )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.speakerName, { color: colors.foreground }]}>
-              {speaker.name}
-            </Text>
-            <Text style={[styles.speakerRole, { color: colors.mutedForeground }]}>
-              {speaker.company}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
         </Pressable>
-      ))}
+      </Modal>
     </ScrollView>
   );
 }
@@ -228,6 +256,12 @@ const styles = StyleSheet.create({
   heroSection: {
     paddingVertical: 12,
     gap: 8,
+    marginBottom: 4,
+    alignItems: "flex-start",
+  },
+  logo: {
+    width: 160,
+    height: 60,
     marginBottom: 4,
   },
   badge: {
@@ -320,68 +354,59 @@ const styles = StyleSheet.create({
   featuredMetaText: {
     fontSize: 13,
   },
-  hotelCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 10,
-    marginBottom: 8,
-    marginTop: 4,
+  speakersScroll: {
+    paddingRight: 20,
+    gap: 12,
+    paddingBottom: 4,
   },
-  hotelHeader: {
-    flexDirection: "row",
+  speakerCard: {
+    width: 120,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
     alignItems: "center",
     gap: 8,
   },
-  hotelTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  hotelText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  hotelButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  hotelButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  hotelPhone: {
-    fontSize: 12,
-    textAlign: "center",
-  },
-  speakerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    gap: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  speakerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  speakerInitial: {
-    fontSize: 18,
-    fontWeight: "700",
+  speakerPhoto: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   speakerName: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 16,
   },
   speakerRole: {
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalContent: {
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    gap: 12,
+    width: 280,
+  },
+  enlargedPhoto: {
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+  },
+  enlargedName: {
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  modalDismiss: {
     fontSize: 12,
-    marginTop: 2,
   },
 });

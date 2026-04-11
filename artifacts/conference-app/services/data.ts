@@ -820,11 +820,25 @@ export function getSessionsForSpeaker(speaker: Speaker): Session[] {
     .filter(Boolean) as Session[];
 }
 
+function parseTime(t: string): number {
+  const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return h * 60 + m;
+}
+
 export function getSessionsByDay(): Record<string, Session[]> {
   const result: Record<string, Session[]> = {};
   for (const session of SESSIONS) {
     if (!result[session.day]) result[session.day] = [];
     result[session.day].push(session);
+  }
+  for (const day of Object.keys(result)) {
+    result[day].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
   }
   return result;
 }
@@ -834,6 +848,9 @@ export function getParaSessionsByDay(): Record<string, Session[]> {
   for (const session of PARA_SESSIONS) {
     if (!result[session.day]) result[session.day] = [];
     result[session.day].push(session);
+  }
+  for (const day of Object.keys(result)) {
+    result[day].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
   }
   return result;
 }
