@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Image,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -16,7 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import QuickActionButton from "@/components/QuickActionButton";
 import { useColors } from "@/hooks/useColors";
 import { getSpeakerImage } from "@/services/speakerImages";
-import { CONFERENCE, SESSIONS, SPEAKERS } from "@/services/data";
+import { CONFERENCE, SESSIONS, SPEAKERS, UPDATES } from "@/services/data";
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 const TRACK_COLORS: Record<string, string> = {
   "Retinal Disease": "#ef4444",
@@ -42,6 +46,14 @@ export default function HomeScreen() {
   const trackColor = TRACK_COLORS[upcomingSession.track] ?? colors.primary;
   const isWeb = Platform.OS === "web";
   const [enlargedPhoto, setEnlargedPhoto] = useState<{ src: any; name: string } | null>(null);
+  const latestUpdate = [...UPDATES].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  )[0];
+  const announcementColor =
+    latestUpdate?.type === "alert" ? "#ef4444" :
+    latestUpdate?.type === "announcement" ? colors.primary : "#f59e0b";
+  const announcementBg = announcementColor + "10";
+  const announcementBorder = announcementColor + "35";
 
   return (
     <ScrollView
@@ -81,19 +93,35 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View
-        style={[
-          styles.welcomeCard,
-          { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" },
-        ]}
-      >
-        <Text style={[styles.welcomeTitle, { color: colors.primary }]}>
-          Welcome
-        </Text>
-        <Text style={[styles.welcomeText, { color: colors.foreground }]}>
-          {CONFERENCE.welcomeMessage}
-        </Text>
-      </View>
+      {latestUpdate && (
+        <Pressable
+          onPress={() => router.push("/updates")}
+          style={({ pressed }) => [
+            styles.announcementCard,
+            { backgroundColor: announcementBg, borderColor: announcementBorder },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <View style={styles.announcementHeader}>
+            <Ionicons name="megaphone-outline" size={15} color={announcementColor} />
+            <Text style={[styles.announcementLabel, { color: announcementColor }]}>
+              {latestUpdate.type === "alert" ? "ALERT" : "ANNOUNCEMENT"}
+            </Text>
+            <Text style={[styles.announcementTime, { color: colors.mutedForeground }]}>
+              {formatDate(latestUpdate.timestamp)}
+            </Text>
+          </View>
+          <Text style={[styles.announcementTitle, { color: colors.foreground }]}>
+            {latestUpdate.title}
+          </Text>
+          <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={3}>
+            {latestUpdate.body}
+          </Text>
+          <Text style={[styles.announcementSeeAll, { color: announcementColor }]}>
+            View all announcements →
+          </Text>
+        </Pressable>
+      )}
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         Quick Access
@@ -295,22 +323,40 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 13,
   },
-  welcomeCard: {
+  announcementCard: {
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    gap: 6,
+    gap: 8,
     marginBottom: 12,
   },
-  welcomeTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+  announcementHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  welcomeText: {
-    fontSize: 14,
-    lineHeight: 22,
+  announcementLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  announcementTime: {
+    fontSize: 11,
+  },
+  announcementTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  announcementBody: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  announcementSeeAll: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
   },
   sectionTitle: {
     fontSize: 18,

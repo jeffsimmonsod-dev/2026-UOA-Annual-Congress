@@ -67,6 +67,13 @@ const useMenuItems = (): MenuItem[] => {
       action: () => Linking.openURL("https://www.utaheyedoc.org/2026_uoa_annual_congress.php"),
       description: "Open UOA registration website",
     },
+    {
+      label: "Send Announcement",
+      icon: "megaphone-outline",
+      color: "#ef4444",
+      route: "/admin",
+      description: "Admin: push notification to attendees",
+    },
   ];
 };
 
