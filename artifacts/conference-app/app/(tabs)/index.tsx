@@ -13,7 +13,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { CONFERENCE, SESSIONS, SPONSORS, UPDATES } from "@/services/data";
+import { useSchedule } from "@/context/ScheduleContext";
+import { CONFERENCE, SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
+import type { Session } from "@/types";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -37,12 +39,36 @@ const TRACK_COLORS: Record<string, string> = {
   "Contact Lenses": "#06b6d4",
 };
 
+const DAY_ORDER = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
+
+function parseMinutes(t: string): number {
+  const parts = t.trim().split(" ");
+  const [h, m] = parts[0].split(":").map(Number);
+  const period = parts[1]?.toUpperCase();
+  let hours = h;
+  if (period === "PM" && h !== 12) hours += 12;
+  if (period === "AM" && h === 12) hours = 0;
+  return hours * 60 + (m || 0);
+}
+
+function sortSessions(sessions: Session[]): Session[] {
+  return [...sessions].sort((a, b) => {
+    const dayDiff = DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
+    if (dayDiff !== 0) return dayDiff;
+    return parseMinutes(a.startTime) - parseMinutes(b.startTime);
+  });
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const upcomingSession = SESSIONS[0];
-  const trackColor = TRACK_COLORS[upcomingSession.track] ?? colors.primary;
+  const { savedIds } = useSchedule();
   const isWeb = Platform.OS === "web";
+
+  const allSessions = [...SESSIONS, ...PARA_SESSIONS];
+  const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
+  const nextSession: Session | null = savedSessions[0] ?? null;
+  const trackColor = nextSession ? (TRACK_COLORS[nextSession.track] ?? colors.primary) : colors.primary;
   const [logoTapCount, setLogoTapCount] = useState(0);
   const logoTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LOGO_TAPS_REQUIRED = 7;
@@ -141,45 +167,76 @@ export default function HomeScreen() {
       )}
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        First Session
+        Next Session
       </Text>
-      <Pressable
-        onPress={() =>
-          router.push({ pathname: "/session/[id]", params: { id: upcomingSession.id } })
-        }
-        style={({ pressed }) => [
-          styles.featuredCard,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            borderLeftColor: trackColor,
-          },
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        <View style={[styles.featuredTrackBadge, { backgroundColor: trackColor + "20" }]}>
-          <Text style={[styles.featuredTrackText, { color: trackColor }]}>
-            {upcomingSession.track}
-          </Text>
-        </View>
-        <Text style={[styles.featuredTitle, { color: colors.foreground }]}>
-          {upcomingSession.title}
-        </Text>
-        <View style={styles.featuredMeta}>
-          <Ionicons name="time-outline" size={13} color={colors.mutedForeground} />
-          <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
-            {upcomingSession.startTime} – {upcomingSession.endTime} · {upcomingSession.room}
-          </Text>
-        </View>
-        {upcomingSession.copeId && (
-          <View style={styles.featuredMeta}>
-            <Ionicons name="school-outline" size={13} color={colors.mutedForeground} />
-            <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
-              COPE: {upcomingSession.copeId}
+
+      {nextSession ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: "/session/[id]", params: { id: nextSession.id } })
+          }
+          style={({ pressed }) => [
+            styles.featuredCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderLeftColor: trackColor,
+            },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <View style={[styles.featuredTrackBadge, { backgroundColor: trackColor + "20" }]}>
+            <Text style={[styles.featuredTrackText, { color: trackColor }]}>
+              {nextSession.track}
             </Text>
           </View>
-        )}
-      </Pressable>
+          <Text style={[styles.featuredTitle, { color: colors.foreground }]}>
+            {nextSession.title}
+          </Text>
+          <View style={styles.featuredMeta}>
+            <Ionicons name="time-outline" size={13} color={colors.mutedForeground} />
+            <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
+              {nextSession.startTime} – {nextSession.endTime} · {nextSession.room}
+            </Text>
+          </View>
+          <View style={styles.featuredMeta}>
+            <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
+            <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
+              {nextSession.day}
+            </Text>
+          </View>
+          {nextSession.copeId && (
+            <View style={styles.featuredMeta}>
+              <Ionicons name="school-outline" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
+                COPE: {nextSession.copeId}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={() => router.push("/(tabs)/schedule")}
+          style={({ pressed }) => [
+            styles.emptySessionCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Ionicons name="bookmark-outline" size={32} color={colors.primary} />
+          <Text style={[styles.emptySessionTitle, { color: colors.foreground }]}>
+            Build Your Personal Schedule
+          </Text>
+          <Text style={[styles.emptySessionBody, { color: colors.mutedForeground }]}>
+            Tap the bookmark icon on any session in the Schedule or Para tab to save it here.
+          </Text>
+          <View style={[styles.emptySessionCta, { backgroundColor: colors.primary + "15" }]}>
+            <Text style={[styles.emptySessionCtaText, { color: colors.primary }]}>
+              Browse Sessions →
+            </Text>
+          </View>
+        </Pressable>
+      )}
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         Our Sponsors
@@ -342,6 +399,35 @@ const styles = StyleSheet.create({
   },
   featuredMetaText: {
     fontSize: 13,
+  },
+  emptySessionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    padding: 24,
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  emptySessionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  emptySessionBody: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  emptySessionCta: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  emptySessionCtaText: {
+    fontSize: 13,
+    fontWeight: "700",
   },
   sponsorsScroll: {
     paddingRight: 20,
