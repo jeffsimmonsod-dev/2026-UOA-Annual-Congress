@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import QuickActionButton from "@/components/QuickActionButton";
 import { useColors } from "@/hooks/useColors";
 import { CONFERENCE, SESSIONS, SPONSORS, UPDATES } from "@/services/data";
 
@@ -140,36 +139,6 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
       )}
-
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        Quick Access
-      </Text>
-      <View style={styles.quickActions}>
-        <QuickActionButton
-          label="Dr. Schedule"
-          icon="calendar-outline"
-          color={colors.primary}
-          onPress={() => router.push("/(tabs)/schedule")}
-        />
-        <QuickActionButton
-          label="Para"
-          icon="people-outline"
-          color="#8b5cf6"
-          onPress={() => router.push("/(tabs)/para")}
-        />
-        <QuickActionButton
-          label="My Schedule"
-          icon="bookmark-outline"
-          color="#10b981"
-          onPress={() => router.push("/(tabs)/my-schedule")}
-        />
-        <QuickActionButton
-          label="Speakers"
-          imageSource={require("../../assets/images/uoa-logo.png")}
-          color="#f59e0b"
-          onPress={() => router.push("/(tabs)/speakers")}
-        />
-      </View>
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         First Session
@@ -342,11 +311,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 12,
     marginBottom: 10,
-  },
-  quickActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 8,
   },
   featuredCard: {
     borderRadius: 16,
