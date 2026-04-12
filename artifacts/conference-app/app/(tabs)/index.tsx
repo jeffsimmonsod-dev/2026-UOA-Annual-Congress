@@ -167,7 +167,7 @@ export default function HomeScreen() {
         />
         <QuickActionButton
           label="Speakers"
-          icon="mic-outline"
+          imageSource={require("../../assets/images/uoa-logo.png")}
           color="#f59e0b"
           onPress={() => router.push("/(tabs)/speakers")}
         />
