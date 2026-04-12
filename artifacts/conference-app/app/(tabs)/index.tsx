@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Image,
-  Modal,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -14,8 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import QuickActionButton from "@/components/QuickActionButton";
 import { useColors } from "@/hooks/useColors";
-import { getSpeakerImage } from "@/services/speakerImages";
-import { CONFERENCE, SESSIONS, SPEAKERS, UPDATES } from "@/services/data";
+import { CONFERENCE, SESSIONS, SPONSORS, UPDATES } from "@/services/data";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -45,7 +44,6 @@ export default function HomeScreen() {
   const upcomingSession = SESSIONS[0];
   const trackColor = TRACK_COLORS[upcomingSession.track] ?? colors.primary;
   const isWeb = Platform.OS === "web";
-  const [enlargedPhoto, setEnlargedPhoto] = useState<{ src: any; name: string } | null>(null);
   const [logoTapCount, setLogoTapCount] = useState(0);
   const logoTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LOGO_TAPS_REQUIRED = 7;
@@ -215,83 +213,41 @@ export default function HomeScreen() {
       </Pressable>
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        Featured Speakers
+        Our Sponsors
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.speakersScroll}
+        contentContainerStyle={styles.sponsorsScroll}
       >
-        {SPEAKERS.map((speaker) => {
-          const localImg = getSpeakerImage(speaker.id);
-          const imgSource = localImg ?? { uri: speaker.photo };
-          return (
-            <Pressable
-              key={speaker.id}
-              onPress={() =>
-                router.push({ pathname: "/speaker/[id]", params: { id: speaker.id } })
-              }
-              style={({ pressed }) => [
-                styles.speakerCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Pressable
-                onPress={() => setEnlargedPhoto({ src: imgSource, name: speaker.name })}
-                hitSlop={4}
-              >
-                <Image
-                  source={imgSource}
-                  style={[styles.speakerPhoto, { backgroundColor: colors.muted }]}
-                />
-              </Pressable>
-              <Text
-                style={[styles.speakerName, { color: colors.foreground }]}
-                numberOfLines={2}
-              >
-                {speaker.name}
+        {SPONSORS.map((sponsor) => (
+          <Pressable
+            key={sponsor.id}
+            onPress={() => sponsor.website && Linking.openURL(sponsor.website)}
+            style={({ pressed }) => [
+              styles.sponsorCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <View style={[styles.sponsorLogoWrap, { backgroundColor: colors.muted }]}>
+              <Image
+                source={{ uri: sponsor.logo }}
+                style={styles.sponsorLogo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={[styles.sponsorName, { color: colors.foreground }]} numberOfLines={2}>
+              {sponsor.name}
+            </Text>
+            <View style={[styles.tierBadge, { backgroundColor: sponsor.tier === "platinum" ? "#e0d6ff" : "#fef3c7" }]}>
+              <Text style={[styles.tierText, { color: sponsor.tier === "platinum" ? "#6d28d9" : "#92400e" }]}>
+                {sponsor.tier.toUpperCase()}
               </Text>
-              <Text
-                style={[styles.speakerRole, { color: colors.mutedForeground }]}
-                numberOfLines={2}
-              >
-                {speaker.company}
-              </Text>
-            </Pressable>
-          );
-        })}
+            </View>
+          </Pressable>
+        ))}
       </ScrollView>
-
-      <Modal
-        visible={!!enlargedPhoto}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEnlargedPhoto(null)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setEnlargedPhoto(null)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            {enlargedPhoto && (
-              <>
-                <Image
-                  source={enlargedPhoto.src}
-                  style={styles.enlargedPhoto}
-                  resizeMode="cover"
-                />
-                <Text style={[styles.enlargedName, { color: colors.foreground }]}>
-                  {enlargedPhoto.name}
-                </Text>
-                <Text style={[styles.modalDismiss, { color: colors.mutedForeground }]}>
-                  Tap anywhere to close
-                </Text>
-              </>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
     </ScrollView>
   );
 }
@@ -423,59 +379,45 @@ const styles = StyleSheet.create({
   featuredMetaText: {
     fontSize: 13,
   },
-  speakersScroll: {
+  sponsorsScroll: {
     paddingRight: 20,
     gap: 12,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
-  speakerCard: {
-    width: 120,
+  sponsorCard: {
+    width: 140,
     borderRadius: 14,
     borderWidth: 1,
-    padding: 12,
+    padding: 14,
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
-  speakerPhoto: {
+  sponsorLogoWrap: {
     width: 72,
     height: 72,
-    borderRadius: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
-  speakerName: {
+  sponsorLogo: {
+    width: 60,
+    height: 60,
+  },
+  sponsorName: {
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
     lineHeight: 16,
   },
-  speakerRole: {
-    fontSize: 11,
-    textAlign: "center",
-    lineHeight: 14,
+  tierBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalContent: {
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-    gap: 12,
-    width: 280,
-  },
-  enlargedPhoto: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-  },
-  enlargedName: {
-    fontSize: 16,
+  tierText: {
+    fontSize: 10,
     fontWeight: "700",
-    textAlign: "center",
-  },
-  modalDismiss: {
-    fontSize: 12,
+    letterSpacing: 0.5,
   },
 });
