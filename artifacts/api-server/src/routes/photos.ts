@@ -33,15 +33,22 @@ router.post("/photos/upload-url", async (_req: Request, res: Response) => {
 });
 
 router.post("/photos", async (req: Request, res: Response) => {
-  const { objectPath, uploaderName, caption, deviceId } = req.body as {
-    objectPath?: string;
+  const { rawGcsUrl, uploaderName, caption, deviceId } = req.body as {
+    rawGcsUrl?: string;
     uploaderName?: string;
     caption?: string;
     deviceId?: string;
   };
 
-  if (!objectPath || !uploaderName || !deviceId) {
-    res.status(400).json({ error: "objectPath, uploaderName, and deviceId are required" });
+  if (!rawGcsUrl || !uploaderName || !deviceId) {
+    res.status(400).json({ error: "rawGcsUrl, uploaderName, and deviceId are required" });
+    return;
+  }
+
+  // Convert the raw GCS URL into the normalized /objects/... path the serve route expects
+  const objectPath = objectStorageService.normalizeObjectEntityPath(rawGcsUrl);
+  if (!objectPath.startsWith("/objects/")) {
+    res.status(400).json({ error: "Could not normalize GCS URL to a valid object path" });
     return;
   }
 

@@ -174,15 +174,15 @@ export default function PhotosScreen() {
         body: blob,
       });
 
+      // Strip query params — send the clean GCS URL so the server can normalize the path
       const urlObj = new URL(uploadURL);
-      const rawPath = urlObj.pathname;
-      const objectPath = rawPath.replace(/^\/[^/]+/, "");
+      const rawGcsUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
 
       await fetch(`${API_BASE}/api/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          objectPath,
+          rawGcsUrl,
           uploaderName: uploaderName.trim(),
           caption: caption.trim(),
           deviceId,
