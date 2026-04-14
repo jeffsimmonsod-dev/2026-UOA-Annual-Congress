@@ -29,83 +29,130 @@ import { useColors } from "@/hooks/useColors";
 const SCREEN = Dimensions.get("window");
 
 function ZoomableImage({ uri }: { uri: string }) {
+  // Current animated values
   const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  const offsetX = useSharedValue(0);
+  const offsetY = useSharedValue(0);
 
-  const clampTranslation = (tx: number, ty: number, s: number) => {
+  // Saved values at gesture start
+  const savedScale = useSharedValue(1);
+  const savedOffsetX = useSharedValue(0);
+  const savedOffsetY = useSharedValue(0);
+
+  const W = SCREEN.width;
+  const H = SCREEN.height * 0.72;
+
+  const resetToFit = () => {
     "worklet";
-    const maxX = Math.max(0, (SCREEN.width * (s - 1)) / 2);
-    const maxY = Math.max(0, (SCREEN.height * 0.75 * (s - 1)) / 2);
+    scale.value = withSpring(1, { damping: 15 });
+    offsetX.value = withSpring(0, { damping: 15 });
+    offsetY.value = withSpring(0, { damping: 15 });
+    savedScale.value = 1;
+    savedOffsetX.value = 0;
+    savedOffsetY.value = 0;
+  };
+
+  const clampOffset = (x: number, y: number, s: number) => {
+    "worklet";
+    const maxX = Math.max(0, (W * (s - 1)) / 2);
+    const maxY = Math.max(0, (H * (s - 1)) / 2);
     return {
-      x: Math.min(maxX, Math.max(-maxX, tx)),
-      y: Math.min(maxY, Math.max(-maxY, ty)),
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y)),
     };
   };
 
-  const pinch = Gesture.Pinch()
+  // Pinch: update scale, then save on end
+  const pinchGesture = Gesture.Pinch()
+    .onBegin(() => {
+      savedScale.value = scale.value;
+      savedOffsetX.value = offsetX.value;
+      savedOffsetY.value = offsetY.value;
+    })
     .onUpdate((e) => {
-      scale.value = Math.min(5, Math.max(1, savedScale.value * e.scale));
+      const newScale = Math.min(6, Math.max(1, savedScale.value * e.scale));
+      scale.value = newScale;
+      // Keep image centred on the pinch focal point
+      const fx = e.focalX - W / 2;
+      const fy = e.focalY - H / 2;
+      const delta = newScale / savedScale.value - 1;
+      const clamped = clampOffset(
+        savedOffsetX.value - fx * delta,
+        savedOffsetY.value - fy * delta,
+        newScale
+      );
+      offsetX.value = clamped.x;
+      offsetY.value = clamped.y;
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      if (scale.value < 1.05) {
-        scale.value = withSpring(1);
-        savedScale.value = 1;
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
-      }
+      savedOffsetX.value = offsetX.value;
+      savedOffsetY.value = offsetY.value;
+      if (scale.value < 1.05) resetToFit();
     });
 
-  const pan = Gesture.Pan()
+  // Pan: only active when zoomed in
+  const panGesture = Gesture.Pan()
+    .averageTouches(true)
+    .minDistance(4)
+    .onBegin(() => {
+      savedOffsetX.value = offsetX.value;
+      savedOffsetY.value = offsetY.value;
+    })
     .onUpdate((e) => {
-      const clamped = clampTranslation(
-        savedTranslateX.value + e.translationX,
-        savedTranslateY.value + e.translationY,
+      if (scale.value <= 1.05) return;
+      const clamped = clampOffset(
+        savedOffsetX.value + e.translationX,
+        savedOffsetY.value + e.translationY,
         scale.value
       );
-      translateX.value = clamped.x;
-      translateY.value = clamped.y;
+      offsetX.value = clamped.x;
+      offsetY.value = clamped.y;
     })
     .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
+      savedOffsetX.value = offsetX.value;
+      savedOffsetY.value = offsetY.value;
     });
 
+  // Double-tap: zoom in or reset
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd(() => {
+    .maxDelay(300)
+    .maxDuration(500)
+    .onEnd((e) => {
       if (scale.value > 1.5) {
-        scale.value = withSpring(1);
-        savedScale.value = 1;
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
+        resetToFit();
       } else {
-        scale.value = withSpring(2.5);
-        savedScale.value = 2.5;
+        const newScale = 3;
+        // Zoom toward the tapped point
+        const fx = e.x - W / 2;
+        const fy = e.y - H / 2;
+        const clamped = clampOffset(-fx * (newScale - 1), -fy * (newScale - 1), newScale);
+        scale.value = withSpring(newScale, { damping: 15 });
+        offsetX.value = withSpring(clamped.x, { damping: 15 });
+        offsetY.value = withSpring(clamped.y, { damping: 15 });
+        savedScale.value = newScale;
+        savedOffsetX.value = clamped.x;
+        savedOffsetY.value = clamped.y;
       }
     });
 
-  const composed = Gesture.Simultaneous(pinch, pan);
-  const all = Gesture.Exclusive(doubleTap, composed);
+  // Run pinch + pan simultaneously; double-tap races against them
+  const gesture = Gesture.Race(
+    doubleTap,
+    Gesture.Simultaneous(pinchGesture, panGesture)
+  );
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
+      { translateX: offsetX.value },
+      { translateY: offsetY.value },
       { scale: scale.value },
     ],
   }));
 
   return (
-    <GestureDetector gesture={all}>
+    <GestureDetector gesture={gesture}>
       <Animated.Image
         source={{ uri }}
         style={[styles.fsImage, animStyle]}
