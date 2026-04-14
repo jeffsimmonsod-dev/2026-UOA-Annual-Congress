@@ -33,9 +33,11 @@ interface PhotoItem {
   id: string;
   objectPath: string;
   uploaderName: string;
+  uploaderDeviceId: string;
   caption: string;
   likes: number;
   likedByMe: boolean;
+  isMyPhoto: boolean;
   createdAt: string;
 }
 
@@ -85,6 +87,33 @@ export default function PhotosScreen() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchPhotos();
+  };
+
+  const handleDelete = async (photo: PhotoItem) => {
+    Alert.alert(
+      "Remove Photo",
+      "Are you sure you want to remove this photo? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+            if (fullscreenPhoto?.id === photo.id) setFullscreenPhoto(null);
+            try {
+              await fetch(`${API_BASE}/api/photos/${photo.id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deviceId }),
+              });
+            } catch {
+              fetchPhotos();
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLike = async (photo: PhotoItem) => {
@@ -194,22 +223,33 @@ export default function PhotosScreen() {
           ) : null}
           <Text style={[styles.cardTime, { color: colors.mutedForeground }]}>{timeAgo(item.createdAt)}</Text>
         </View>
-        <Pressable
-          onPress={() => handleLike(item)}
-          style={[
-            styles.likeButton,
-            { backgroundColor: item.likedByMe ? "#ef444420" : colors.muted },
-          ]}
-        >
-          <Ionicons
-            name={item.likedByMe ? "heart" : "heart-outline"}
-            size={20}
-            color={item.likedByMe ? "#ef4444" : colors.mutedForeground}
-          />
-          <Text style={[styles.likeCount, { color: item.likedByMe ? "#ef4444" : colors.mutedForeground }]}>
-            {item.likes}
-          </Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {item.isMyPhoto && (
+            <Pressable
+              onPress={() => handleDelete(item)}
+              style={[styles.likeButton, { backgroundColor: colors.muted }]}
+              hitSlop={8}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => handleLike(item)}
+            style={[
+              styles.likeButton,
+              { backgroundColor: item.likedByMe ? "#ef444420" : colors.muted },
+            ]}
+          >
+            <Ionicons
+              name={item.likedByMe ? "heart" : "heart-outline"}
+              size={20}
+              color={item.likedByMe ? "#ef4444" : colors.mutedForeground}
+            />
+            <Text style={[styles.likeCount, { color: item.likedByMe ? "#ef4444" : colors.mutedForeground }]}>
+              {item.likes}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
