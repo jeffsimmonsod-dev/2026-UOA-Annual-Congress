@@ -11,7 +11,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "YOUR_DEPLOYED_API_DOMAIN_HERE"
+        "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
       }
     }
   },
