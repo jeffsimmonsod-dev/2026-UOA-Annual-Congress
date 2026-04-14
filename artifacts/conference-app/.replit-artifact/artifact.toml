@@ -1,6 +1,6 @@
 kind = "mobile"
 previewPath = "/"
-title = "Conference App"
+title = "2026 UOA Annual Congress"
 version = "1.0.0"
 id = "artifacts/conference-app"
 router = "expo-domain"
