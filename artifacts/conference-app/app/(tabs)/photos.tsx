@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -17,8 +17,103 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+
+const SCREEN = Dimensions.get("window");
+
+function ZoomableImage({ uri }: { uri: string }) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const clampTranslation = (tx: number, ty: number, s: number) => {
+    "worklet";
+    const maxX = Math.max(0, (SCREEN.width * (s - 1)) / 2);
+    const maxY = Math.max(0, (SCREEN.height * 0.75 * (s - 1)) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, tx)),
+      y: Math.min(maxY, Math.max(-maxY, ty)),
+    };
+  };
+
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(5, Math.max(1, savedScale.value * e.scale));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value < 1.05) {
+        scale.value = withSpring(1);
+        savedScale.value = 1;
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      }
+    });
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      const clamped = clampTranslation(
+        savedTranslateX.value + e.translationX,
+        savedTranslateY.value + e.translationY,
+        scale.value
+      );
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1.5) {
+        scale.value = withSpring(1);
+        savedScale.value = 1;
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      } else {
+        scale.value = withSpring(2.5);
+        savedScale.value = 2.5;
+      }
+    });
+
+  const composed = Gesture.Simultaneous(pinch, pan);
+  const all = Gesture.Exclusive(doubleTap, composed);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={all}>
+      <Animated.Image
+        source={{ uri }}
+        style={[styles.fsImage, animStyle]}
+        resizeMode="contain"
+      />
+    </GestureDetector>
+  );
+}
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -346,24 +441,24 @@ export default function PhotosScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!fullscreenPhoto} animationType="fade" transparent>
-        <Pressable style={styles.fsOverlay} onPress={() => setFullscreenPhoto(null)}>
+      <Modal visible={!!fullscreenPhoto} animationType="fade" transparent statusBarTranslucent>
+        <GestureHandlerRootView style={styles.fsOverlay}>
           {fullscreenPhoto && (
             <>
-              <Image
-                source={{ uri: getImageUrl(fullscreenPhoto.objectPath) }}
-                style={styles.fsImage}
-                resizeMode="contain"
-              />
+              <ZoomableImage uri={getImageUrl(fullscreenPhoto.objectPath)} />
               <View style={styles.fsMeta}>
                 <Text style={styles.fsName}>{fullscreenPhoto.uploaderName}</Text>
                 {fullscreenPhoto.caption ? (
                   <Text style={styles.fsCaption}>{fullscreenPhoto.caption}</Text>
                 ) : null}
+                <Text style={styles.fsHint}>Pinch to zoom · Double-tap to reset</Text>
               </View>
+              <Pressable style={styles.fsClose} onPress={() => setFullscreenPhoto(null)}>
+                <Ionicons name="close-circle" size={36} color="rgba(255,255,255,0.85)" />
+              </Pressable>
             </>
           )}
-        </Pressable>
+        </GestureHandlerRootView>
       </Modal>
     </View>
   );
@@ -507,29 +602,47 @@ const styles = StyleSheet.create({
   },
   fsOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
   fsImage: {
-    width: "100%",
-    height: "75%",
-    borderRadius: 12,
+    width: SCREEN.width,
+    height: SCREEN.height * 0.72,
   },
   fsMeta: {
-    marginTop: 16,
+    position: "absolute",
+    bottom: 50,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 24,
   },
   fsName: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   fsCaption: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.75)",
     fontSize: 14,
     textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  fsHint: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  fsClose: {
+    position: "absolute",
+    top: 52,
+    right: 16,
   },
 });
