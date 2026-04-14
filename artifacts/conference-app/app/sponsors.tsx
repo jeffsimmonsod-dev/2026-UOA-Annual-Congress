@@ -16,10 +16,10 @@ import { SPONSORS } from "@/services/data";
 import type { Sponsor } from "@/types";
 
 const TIER_CONFIG = {
-  platinum: { label: "Platinum", color: "#64748b", bg: "#f1f5f9" },
-  gold: { label: "Gold", color: "#b45309", bg: "#fef3c7" },
-  silver: { label: "Silver", color: "#6b7280", bg: "#f3f4f6" },
-  bronze: { label: "Bronze", color: "#92400e", bg: "#fef3c7" },
+  platinum: { label: "Platinum", color: "#5b21b6", bg: "#e8e4f8" },
+  gold: { label: "Gold", color: "#92400e", bg: "#fef3c7" },
+  silver: { label: "Silver", color: "#475569", bg: "#f1f5f9" },
+  bronze: { label: "Bronze", color: "#78350f", bg: "#fef3c7" },
 };
 
 export default function SponsorsScreen() {

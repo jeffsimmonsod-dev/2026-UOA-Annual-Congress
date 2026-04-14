@@ -39,6 +39,13 @@ const TRACK_COLORS: Record<string, string> = {
   "Contact Lenses": "#06b6d4",
 };
 
+const TIER_COLORS: Record<string, { bg: string; text: string }> = {
+  platinum: { bg: "#e8e4f8", text: "#5b21b6" },
+  gold:     { bg: "#fef3c7", text: "#92400e" },
+  silver:   { bg: "#f1f5f9", text: "#475569" },
+  bronze:   { bg: "#fef3c7", text: "#78350f" },
+};
+
 const DAY_ORDER = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
 
 function parseMinutes(t: string): number {
@@ -266,8 +273,8 @@ export default function HomeScreen() {
             <Text style={[styles.sponsorName, { color: colors.foreground }]} numberOfLines={2}>
               {sponsor.name}
             </Text>
-            <View style={[styles.tierBadge, { backgroundColor: sponsor.tier === "platinum" ? "#e0d6ff" : "#fef3c7" }]}>
-              <Text style={[styles.tierText, { color: sponsor.tier === "platinum" ? "#6d28d9" : "#92400e" }]}>
+            <View style={[styles.tierBadge, { backgroundColor: TIER_COLORS[sponsor.tier]?.bg ?? "#f3f4f6" }]}>
+              <Text style={[styles.tierText, { color: TIER_COLORS[sponsor.tier]?.text ?? "#6b7280" }]}>
                 {sponsor.tier.toUpperCase()}
               </Text>
             </View>

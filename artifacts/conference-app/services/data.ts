@@ -594,43 +594,161 @@ export const PARA_SESSIONS: Session[] = [
 ];
 
 export const SPONSORS: Sponsor[] = [
+  // ── Platinum ──────────────────────────────────────────────
   {
     id: "sp1",
-    name: "2026 UOA Annual Congress Partners",
+    name: "Waite Vision",
     tier: "platinum",
-    logo: "https://utaheyedoc.org/images/favicon.ico",
-    website: "https://www.utaheyedoc.org/2026_partners.php",
+    logo: "https://logo.clearbit.com/waitevision.com",
+    website: "https://www.waitevision.com",
     description:
-      "The 2026 UOA Annual Congress is supported by generous industry partners. Visit the exhibitor hall to connect with sponsors and learn about the latest products and services in optometry.",
-    booth: "Exhibitor Hall",
+      "Waite Vision is the premier vision correction center utilizing the most advanced technology and surgical techniques, supporting optometrists in the community to achieve the highest quality of patient care.",
   },
   {
     id: "sp2",
-    name: "Grand Hyatt Deer Valley",
+    name: "The Eye Institute of Utah",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/hyatt.com",
-    website: "https://www.hyatt.com/en-US/group-booking/SLCVD/G-UTOP",
+    logo: "https://logo.clearbit.com/theeyeinstitute.com",
+    website: "https://theeyeinstitute.com",
     description:
-      "The Grand Hyatt Deer Valley is the stunning, brand-new host venue for the 2026 UOA Annual Congress. Located in Park City, Utah, this world-class hotel offers exceptional accommodations and meeting facilities.",
-    booth: "Hotel Host",
+      "Known throughout the Intermountain West as a leader in eye care, The Eye Institute of Utah specializes in cataract surgery, LASIK, refractive procedures, glaucoma, dry eye, and corneal transplantation.",
   },
   {
     id: "sp3",
-    name: "American Optometric Association",
-    tier: "gold",
-    logo: "https://logo.clearbit.com/aoa.org",
-    website: "https://www.aoa.org",
+    name: "VSP Vision",
+    tier: "platinum",
+    logo: "https://logo.clearbit.com/vsp.com",
+    website: "https://www.vspproviderhub.com",
     description:
-      "The American Optometric Association serves as the professional, scientific, and educational organization for doctors of optometry, students of optometry, and paraoptometric assistants and technicians.",
+      "VSP Vision's business is helping you with yours, so you can focus on what you do best: providing high-quality eye care to your patients.",
   },
   {
     id: "sp4",
-    name: "Utah Optometric Association",
-    tier: "gold",
-    logo: "https://utaheyedoc.org/images/favicon.ico",
-    website: "https://www.utaheyedoc.org",
+    name: "Hoopes Vision",
+    tier: "platinum",
+    logo: "https://logo.clearbit.com/hoopesvision.com",
+    website: "https://www.hoopesvision.com",
     description:
-      "The Utah Optometric Association serves Utah's doctors of optometry, supporting professional development, advocacy, and continuing education. UOA is the proud organizer of the 2026 Annual Congress.",
+      "Hoopes Vision is a leading surgical facility providing the newest, safest, and most innovative vision correction technology in an atmosphere of warm, personalized patient care.",
+  },
+  {
+    id: "sp5",
+    name: "Utah Eye Centers",
+    tier: "platinum",
+    logo: "https://logo.clearbit.com/utaheyecenters.com",
+    website: "https://www.utaheyecenters.com",
+    description:
+      "At Utah Eye Centers, our foremost goal is to ensure your eyes are healthy, combining expertise and state-of-the-art technology across ocular exams, macular degeneration screening, glaucoma treatment, cataracts, and LASIK.",
+  },
+  // ── Gold ──────────────────────────────────────────────────
+  {
+    id: "sp6",
+    name: "Bausch + Lomb",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/bausch.com",
+    website: "https://www.bausch.com",
+    description:
+      "Bausch + Lomb's mission is simple: helping you see better to live better all over the world. Through unwavering focus on innovation, quality, and craftsmanship, they protect and enhance the gift of sight.",
+  },
+  {
+    id: "sp7",
+    name: "Glaukos",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/glaukos.com",
+    website: "https://www.glaukos.com",
+    description:
+      "Glaukos pioneers novel, dropless platforms that advance the standard of care for patients suffering from sight-threatening diseases including glaucoma, corneal disorders, and retinal disease.",
+  },
+  {
+    id: "sp8",
+    name: "Dompé",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/dompe.com",
+    website: "https://www.dompe.com",
+    description:
+      "Dompé pushes the understanding of science and pursues R&D in new areas to positively impact patients living with unmet medical needs.",
+  },
+  {
+    id: "sp9",
+    name: "MacuHealth",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/macuhealth.com",
+    website: "https://www.macuhealth.com",
+    description:
+      "MacuHealth is setting a new standard for nutritional vision supplements, developing cutting-edge macular health vitamins that reduce the risk of macular degeneration and significantly improve visual performance.",
+  },
+  {
+    id: "sp10",
+    name: "IT4EYES",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/stsutah.com",
+    website: "https://stsutah.com",
+    description:
+      "IT4EYES specializes in tailored IT solutions exclusively for optometrists — from enhancing efficiency and ensuring data security to implementing cybersecurity measures that safeguard your practice.",
+  },
+  {
+    id: "sp11",
+    name: "Johnson & Johnson Vision",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/jjvision.com",
+    website: "https://www.jjvision.com",
+    description:
+      "As the only eye health company with health at its core, Johnson & Johnson Vision is uniquely positioned to reimagine the future of eye health with an all-encompassing portfolio of solutions.",
+  },
+  {
+    id: "sp12",
+    name: "EssilorLuxottica",
+    tier: "gold",
+    logo: "https://logo.clearbit.com/essilorluxottica.com",
+    website: "https://www.essilorluxottica.com/en/",
+    description:
+      "EssilorLuxottica is a global leader in the design, manufacturing, and distribution of advanced vision care products, eyewear, and med-tech solutions.",
+  },
+  // ── Silver ────────────────────────────────────────────────
+  {
+    id: "sp13",
+    name: "IDOC",
+    tier: "silver",
+    logo: "https://logo.clearbit.com/idoc.net",
+    website: "https://idoc.net",
+    description:
+      "IDOC is a quietly powerful ally for independent optometrists, with over 3,200 OD members throughout the U.S., delivering scale, strategic support, and supply chain advantages to help members thrive.",
+  },
+  {
+    id: "sp14",
+    name: "LKC Technologies",
+    tier: "silver",
+    logo: "https://logo.clearbit.com/lkc.com",
+    website: "https://lkc.com",
+    description:
+      "As leaders in visual electrophysiology, LKC arms eye care professionals with innovative, accessible technology to assess retinal function, fueling research and enhancing diagnostic capabilities.",
+  },
+  {
+    id: "sp15",
+    name: "CooperVision",
+    tier: "silver",
+    logo: "https://logo.clearbit.com/coopervision.com",
+    website: "https://www.coopervision.com",
+    description:
+      "CooperVision is one of the world's leading manufacturers of soft contact lenses, producing a full array of daily, two-week, and monthly lenses addressing astigmatism, presbyopia, and childhood myopia.",
+  },
+  {
+    id: "sp16",
+    name: "LENZ Therapeutics",
+    tier: "silver",
+    logo: "https://logo.clearbit.com/lenz-tx.com",
+    website: "https://lenz-tx.com",
+    description:
+      "LENZ Therapeutics focuses on commercializing VIZZ™ (aceclidine ophthalmologic solution) 1.44%, the first and only FDA-approved aceclidine-based eye drop for the treatment of presbyopia.",
+  },
+  {
+    id: "sp17",
+    name: "Adit",
+    tier: "silver",
+    logo: "https://logo.clearbit.com/adit.com",
+    website: "https://adit.com",
+    description:
+      "Adit is the all-in-one AI-powered platform for faster practice growth — phones, texting, reminders, forms, scheduling, payments, reviews, and analytics, all amplified by optometry's most advanced AI agent.",
   },
 ];
 
