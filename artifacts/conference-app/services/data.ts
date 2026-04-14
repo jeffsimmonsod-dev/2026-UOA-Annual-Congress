@@ -599,7 +599,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp1",
     name: "Waite Vision",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/waitevision.com",
+    logo: "https://utaheyedoc.org/photos/Waite_Vision_Logo_09162023084920.PNG",
     website: "https://www.waitevision.com",
     description:
       "Waite Vision is the premier vision correction center utilizing the most advanced technology and surgical techniques, supporting optometrists in the community to achieve the highest quality of patient care.",
@@ -608,7 +608,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp2",
     name: "The Eye Institute of Utah",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/theeyeinstitute.com",
+    logo: "https://utaheyedoc.org/photos/The_Eye_Institue_Logo_09162023085926.JPG",
     website: "https://theeyeinstitute.com",
     description:
       "Known throughout the Intermountain West as a leader in eye care, The Eye Institute of Utah specializes in cataract surgery, LASIK, refractive procedures, glaucoma, dry eye, and corneal transplantation.",
@@ -617,7 +617,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp3",
     name: "VSP Vision",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/vsp.com",
+    logo: "https://utaheyedoc.org/photos/VSP_Vision_Logotype_RGB_02262024083642.PNG",
     website: "https://www.vspproviderhub.com",
     description:
       "VSP Vision's business is helping you with yours, so you can focus on what you do best: providing high-quality eye care to your patients.",
@@ -626,7 +626,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp4",
     name: "Hoopes Vision",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/hoopesvision.com",
+    logo: "https://utaheyedoc.org/photos/Hoopes_Logo_09162023084752.PNG",
     website: "https://www.hoopesvision.com",
     description:
       "Hoopes Vision is a leading surgical facility providing the newest, safest, and most innovative vision correction technology in an atmosphere of warm, personalized patient care.",
@@ -635,7 +635,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp5",
     name: "Utah Eye Centers",
     tier: "platinum",
-    logo: "https://logo.clearbit.com/utaheyecenters.com",
+    logo: "https://utaheyedoc.org/photos/Utah_Eye_Centers_Logo_09162023085541.PNG",
     website: "https://www.utaheyecenters.com",
     description:
       "At Utah Eye Centers, our foremost goal is to ensure your eyes are healthy, combining expertise and state-of-the-art technology across ocular exams, macular degeneration screening, glaucoma treatment, cataracts, and LASIK.",
@@ -645,7 +645,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp6",
     name: "Bausch + Lomb",
     tier: "gold",
-    logo: "https://logo.clearbit.com/bausch.com",
+    logo: "https://utaheyedoc.org/photos/Bausch_Logo_01082024072344.PNG",
     website: "https://www.bausch.com",
     description:
       "Bausch + Lomb's mission is simple: helping you see better to live better all over the world. Through unwavering focus on innovation, quality, and craftsmanship, they protect and enhance the gift of sight.",
@@ -654,7 +654,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp7",
     name: "Glaukos",
     tier: "gold",
-    logo: "https://logo.clearbit.com/glaukos.com",
+    logo: "https://utaheyedoc.org/photos/glaukos-corporate-logo_01062025104805.JPG",
     website: "https://www.glaukos.com",
     description:
       "Glaukos pioneers novel, dropless platforms that advance the standard of care for patients suffering from sight-threatening diseases including glaucoma, corneal disorders, and retinal disease.",
@@ -663,7 +663,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp8",
     name: "Dompé",
     tier: "gold",
-    logo: "https://logo.clearbit.com/dompe.com",
+    logo: "https://utaheyedoc.org/photos/dompe-logo_01032024065142.JPG",
     website: "https://www.dompe.com",
     description:
       "Dompé pushes the understanding of science and pursues R&D in new areas to positively impact patients living with unmet medical needs.",
@@ -672,7 +672,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp9",
     name: "MacuHealth",
     tier: "gold",
-    logo: "https://logo.clearbit.com/macuhealth.com",
+    logo: "https://utaheyedoc.org/photos/MacuHealth_Logo_09162023090314.PNG",
     website: "https://www.macuhealth.com",
     description:
       "MacuHealth is setting a new standard for nutritional vision supplements, developing cutting-edge macular health vitamins that reduce the risk of macular degeneration and significantly improve visual performance.",
@@ -681,7 +681,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp10",
     name: "IT4EYES",
     tier: "gold",
-    logo: "https://logo.clearbit.com/stsutah.com",
+    logo: "https://utaheyedoc.org/photos/Screenshot_2024-03-26_at_5.48.56AM_03262024074916.JPG",
     website: "https://stsutah.com",
     description:
       "IT4EYES specializes in tailored IT solutions exclusively for optometrists — from enhancing efficiency and ensuring data security to implementing cybersecurity measures that safeguard your practice.",
@@ -690,7 +690,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp11",
     name: "Johnson & Johnson Vision",
     tier: "gold",
-    logo: "https://logo.clearbit.com/jjvision.com",
+    logo: "https://utaheyedoc.org/photos/JJ_02262024085003.JPG",
     website: "https://www.jjvision.com",
     description:
       "As the only eye health company with health at its core, Johnson & Johnson Vision is uniquely positioned to reimagine the future of eye health with an all-encompassing portfolio of solutions.",
@@ -699,7 +699,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp12",
     name: "EssilorLuxottica",
     tier: "gold",
-    logo: "https://logo.clearbit.com/essilorluxottica.com",
+    logo: "https://utaheyedoc.org/photos/LOGO_ELEC-all_new_005_01302026163036.JPG",
     website: "https://www.essilorluxottica.com/en/",
     description:
       "EssilorLuxottica is a global leader in the design, manufacturing, and distribution of advanced vision care products, eyewear, and med-tech solutions.",
@@ -709,7 +709,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp13",
     name: "IDOC",
     tier: "silver",
-    logo: "https://logo.clearbit.com/idoc.net",
+    logo: "https://utaheyedoc.org/photos/idoc.logo.rgb.fullcolor_Utah_3_02122026155455.PNG",
     website: "https://idoc.net",
     description:
       "IDOC is a quietly powerful ally for independent optometrists, with over 3,200 OD members throughout the U.S., delivering scale, strategic support, and supply chain advantages to help members thrive.",
@@ -718,7 +718,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp14",
     name: "LKC Technologies",
     tier: "silver",
-    logo: "https://logo.clearbit.com/lkc.com",
+    logo: "https://utaheyedoc.org/photos/cropped-cropped-LKC_logo_RGB_color_no_tagline_mini_400px_04172024151633.PNG",
     website: "https://lkc.com",
     description:
       "As leaders in visual electrophysiology, LKC arms eye care professionals with innovative, accessible technology to assess retinal function, fueling research and enhancing diagnostic capabilities.",
@@ -727,7 +727,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp15",
     name: "CooperVision",
     tier: "silver",
-    logo: "https://logo.clearbit.com/coopervision.com",
+    logo: "https://utaheyedoc.org/photos/CooperVision_01032024065824.JPG",
     website: "https://www.coopervision.com",
     description:
       "CooperVision is one of the world's leading manufacturers of soft contact lenses, producing a full array of daily, two-week, and monthly lenses addressing astigmatism, presbyopia, and childhood myopia.",
@@ -736,7 +736,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp16",
     name: "LENZ Therapeutics",
     tier: "silver",
-    logo: "https://logo.clearbit.com/lenz-tx.com",
+    logo: "https://utaheyedoc.org/photos/LENZ_logo_01132026134605.JPG",
     website: "https://lenz-tx.com",
     description:
       "LENZ Therapeutics focuses on commercializing VIZZ™ (aceclidine ophthalmologic solution) 1.44%, the first and only FDA-approved aceclidine-based eye drop for the treatment of presbyopia.",
@@ -745,7 +745,7 @@ export const SPONSORS: Sponsor[] = [
     id: "sp17",
     name: "Adit",
     tier: "silver",
-    logo: "https://logo.clearbit.com/adit.com",
+    logo: "https://utaheyedoc.org/photos/adit_logo_03042026115718.JPG",
     website: "https://adit.com",
     description:
       "Adit is the all-in-one AI-powered platform for faster practice growth — phones, texting, reminders, forms, scheduling, payments, reviews, and analytics, all amplified by optometry's most advanced AI agent.",
