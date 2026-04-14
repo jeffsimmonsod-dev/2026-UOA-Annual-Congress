@@ -19,9 +19,11 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
@@ -114,23 +116,29 @@ function ZoomableImage({ uri }: { uri: string }) {
       savedOffsetY.value = offsetY.value;
     });
 
-  // Double-tap: zoom in or reset
+  const ZOOM_CONFIG = { duration: 280, easing: Easing.out(Easing.cubic) };
+
+  // Double-tap: zoom in or reset — withTiming so there's no bounce
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDelay(300)
     .maxDuration(500)
     .onEnd((e) => {
       if (scale.value > 1.5) {
-        resetToFit();
+        scale.value = withTiming(1, ZOOM_CONFIG);
+        offsetX.value = withTiming(0, ZOOM_CONFIG);
+        offsetY.value = withTiming(0, ZOOM_CONFIG);
+        savedScale.value = 1;
+        savedOffsetX.value = 0;
+        savedOffsetY.value = 0;
       } else {
         const newScale = 3;
-        // Zoom toward the tapped point
         const fx = e.x - W / 2;
         const fy = e.y - H / 2;
         const clamped = clampOffset(-fx * (newScale - 1), -fy * (newScale - 1), newScale);
-        scale.value = withSpring(newScale, { damping: 15 });
-        offsetX.value = withSpring(clamped.x, { damping: 15 });
-        offsetY.value = withSpring(clamped.y, { damping: 15 });
+        scale.value = withTiming(newScale, ZOOM_CONFIG);
+        offsetX.value = withTiming(clamped.x, ZOOM_CONFIG);
+        offsetY.value = withTiming(clamped.y, ZOOM_CONFIG);
         savedScale.value = newScale;
         savedOffsetX.value = clamped.x;
         savedOffsetY.value = clamped.y;
