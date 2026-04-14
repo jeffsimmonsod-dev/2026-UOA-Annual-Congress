@@ -164,30 +164,25 @@ export default function PhotosScreen() {
     }
     setUploading(true);
     try {
-      const urlRes = await fetch(`${API_BASE}/api/photos/upload-url`, { method: "POST" });
-      const { uploadURL } = await urlRes.json();
+      const form = new FormData();
+      form.append("photo", {
+        uri: pickedUri,
+        name: "photo.jpg",
+        type: "image/jpeg",
+      } as any);
+      form.append("uploaderName", uploaderName.trim());
+      form.append("caption", caption.trim());
+      form.append("deviceId", deviceId);
 
-      const blob = await fetch(pickedUri).then((r) => r.blob());
-      await fetch(uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": blob.type || "image/jpeg" },
-        body: blob,
-      });
-
-      // Strip query params — send the clean GCS URL so the server can normalize the path
-      const urlObj = new URL(uploadURL);
-      const rawGcsUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
-
-      await fetch(`${API_BASE}/api/photos`, {
+      const res = await fetch(`${API_BASE}/api/photos/upload`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rawGcsUrl,
-          uploaderName: uploaderName.trim(),
-          caption: caption.trim(),
-          deviceId,
-        }),
+        body: form,
       });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(`Upload failed (${res.status}): ${JSON.stringify(errBody)}`);
+      }
 
       setUploadModal(false);
       setPickedUri(null);
@@ -195,7 +190,7 @@ export default function PhotosScreen() {
       setCaption("");
       fetchPhotos();
     } catch (err) {
-      Alert.alert("Upload failed", "Please check your connection and try again.");
+      Alert.alert("Upload failed", String(err));
     } finally {
       setUploading(false);
     }
