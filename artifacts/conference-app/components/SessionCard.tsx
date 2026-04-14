@@ -31,12 +31,14 @@ const TRACK_COLORS: Record<string, string> = {
 };
 
 export default function SessionCard({ session, showDay = false }: Props) {
+  "use no memo";
   const colors = useColors();
   const { isSaved, toggleSession, checkConflict } = useSchedule();
+  const [conflictSession, setConflictSession] = useState<Session | null>(null);
+  if (!session) return null;
   const saved = isSaved(session.id);
   const speakers = getSpeakersForSession(session);
   const trackColor = TRACK_COLORS[session.track] ?? colors.primary;
-  const [conflictSession, setConflictSession] = useState<Session | null>(null);
 
   const handlePress = () => {
     router.push({ pathname: "/session/[id]", params: { id: session.id } });

@@ -101,7 +101,7 @@ export default function ParaScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {sessions.map((session) => (
+        {sessions.filter(Boolean).map((session) => (
           <SessionCard key={session.id} session={session} />
         ))}
         {sessions.length === 0 && (
