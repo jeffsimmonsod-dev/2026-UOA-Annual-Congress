@@ -173,7 +173,7 @@ export default function PhotosScreen() {
   };
 
   const getImageUrl = (objectPath: string) =>
-    `${API_BASE}/api/storage/objects${objectPath}`;
+    `${API_BASE}/api/storage${objectPath}`;
 
   const renderPhoto = ({ item }: { item: PhotoItem }) => (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
