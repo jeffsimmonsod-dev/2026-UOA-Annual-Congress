@@ -24,7 +24,19 @@ interface MenuItem {
 }
 
 const useMenuItems = (): MenuItem[] => {
+  const isIOS = Platform.OS === "ios";
   return [
+    ...(isIOS
+      ? [
+          {
+            label: "Para Education",
+            icon: "people-outline" as keyof typeof Ionicons.glyphMap,
+            color: "#0ea5e9",
+            route: "/(tabs)/para",
+            description: "Paraoptometric CE schedule",
+          },
+        ]
+      : []),
     {
       label: "Speakers",
       icon: "person-circle-outline",

@@ -24,10 +24,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
         <Label>My Schedule</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="para">
-        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-        <Label>Para</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
         <Icon sf={{ default: "photo.on.rectangle", selected: "photo.on.rectangle.angled" }} />
         <Label>Photos</Label>
