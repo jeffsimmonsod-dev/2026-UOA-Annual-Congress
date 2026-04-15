@@ -21,7 +21,6 @@ interface BoothDef {
   w: number;
   h: number;
   cat: BoothCategory;
-  labelY?: number;
 }
 
 const FILL: Record<BoothCategory, string> = {
@@ -37,6 +36,64 @@ const STROKE: Record<BoothCategory, string> = {
 const VISITED_FILL = "#6ee7b7";
 const VISITED_STROKE = "#059669";
 
+// Company names keyed by booth number
+export const BOOTH_NAMES: Record<string, string> = {
+  "98":  "Edward Jones",
+  "101": "Lenz Therap.",
+  "103": "Visionix",
+  "106": "Restoration Ophth.",
+  "108": "DSBVI",
+  "110": "Hope Alliance",
+  "111": "Rawzi Eyewear",
+  "112": "Friends for Sight",
+  "200": "Dompé",
+  "201": "The Eye Institute",
+  "202": "Glaukos",
+  "203": "LKC Technologies",
+  "204": "EssilorLuxottica",
+  "205": "Coopervision",
+  "206": "Apellis Pharma.",
+  "207": "VSP",
+  "210": "Rocky Mtn Univ.",
+  "211": "J&J Vision",
+  "212": "Waite Vision",
+  "300": "ADIT",
+  "301": "Bausch+Lomb",
+  "302": "Medically USA",
+  "303": "Sun Pharma",
+  "304": "Eye Designs LLC",
+  "305": "Europa Eyewear",
+  "306": "Aseptikits",
+  "307": "Eyefficient",
+  "308": "Cherry Optical",
+  "309": "L'Amy America",
+  "310": "MyEyeDr",
+  "311": "Premier Vision",
+  "312": "Alcon",
+  "313": "Modern Optical",
+  "314": "IT4Eyes",
+  "315": "MOREL Eyewear",
+  "400": "Blue River Med.",
+  "402": "Orgreens Optics",
+  "403": "Essilor Labs",
+  "404": "Shamir Insights",
+  "405": "Luxottica Frames",
+  "406": "Contamac",
+  "407": "Essilor Instrum.",
+  "411": "Optikam Tech",
+  "412": "Kering Eyewear",
+  "414": "MacuHealth",
+  "415": "Optos, Inc",
+  "500": "Topcon",
+  "502": "Utah Eye Centers",
+  "503": "Teem",
+  "507": "ZEISS",
+  "509": "ZEISS",
+  "512": "Optometric Aesth.",
+  "514": "Nikon Optical",
+  "515": "Hoopes Vision",
+};
+
 const SVG_W = 760;
 
 // ─── Foyer row (above hallway) ──────────────────────────────────────────────
@@ -44,14 +101,14 @@ const FOYER_ABOVE_IDS = ["98", "99", "100", "102", "104", "106", "108", "110", "
 const FOYER_BELOW_IDS = ["101", "103", "105", "107", "109", "111"];
 
 const FA_BW = 73;
-const FA_BH = 52;
+const FA_BH = 58;
 const FA_GAP = 5;
 const FA_TOTAL = FOYER_ABOVE_IDS.length * FA_BW + (FOYER_ABOVE_IDS.length - 1) * FA_GAP;
 const FA_X0 = (SVG_W - FA_TOTAL) / 2;
 const FA_Y = 30;
 
 const FB_BW = 100;
-const FB_BH = 52;
+const FB_BH = 58;
 const FB_GAP = 10;
 const FB_TOTAL = FOYER_BELOW_IDS.length * FB_BW + (FOYER_BELOW_IDS.length - 1) * FB_GAP;
 const FB_X0 = (SVG_W - FB_TOTAL) / 2;
@@ -76,9 +133,9 @@ const foyerBelow: BoothDef[] = FOYER_BELOW_IDS.map((id, i) => ({
 }));
 
 // ─── Ballroom layout ────────────────────────────────────────────────────────
-const BALL_Y0 = FB_Y + FB_BH + 80; // ballroom starts here (after entrance/doors area)
+const BALL_Y0 = FB_Y + FB_BH + 80;
 const PERIM_W = 65;
-const PERIM_BH = 58;
+const PERIM_BH = 64;
 const PERIM_GAP = 6;
 const CENTER_X0 = PERIM_W + 6;
 const CENTER_W = SVG_W - 2 * (PERIM_W + 6);
@@ -92,13 +149,13 @@ const topWall: BoothDef[] = TOP_IDS.map((id, i) => ({
   x: CENTER_X0 + i * (TOP_BW + 6),
   y: TOP_Y,
   w: TOP_BW,
-  h: 58,
+  h: 64,
   cat: "perimeter",
 }));
 
 // Island booth rows — 3 back-to-back pairs
 const ISL_BW = 98;
-const ISL_BH = 50;
+const ISL_BH = 56;
 const ISL_GAP = 6;
 const ISL_PAIR_GAP = 8;
 const ISL_ROW_GAP = 48;
@@ -117,7 +174,7 @@ function islandRow(ids: string[], y: number): BoothDef[] {
 }
 
 // Pair 1
-const PAIR1_Y = TOP_Y + 58 + 40;
+const PAIR1_Y = TOP_Y + 64 + 40;
 const pair1A = islandRow(["201", "203", "205", "207", "211"], PAIR1_Y);
 const pair1B = islandRow(["304", "306", "308", "310", "312"], PAIR1_Y + ISL_BH + ISL_PAIR_GAP);
 
@@ -140,7 +197,7 @@ const bottomRow: BoothDef[] = BOT_IDS.map((id, i) => ({
   x: CENTER_X0 + i * (BOT_BW + 6),
   y: BOT_Y,
   w: BOT_BW,
-  h: 58,
+  h: 64,
   cat: "perimeter",
 }));
 
@@ -180,20 +237,36 @@ const ALL_BOOTHS: BoothDef[] = [
   ...rightWall,
 ];
 
-const SVG_H = BOT_Y + 58 + 40;
+const SVG_H = BOT_Y + 64 + 40;
 
-function BoothRect({
-  booth,
-  visited,
-}: {
-  booth: BoothDef;
-  visited: boolean;
-}) {
+function wrapName(name: string, maxChars: number): string[] {
+  if (!name) return [];
+  if (name.length <= maxChars) return [name];
+  // Try to split at a space
+  const mid = Math.floor(name.length / 2);
+  let split = name.lastIndexOf(" ", mid);
+  if (split < 2) split = name.indexOf(" ");
+  if (split < 0) return [name.slice(0, maxChars - 1) + "…"];
+  return [name.slice(0, split), name.slice(split + 1)];
+}
+
+function BoothRect({ booth, visited }: { booth: BoothDef; visited: boolean }) {
   const fill = visited ? VISITED_FILL : FILL[booth.cat];
   const stroke = visited ? VISITED_STROKE : STROKE[booth.cat];
   const cx = booth.x + booth.w / 2;
-  const cy = booth.y + booth.h / 2;
-  const fontSize = booth.w < 68 ? 9 : booth.w < 90 ? 10 : 11;
+  const isNarrow = booth.w < 70;
+  const company = BOOTH_NAMES[booth.id] || "";
+
+  // Font sizes based on booth width
+  const numSize = isNarrow ? 9 : 10;
+  const nameSize = isNarrow ? 7 : 8;
+
+  // Layout: if company name, booth number at top third, name at bottom half
+  const numY = company
+    ? booth.y + (isNarrow ? 16 : 17)
+    : booth.y + booth.h / 2;
+
+  const nameLines = company ? wrapName(company, isNarrow ? 10 : 14) : [];
 
   return (
     <G>
@@ -208,12 +281,13 @@ function BoothRect({
         strokeWidth={1.5}
       />
       {visited && (
-        <Circle cx={cx + booth.w * 0.2} cy={booth.y + 11} r={7} fill={VISITED_STROKE} />
+        <Circle cx={cx + booth.w * 0.28} cy={booth.y + 10} r={7} fill={VISITED_STROKE} />
       )}
+      {/* Booth number */}
       <SvgText
         x={cx}
-        y={cy + (visited ? 3 : 0)}
-        fontSize={fontSize}
+        y={numY}
+        fontSize={numSize}
         fontWeight="700"
         fill={visited ? "#065f46" : "#1e293b"}
         textAnchor="middle"
@@ -221,10 +295,26 @@ function BoothRect({
       >
         {booth.id}
       </SvgText>
+      {/* Company name lines */}
+      {nameLines.map((line, i) => (
+        <SvgText
+          key={i}
+          x={cx}
+          y={numY + (numSize * 0.8) + (i * (nameSize + 2)) + 4}
+          fontSize={nameSize}
+          fontWeight="400"
+          fill={visited ? "#065f46" : "#334155"}
+          textAnchor="middle"
+          alignmentBaseline="middle"
+        >
+          {line}
+        </SvgText>
+      ))}
+      {/* Visited checkmark badge */}
       {visited && (
         <SvgText
-          x={cx + booth.w * 0.2}
-          y={booth.y + 11.5}
+          x={cx + booth.w * 0.28}
+          y={booth.y + 10.5}
           fontSize={8}
           fontWeight="700"
           fill="#fff"

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,68 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import ExhibitHallMap from "@/components/ExhibitHallMap";
+
+// Full exhibitor directory from CSV (booth number → full company name)
+const EXHIBITOR_DIRECTORY: { booth: string; company: string }[] = [
+  { booth: "300", company: "ADIT" },
+  { booth: "312", company: "Alcon" },
+  { booth: "206", company: "Apellis Pharmaceuticals" },
+  { booth: "306", company: "Aseptikits" },
+  { booth: "301", company: "Bausch+Lomb" },
+  { booth: "400", company: "Blue River Medical, Inc" },
+  { booth: "308", company: "Cherry Optical Lab" },
+  { booth: "406", company: "Contamac" },
+  { booth: "205", company: "Coopervision" },
+  { booth: "200", company: "Dompé" },
+  { booth: "108", company: "DSBVI" },
+  { booth: "98",  company: "Edward Jones" },
+  { booth: "407", company: "Essilor Instruments" },
+  { booth: "403", company: "Essilor Labs of America" },
+  { booth: "204", company: "EssilorLuxottica Eyecare" },
+  { booth: "305", company: "Europa Eyewear" },
+  { booth: "307", company: "Eyefficient/S4Optik" },
+  { booth: "304", company: "Eye Designs LLC" },
+  { booth: "112", company: "Friends for Sight" },
+  { booth: "202", company: "Glaukos" },
+  { booth: "515", company: "Hoopes Vision" },
+  { booth: "110", company: "Hope Alliance" },
+  { booth: "314", company: "IT4Eyes" },
+  { booth: "211", company: "Johnson & Johnson" },
+  { booth: "412", company: "Kering Eyewear" },
+  { booth: "309", company: "L'Amy America" },
+  { booth: "101", company: "Lenz Therapeutics" },
+  { booth: "203", company: "LKC Technologies" },
+  { booth: "405", company: "Luxottica Frames" },
+  { booth: "414", company: "MacuHealth" },
+  { booth: "302", company: "Medically USA" },
+  { booth: "313", company: "Modern Optical" },
+  { booth: "315", company: "MOREL Eyewear" },
+  { booth: "310", company: "MyEyeDr" },
+  { booth: "514", company: "Nikon Optical US" },
+  { booth: "415", company: "Optos, Inc" },
+  { booth: "411", company: "Optikam Tech Inc" },
+  { booth: "512", company: "Optometric Aesthetics" },
+  { booth: "402", company: "Orgreens Optics" },
+  { booth: "311", company: "Premier Vision Lab" },
+  { booth: "111", company: "Rawzi Eyewear" },
+  { booth: "106", company: "Restoration Ophthalmics" },
+  { booth: "210", company: "Rocky Mountain University" },
+  { booth: "404", company: "Shamir Insights Inc" },
+  { booth: "303", company: "Sun Pharma" },
+  { booth: "503", company: "Teem" },
+  { booth: "201", company: "The Eye Institute" },
+  { booth: "500", company: "Topcon Healthcare" },
+  { booth: "502", company: "Utah Eye Centers" },
+  { booth: "103", company: "Visionix" },
+  { booth: "207", company: "VSP" },
+  { booth: "212", company: "Waite Vision" },
+  { booth: "507", company: "ZEISS (507)" },
+  { booth: "509", company: "ZEISS (509)" },
+];
+
+const SORTED_EXHIBITORS = [...EXHIBITOR_DIRECTORY].sort((a, b) =>
+  a.company.localeCompare(b.company)
+);
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -63,10 +126,24 @@ export default function ExhibitHallScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [mapVisible, setMapVisible] = useState(false);
   const [mapZoom, setMapZoom] = useState(1);
+  const [mapTab, setMapTab] = useState<"map" | "directory">("map");
 
   const zoomIn = () => setMapZoom((z) => Math.min(z + 0.25, 2.5));
   const zoomOut = () => setMapZoom((z) => Math.max(z - 0.25, 0.5));
   const zoomReset = () => setMapZoom(1);
+
+  // Build alphabetical sections for directory
+  const directorySections = useMemo(() => {
+    const grouped: Record<string, { booth: string; company: string }[]> = {};
+    for (const item of SORTED_EXHIBITORS) {
+      const letter = item.company[0].toUpperCase();
+      if (!grouped[letter]) grouped[letter] = [];
+      grouped[letter].push(item);
+    }
+    return Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([letter, data]) => ({ title: letter, data }));
+  }, []);
 
   const fetchPassport = useCallback(async () => {
     try {
@@ -219,14 +296,14 @@ export default function ExhibitHallScreen() {
               <Text style={styles.scanBtnText}>Scan QR Code</Text>
             </Pressable>
             <Pressable
-              onPress={() => { setMapZoom(1); setMapVisible(true); }}
+              onPress={() => { setMapZoom(1); setMapTab("map"); setMapVisible(true); }}
               style={({ pressed }) => [
                 styles.mapBtn,
                 { backgroundColor: colors.card, borderColor: colors.primary, opacity: pressed ? 0.85 : 1 },
               ]}
             >
               <Ionicons name="map-outline" size={20} color={colors.primary} />
-              <Text style={[styles.mapBtnText, { color: colors.primary }]}>View Map</Text>
+              <Text style={[styles.mapBtnText, { color: colors.primary }]}>Map & Directory</Text>
             </Pressable>
           </View>
 
@@ -292,58 +369,102 @@ export default function ExhibitHallScreen() {
             <Pressable onPress={() => setMapVisible(false)} style={styles.backBtn}>
               <Ionicons name="close" size={26} color={colors.primary} />
             </Pressable>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Hall Map</Text>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Exhibit Hall</Text>
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Legend */}
-          <View style={[styles.mapLegendBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#c4b5fd", borderColor: "#7c3aed" }]} />
-                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Foyer</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" }]} />
-                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Islands</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#fde68a", borderColor: "#d97706" }]} />
-                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Perimeter</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#6ee7b7", borderColor: "#059669" }]} />
-                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Visited</Text>
-              </View>
-            </View>
-            {/* Zoom controls */}
-            <View style={styles.zoomControls}>
-              <Pressable onPress={zoomOut} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Ionicons name="remove" size={18} color={colors.foreground} />
+          {/* Tabs: Map | Directory */}
+          <View style={[styles.mapTabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            {(["map", "directory"] as const).map((tab) => (
+              <Pressable
+                key={tab}
+                onPress={() => setMapTab(tab)}
+                style={[styles.mapTabItem, mapTab === tab && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+              >
+                <Ionicons
+                  name={tab === "map" ? "map-outline" : "list-outline"}
+                  size={16}
+                  color={mapTab === tab ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.mapTabLabel, { color: mapTab === tab ? colors.primary : colors.mutedForeground }]}>
+                  {tab === "map" ? "Floor Map" : "Directory"}
+                </Text>
               </Pressable>
-              <Pressable onPress={zoomReset} style={[styles.zoomResetBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Text style={[styles.zoomLabel, { color: colors.foreground }]}>{Math.round(mapZoom * 100)}%</Text>
-              </Pressable>
-              <Pressable onPress={zoomIn} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Ionicons name="add" size={18} color={colors.foreground} />
-              </Pressable>
-            </View>
+            ))}
           </View>
 
-          {/* Scrollable + zoomable map */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 12 }}
-            showsVerticalScrollIndicator
-          >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator
+          {mapTab === "map" ? (
+            <>
+              {/* Legend + zoom controls */}
+              <View style={[styles.mapLegendBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                <View style={styles.legend}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: "#c4b5fd", borderColor: "#7c3aed" }]} />
+                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Foyer</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" }]} />
+                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Islands</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: "#fde68a", borderColor: "#d97706" }]} />
+                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Perimeter</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: "#6ee7b7", borderColor: "#059669" }]} />
+                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Visited</Text>
+                  </View>
+                </View>
+                <View style={styles.zoomControls}>
+                  <Pressable onPress={zoomOut} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Ionicons name="remove" size={18} color={colors.foreground} />
+                  </Pressable>
+                  <Pressable onPress={zoomReset} style={[styles.zoomResetBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={[styles.zoomLabel, { color: colors.foreground }]}>{Math.round(mapZoom * 100)}%</Text>
+                  </Pressable>
+                  <Pressable onPress={zoomIn} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Ionicons name="add" size={18} color={colors.foreground} />
+                  </Pressable>
+                </View>
+              </View>
+              {/* Scrollable + zoomable map */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }} showsVerticalScrollIndicator>
+                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+                  <ExhibitHallMap visitedBooths={visitedBoothNumbers} scale={mapZoom} />
+                </ScrollView>
+              </ScrollView>
+            </>
+          ) : (
+            <SectionList
+              sections={directorySections}
+              keyExtractor={(item) => item.booth}
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-            >
-              <ExhibitHallMap visitedBooths={visitedBoothNumbers} scale={mapZoom} />
-            </ScrollView>
-          </ScrollView>
+              stickySectionHeadersEnabled
+              renderSectionHeader={({ section: { title } }) => (
+                <View style={[styles.dirSectionHeader, { backgroundColor: colors.muted, borderBottomColor: colors.border }]}>
+                  <Text style={[styles.dirSectionLetter, { color: colors.primary }]}>{title}</Text>
+                </View>
+              )}
+              renderItem={({ item, index, section }) => (
+                <View
+                  style={[
+                    styles.dirRow,
+                    {
+                      backgroundColor: colors.card,
+                      borderBottomColor: colors.border,
+                      borderBottomWidth: index < section.data.length - 1 ? StyleSheet.hairlineWidth : 0,
+                    },
+                  ]}
+                >
+                  <View style={[styles.dirBoothBadge, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}>
+                    <Text style={[styles.dirBoothNum, { color: colors.primary }]}>{item.booth}</Text>
+                  </View>
+                  <Text style={[styles.dirCompany, { color: colors.foreground }]}>{item.company}</Text>
+                </View>
+              )}
+            />
+          )}
         </View>
       </Modal>
 
@@ -637,4 +758,42 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   zoomLabel: { fontSize: 12, fontWeight: "600" },
+  mapTabBar: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  mapTabItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  mapTabLabel: { fontSize: 13, fontWeight: "600" },
+  dirSectionHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dirSectionLetter: { fontSize: 13, fontWeight: "700" },
+  dirRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 14,
+  },
+  dirBoothBadge: {
+    minWidth: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  dirBoothNum: { fontSize: 12, fontWeight: "700" },
+  dirCompany: { fontSize: 15, fontWeight: "500", flex: 1 },
 });
