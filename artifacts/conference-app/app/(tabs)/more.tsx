@@ -26,6 +26,13 @@ interface MenuItem {
 const useMenuItems = (): MenuItem[] => {
   const isIOS = Platform.OS === "ios";
   return [
+    {
+      label: "Exhibit Hall",
+      icon: "storefront-outline" as keyof typeof Ionicons.glyphMap,
+      color: "#f59e0b",
+      route: "/exhibit-hall",
+      description: "Booth passport & raffle entry",
+    },
     ...(isIOS
       ? [
           {

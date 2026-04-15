@@ -1,0 +1,488 @@
+import { Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColors } from "@/hooks/useColors";
+
+const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+function getDeviceId(): string {
+  if (typeof globalThis.__deviceId === "string") return globalThis.__deviceId;
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  globalThis.__deviceId = id;
+  return id;
+}
+
+interface Booth {
+  id: number;
+  name: string;
+  company: string;
+  booth_number: string | null;
+  description: string | null;
+  visit_count: number;
+  visited: boolean;
+}
+
+interface PassportData {
+  booths: Booth[];
+  total: number;
+  visitedCount: number;
+  complete: boolean;
+}
+
+export default function ExhibitHallScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const deviceId = useRef(getDeviceId()).current;
+
+  const [passport, setPassport] = useState<PassportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [attendeeName, setAttendeeName] = useState("");
+  const [scanned, setScanned] = useState(false);
+  const [pendingScan, setPendingScan] = useState<{ boothId: number; secretToken: string } | null>(null);
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const fetchPassport = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/booths?deviceId=${encodeURIComponent(deviceId)}`);
+      if (res.ok) setPassport(await res.json());
+    } catch {}
+    setLoading(false);
+  }, [deviceId]);
+
+  useEffect(() => { fetchPassport(); }, [fetchPassport]);
+
+  const handleOpenScanner = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert("Camera permission needed", "Please allow camera access to scan booth QR codes.");
+        return;
+      }
+    }
+    setScanned(false);
+    setScannerVisible(true);
+  };
+
+  const handleBarcodeScan = ({ data }: { data: string }) => {
+    if (scanned) return;
+    const prefix = "uoa2026:booth:";
+    if (!data.startsWith(prefix)) {
+      Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
+      return;
+    }
+    setScanned(true);
+    const parts = data.slice(prefix.length).split(":");
+    if (parts.length < 2) {
+      Alert.alert("Invalid QR Code", "Malformed booth code.");
+      return;
+    }
+    const boothId = parseInt(parts[0], 10);
+    const secretToken = parts[1];
+    setScannerVisible(false);
+    setPendingScan({ boothId, secretToken });
+    if (!attendeeName.trim()) {
+      setNameModalVisible(true);
+    } else {
+      doCheckin(boothId, secretToken, attendeeName);
+    }
+  };
+
+  const doCheckin = async (boothId: number, secretToken: string, name: string) => {
+    setCheckingIn(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/booths/checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Check-in failed", data.error || "Something went wrong.");
+      } else if (data.alreadyVisited) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert("Already visited!", `You already checked in at ${data.booth.name}.`);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await fetchPassport();
+        const newVisited = (passport?.visitedCount ?? 0) + 1;
+        const total = passport?.total ?? 0;
+        if (total > 0 && newVisited === total) {
+          Alert.alert("🎉 Passport Complete!", "You've visited all booths! Find a UOA staff member to enter the raffle.");
+        } else {
+          Alert.alert("✓ Checked in!", `Welcome to ${data.booth.name} (${data.booth.company})!`);
+        }
+      }
+    } catch {
+      Alert.alert("Error", "Could not connect to server. Please try again.");
+    }
+    setCheckingIn(false);
+    setPendingScan(null);
+  };
+
+  const handleNameSubmit = () => {
+    setNameModalVisible(false);
+    if (pendingScan) {
+      doCheckin(pendingScan.boothId, pendingScan.secretToken, attendeeName);
+    }
+  };
+
+  const booths = passport?.booths ?? [];
+  const visited = passport?.visitedCount ?? 0;
+  const total = passport?.total ?? 0;
+  const complete = passport?.complete ?? false;
+  const progress = total > 0 ? visited / total : 0;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Exhibit Hall</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
+
+          {complete && (
+            <View style={[styles.completeBanner, { backgroundColor: "#10b98120", borderColor: "#10b981" }]}>
+              <Ionicons name="trophy" size={28} color="#10b981" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.completeTitle, { color: "#10b981" }]}>Passport Complete! 🎉</Text>
+                <Text style={[styles.completeSubtitle, { color: colors.mutedForeground }]}>Find a UOA staff member to enter the raffle.</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={[styles.passportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.passportHeader}>
+              <View>
+                <Text style={[styles.passportTitle, { color: colors.foreground }]}>Your Passport</Text>
+                <Text style={[styles.passportSubtitle, { color: colors.mutedForeground }]}>
+                  {total === 0 ? "No booths set up yet" : `${visited} of ${total} booths visited`}
+                </Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: complete ? "#10b981" : colors.primary }]}>
+                <Text style={styles.badgeText}>{visited}/{total}</Text>
+              </View>
+            </View>
+            {total > 0 && (
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: complete ? "#10b981" : colors.primary }]} />
+              </View>
+            )}
+          </View>
+
+          <Pressable
+            onPress={handleOpenScanner}
+            style={({ pressed }) => [styles.scanBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+          >
+            <Ionicons name="qr-code-outline" size={22} color="#fff" />
+            <Text style={styles.scanBtnText}>Scan a Booth QR Code</Text>
+          </Pressable>
+
+          {total === 0 ? (
+            <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="storefront-outline" size={40} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                Booths will appear here once the exhibit hall is set up.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.boothList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.listTitle, { color: colors.foreground }]}>Booth Checklist</Text>
+              {booths.map((booth, i) => (
+                <View
+                  key={booth.id}
+                  style={[
+                    styles.boothRow,
+                    i < booths.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                  ]}
+                >
+                  <View style={[styles.boothCheck, { backgroundColor: booth.visited ? "#10b98120" : colors.muted, borderColor: booth.visited ? "#10b981" : colors.border }]}>
+                    {booth.visited ? (
+                      <Ionicons name="checkmark" size={16} color="#10b981" />
+                    ) : (
+                      <View style={[styles.emptyCheck, { borderColor: colors.border }]} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.boothName, { color: colors.foreground }]}>
+                      {booth.booth_number ? `#${booth.booth_number} · ` : ""}{booth.company}
+                    </Text>
+                    <Text style={[styles.boothCompany, { color: colors.mutedForeground }]}>{booth.name}</Text>
+                  </View>
+                  {booth.visited && (
+                    <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={[styles.infoCard, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+            <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
+              Scan the QR code at each exhibitor booth to mark it visited. Complete all booths to enter the raffle!
+            </Text>
+          </View>
+        </ScrollView>
+      )}
+
+      {checkingIn && (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.overlayText}>Checking in...</Text>
+        </View>
+      )}
+
+      <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          <View style={[styles.scannerHeader, { paddingTop: insets.top + 12 }]}>
+            <Pressable onPress={() => setScannerVisible(false)} style={styles.closeScannerBtn}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </Pressable>
+            <Text style={styles.scannerTitle}>Scan Booth QR Code</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {permission?.granted ? (
+            <CameraView
+              style={{ flex: 1 }}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+              onBarcodeScanned={scanned ? undefined : handleBarcodeScan}
+            />
+          ) : (
+            <View style={styles.center}>
+              <Text style={{ color: "#fff" }}>Camera permission required</Text>
+            </View>
+          )}
+
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scanFrame} />
+            <Text style={styles.scannerHint}>Point your camera at the QR code at the booth</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={nameModalVisible} transparent animationType="fade" onRequestClose={() => setNameModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalBackdrop}>
+          <View style={[styles.nameModal, { backgroundColor: colors.card }]}>
+            <Text style={[styles.nameModalTitle, { color: colors.foreground }]}>Enter Your Name</Text>
+            <Text style={[styles.nameModalSubtitle, { color: colors.mutedForeground }]}>
+              So we can identify you for the raffle
+            </Text>
+            <TextInput
+              style={[styles.nameInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+              placeholder="Your full name"
+              placeholderTextColor={colors.mutedForeground}
+              value={attendeeName}
+              onChangeText={setAttendeeName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleNameSubmit}
+            />
+            <Pressable
+              onPress={handleNameSubmit}
+              style={({ pressed }) => [styles.nameSubmitBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <Text style={styles.nameSubmitText}>Check In</Text>
+            </Pressable>
+            <Pressable onPress={() => { setNameModalVisible(false); if (pendingScan) doCheckin(pendingScan.boothId, pendingScan.secretToken, ""); }}>
+              <Text style={[styles.skipText, { color: colors.mutedForeground }]}>Skip (no name)</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: { width: 40, alignItems: "flex-start" },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: "700", textAlign: "center" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  content: { padding: 16, gap: 12 },
+  completeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  completeTitle: { fontSize: 16, fontWeight: "700" },
+  completeSubtitle: { fontSize: 13, marginTop: 2 },
+  passportCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  passportHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  passportTitle: { fontSize: 17, fontWeight: "700" },
+  passportSubtitle: { fontSize: 13, marginTop: 2 },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  badgeText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  progressBar: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: 8, borderRadius: 4 },
+  scanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  scanBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  emptyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 32,
+    alignItems: "center",
+    gap: 12,
+  },
+  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  boothList: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+    padding: 16,
+    gap: 4,
+  },
+  listTitle: { fontSize: 15, fontWeight: "700", marginBottom: 8 },
+  boothRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+  },
+  boothCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyCheck: { width: 14, height: 14, borderRadius: 4, borderWidth: 1.5 },
+  boothName: { fontSize: 14, fontWeight: "600" },
+  boothCompany: { fontSize: 12, marginTop: 1 },
+  infoCard: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "flex-start",
+  },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#00000088",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  overlayText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  scannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: "#000",
+  },
+  closeScannerBtn: { width: 40, alignItems: "flex-start" },
+  scannerTitle: { flex: 1, color: "#fff", fontSize: 17, fontWeight: "700", textAlign: "center" },
+  scannerOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingBottom: 60,
+    gap: 24,
+  },
+  scanFrame: {
+    width: 220,
+    height: 220,
+    borderWidth: 3,
+    borderColor: "#fff",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  scannerHint: { color: "#ffffffcc", fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000060",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  nameModal: {
+    width: "100%",
+    borderRadius: 20,
+    padding: 24,
+    gap: 12,
+    alignItems: "center",
+  },
+  nameModalTitle: { fontSize: 18, fontWeight: "700" },
+  nameModalSubtitle: { fontSize: 14, textAlign: "center" },
+  nameInput: {
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 16,
+    marginTop: 4,
+  },
+  nameSubmitBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  nameSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  skipText: { fontSize: 13, marginTop: 4 },
+});

@@ -14,7 +14,10 @@
       "backgroundColor": "#f8fafc"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall"
+      }
     },
     "android": {
       "package": "org.utaheyedoc.congress2026",
@@ -26,7 +29,8 @@
       "permissions": [
         "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -40,7 +44,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-camera"
     ],
     "experiments": {
       "typedRoutes": true,
