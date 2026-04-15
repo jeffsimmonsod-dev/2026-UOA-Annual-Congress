@@ -94,21 +94,21 @@ export const BOOTH_NAMES: Record<string, string> = {
   "515": "Hoopes Vision",
 };
 
-const SVG_W = 760;
+const SVG_W = 900;
 
 // ─── Foyer row (above hallway) ──────────────────────────────────────────────
 const FOYER_ABOVE_IDS = ["98", "99", "100", "102", "104", "106", "108", "110", "112"];
 const FOYER_BELOW_IDS = ["101", "103", "105", "107", "109", "111"];
 
-const FA_BW = 73;
-const FA_BH = 58;
+const FA_BW = 86;
+const FA_BH = 76;
 const FA_GAP = 5;
 const FA_TOTAL = FOYER_ABOVE_IDS.length * FA_BW + (FOYER_ABOVE_IDS.length - 1) * FA_GAP;
 const FA_X0 = (SVG_W - FA_TOTAL) / 2;
 const FA_Y = 30;
 
-const FB_BW = 100;
-const FB_BH = 58;
+const FB_BW = 122;
+const FB_BH = 76;
 const FB_GAP = 10;
 const FB_TOTAL = FOYER_BELOW_IDS.length * FB_BW + (FOYER_BELOW_IDS.length - 1) * FB_GAP;
 const FB_X0 = (SVG_W - FB_TOTAL) / 2;
@@ -134,8 +134,8 @@ const foyerBelow: BoothDef[] = FOYER_BELOW_IDS.map((id, i) => ({
 
 // ─── Ballroom layout ────────────────────────────────────────────────────────
 const BALL_Y0 = FB_Y + FB_BH + 80;
-const PERIM_W = 65;
-const PERIM_BH = 64;
+const PERIM_W = 78;
+const PERIM_BH = 80;
 const PERIM_GAP = 6;
 const CENTER_X0 = PERIM_W + 6;
 const CENTER_W = SVG_W - 2 * (PERIM_W + 6);
@@ -149,13 +149,13 @@ const topWall: BoothDef[] = TOP_IDS.map((id, i) => ({
   x: CENTER_X0 + i * (TOP_BW + 6),
   y: TOP_Y,
   w: TOP_BW,
-  h: 64,
+  h: 80,
   cat: "perimeter",
 }));
 
 // Island booth rows — 3 back-to-back pairs
-const ISL_BW = 98;
-const ISL_BH = 56;
+const ISL_BW = 116;
+const ISL_BH = 72;
 const ISL_GAP = 6;
 const ISL_PAIR_GAP = 8;
 const ISL_ROW_GAP = 48;
@@ -197,7 +197,7 @@ const bottomRow: BoothDef[] = BOT_IDS.map((id, i) => ({
   x: CENTER_X0 + i * (BOT_BW + 6),
   y: BOT_Y,
   w: BOT_BW,
-  h: 64,
+  h: 80,
   cat: "perimeter",
 }));
 
@@ -254,19 +254,19 @@ function BoothRect({ booth, visited }: { booth: BoothDef; visited: boolean }) {
   const fill = visited ? VISITED_FILL : FILL[booth.cat];
   const stroke = visited ? VISITED_STROKE : STROKE[booth.cat];
   const cx = booth.x + booth.w / 2;
-  const isNarrow = booth.w < 70;
+  const isNarrow = booth.w < 85;
   const company = BOOTH_NAMES[booth.id] || "";
 
   // Font sizes based on booth width
-  const numSize = isNarrow ? 9 : 10;
-  const nameSize = isNarrow ? 7 : 8;
+  const numSize = isNarrow ? 11 : 13;
+  const nameSize = isNarrow ? 9 : 11;
 
-  // Layout: if company name, booth number at top third, name at bottom half
+  // Layout: if company name, booth number at top third, name below
   const numY = company
-    ? booth.y + (isNarrow ? 16 : 17)
+    ? booth.y + (isNarrow ? 20 : 22)
     : booth.y + booth.h / 2;
 
-  const nameLines = company ? wrapName(company, isNarrow ? 10 : 14) : [];
+  const nameLines = company ? wrapName(company, isNarrow ? 11 : 15) : [];
 
   return (
     <G>
