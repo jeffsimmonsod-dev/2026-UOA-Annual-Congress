@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import ExhibitHallMap from "@/components/ExhibitHallMap";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -60,6 +61,12 @@ export default function ExhibitHallScreen() {
   const [checkingIn, setCheckingIn] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
+  const [mapVisible, setMapVisible] = useState(false);
+  const [mapZoom, setMapZoom] = useState(1);
+
+  const zoomIn = () => setMapZoom((z) => Math.min(z + 0.25, 2.5));
+  const zoomOut = () => setMapZoom((z) => Math.max(z - 0.25, 0.5));
+  const zoomReset = () => setMapZoom(1);
 
   const fetchPassport = useCallback(async () => {
     try {
@@ -153,6 +160,10 @@ export default function ExhibitHallScreen() {
   const complete = passport?.complete ?? false;
   const progress = total > 0 ? visited / total : 0;
 
+  const visitedBoothNumbers = booths
+    .filter((b) => b.visited && b.booth_number)
+    .map((b) => b.booth_number as string);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -199,13 +210,25 @@ export default function ExhibitHallScreen() {
             )}
           </View>
 
-          <Pressable
-            onPress={handleOpenScanner}
-            style={({ pressed }) => [styles.scanBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
-          >
-            <Ionicons name="qr-code-outline" size={22} color="#fff" />
-            <Text style={styles.scanBtnText}>Scan a Booth QR Code</Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable
+              onPress={handleOpenScanner}
+              style={({ pressed }) => [styles.scanBtn, { flex: 1, backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            >
+              <Ionicons name="qr-code-outline" size={22} color="#fff" />
+              <Text style={styles.scanBtnText}>Scan QR Code</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { setMapZoom(1); setMapVisible(true); }}
+              style={({ pressed }) => [
+                styles.mapBtn,
+                { backgroundColor: colors.card, borderColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Ionicons name="map-outline" size={20} color={colors.primary} />
+              <Text style={[styles.mapBtnText, { color: colors.primary }]}>View Map</Text>
+            </Pressable>
+          </View>
 
           {total === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -261,6 +284,68 @@ export default function ExhibitHallScreen() {
           <Text style={styles.overlayText}>Checking in...</Text>
         </View>
       )}
+
+      <Modal visible={mapVisible} animationType="slide" onRequestClose={() => setMapVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          {/* Map modal header */}
+          <View style={[styles.mapModalHeader, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            <Pressable onPress={() => setMapVisible(false)} style={styles.backBtn}>
+              <Ionicons name="close" size={26} color={colors.primary} />
+            </Pressable>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Hall Map</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Legend */}
+          <View style={[styles.mapLegendBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#c4b5fd", borderColor: "#7c3aed" }]} />
+                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Foyer</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" }]} />
+                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Islands</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#fde68a", borderColor: "#d97706" }]} />
+                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Perimeter</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#6ee7b7", borderColor: "#059669" }]} />
+                <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Visited</Text>
+              </View>
+            </View>
+            {/* Zoom controls */}
+            <View style={styles.zoomControls}>
+              <Pressable onPress={zoomOut} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Ionicons name="remove" size={18} color={colors.foreground} />
+              </Pressable>
+              <Pressable onPress={zoomReset} style={[styles.zoomResetBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Text style={[styles.zoomLabel, { color: colors.foreground }]}>{Math.round(mapZoom * 100)}%</Text>
+              </Pressable>
+              <Pressable onPress={zoomIn} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Ionicons name="add" size={18} color={colors.foreground} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Scrollable + zoomable map */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 12 }}
+            showsVerticalScrollIndicator
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+            >
+              <ExhibitHallMap visitedBooths={visitedBoothNumbers} scale={mapZoom} />
+            </ScrollView>
+          </ScrollView>
+        </View>
+      </Modal>
 
       <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
         <View style={{ flex: 1, backgroundColor: "#000" }}>
@@ -485,4 +570,71 @@ const styles = StyleSheet.create({
   },
   nameSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   skipText: { fontSize: 13, marginTop: 4 },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  mapBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  mapBtnText: { fontSize: 14, fontWeight: "700" },
+  mapModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  mapLegendBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    flex: 1,
+  },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 1.5,
+  },
+  legendLabel: { fontSize: 10 },
+  zoomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  zoomBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomResetBtn: {
+    paddingHorizontal: 8,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomLabel: { fontSize: 12, fontWeight: "600" },
 });
