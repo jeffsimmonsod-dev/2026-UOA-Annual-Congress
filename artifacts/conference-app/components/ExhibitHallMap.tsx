@@ -1,339 +1,294 @@
 import React from "react";
-import Svg, {
-  Rect,
-  Text as SvgText,
-  G,
-  Line,
-  Path,
-  Polygon,
-} from "react-native-svg";
+import Svg, { Rect, Text as SvgText, G, Path, Circle } from "react-native-svg";
 
-interface ExhibitHallMapProps {
-  visitedBooths: string[];
-  scale?: number;
-}
-
-type BoothCat = "foyer" | "island" | "perimeter" | "corner";
-
-interface BoothDef {
-  id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  cat: BoothCat;
-}
-
-// ─── Colors ──────────────────────────────────────────────────────────────────
-const FILL: Record<BoothCat, string> = {
-  foyer:    "#c4b5fd",
-  island:   "#bfdbfe",
-  perimeter:"#fde68a",
-  corner:   "#fed7aa",
-};
-const STROKE: Record<BoothCat, string> = {
-  foyer:    "#7c3aed",
-  island:   "#3b82f6",
-  perimeter:"#d97706",
-  corner:   "#ea580c",
-};
-const VISITED_FILL   = "#6ee7b7";
-const VISITED_STROKE = "#059669";
-
-// ─── Exhibitor names (abbreviated to fit booths) ─────────────────────────────
+// ─── Public booth name lookup (used by directory too) ────────────────────────
 export const BOOTH_NAMES: Record<string, string> = {
-  "98":  "Edward Jones",
-  "101": "Lenz Therap.",
-  "103": "Visionix",
-  "106": "Restoration Ophth.",
-  "108": "DSBVI",
+  "98":  "Edward Jones",       "99": "Edward Jones",       "100": "Edward Jones",
+  "102": "Lenz Therapeutics",  "101": "Lenz Therapeutics",
+  "104": "Visionix",           "103": "Visionix",          "105": "Visionix",
+  "106": "Restoration Ophth.", "107": "Restoration Ophth.",
+  "108": "DSBVI",              "109": "DSBVI",
   "110": "Hope Alliance",
   "111": "Rawzi Eyewear",
   "112": "Friends for Sight",
   "200": "Dompé",
-  "202": "Glaukos",
-  "204": "EssilorLuxottica",
-  "206": "Apellis Pharma.",
-  "210": "Rocky Mtn Univ.",
-  "212": "Waite Vision",
-  "201": "The Eye Institute",
-  "203": "LKC Technologies",
-  "205": "Coopervision",
-  "207": "VSP",
-  "211": "J&J Vision",
-  "300": "ADIT",
-  "302": "Medically USA",
-  "304": "Eye Designs LLC",
-  "306": "Aseptikits",
-  "308": "Cherry Optical",
-  "310": "MyEyeDr",
-  "312": "Alcon",
-  "301": "Bausch+Lomb",
-  "303": "Sun Pharma",
-  "305": "Europa Eyewear",
-  "307": "Eyefficient",
-  "309": "L'Amy America",
-  "311": "Premier Vision",
-  "313": "Modern Optical",
-  "314": "IT4Eyes",
-  "315": "MOREL Eyewear",
-  "400": "Blue River Med.",
-  "402": "Orgreens Optics",
-  "404": "Shamir Insights",
-  "406": "Contamac",
-  "408": "",
-  "410": "",
-  "412": "Kering Eyewear",
-  "403": "Essilor Labs",
-  "405": "Luxottica Frames",
-  "407": "Essilor Instrum.",
-  "409": "",
-  "411": "Optikam Tech",
-  "414": "MacuHealth",
-  "415": "Optos, Inc",
-  "500": "Topcon",
-  "502": "Utah Eye Centers",
-  "504": "",
-  "506": "",
-  "508": "ZEISS",
-  "510": "ZEISS",
-  "512": "Optometric Aesth.",
-  "503": "Teem",
-  "507": "",
-  "509": "",
-  "511": "",
-  "513": "",
-  "514": "Nikon Optical",
-  "515": "Hoopes Vision",
+  "201": "The Eye Institute",  "202": "Glaukos",
+  "203": "LKC Technologies",   "204": "EssilorLuxottica",
+  "205": "CooperVision",       "206": "Apellis Pharma.",
+  "207": "VSP",                "210": "Rocky Mtn Univ.",
+  "211": "J&J Vision",         "212": "Waite Vision",
+  "300": "ADIT",               "301": "Bausch+Lomb",
+  "302": "Medically USA",      "303": "Sun Pharma",
+  "304": "Eye Designs LLC",    "305": "Europa Eyewear",
+  "306": "Aseptikits",         "307": "Eyefficient/S4Optik",
+  "308": "Cherry Optical",     "309": "L'Amy America",
+  "310": "MyEyeDr",            "311": "Premier Vision",
+  "312": "Alcon",              "313": "Modern Optical",
+  "314": "IT4Eyes",            "315": "MOREL Eyewear",
+  "400": "Blue River Med.",    "401": "Blue River Med.",
+  "402": "Orgreens Optics",    "403": "Essilor Labs",
+  "404": "Shamir Insights",    "405": "Luxottica Frames",
+  "406": "Contamac",           "407": "Essilor Instrum.",
+  "410": "",                   "408": "",                  "409": "",
+  "411": "Optikam Tech",       "412": "Kering Eyewear",
+  "414": "MacuHealth",         "415": "Optos, Inc",
+  "500": "Topcon",             "501": "",
+  "502": "Utah Eye Centers",   "503": "Teem",
+  "504": "",                   "505": "",
+  "506": "",                   "507": "",
+  "508": "ZEISS",              "509": "",
+  "510": "ZEISS",              "511": "",
+  "512": "Optometric Aesth.",  "513": "",
+  "514": "Nikon Optical",      "515": "Hoopes Vision",
   "516": "",
 };
 
-// ─── Canvas dimensions ────────────────────────────────────────────────────────
-const SVG_W   = 1020;
-const LWALL_W = 96;   // left-wall booth strip width
-const RWALL_W = 92;   // right-wall booth strip width
-const CX0     = LWALL_W + 10;   // center area left edge  = 106
-const CX1     = SVG_W - RWALL_W - 10; // center area right edge = 918
-const CW      = CX1 - CX0;           // center width          = 812
+// ─── Layout constants ─────────────────────────────────────────────────────────
+const SVG_W = 820;
 
-// ─── FOYER ────────────────────────────────────────────────────────────────────
-const FBOOTH_W = 85;
-const FBOOTH_H = 76;
-const FGAP     = 5;
+// Foyer
+const FB_W  = 74;   const FB_H  = 52;   const F_GAP = 5;
+const FA_Y  = 30;
+const FA_IDS = ["98","99","100","102","104","106","108","110","112"];
+const FA_TOT = FA_IDS.length * FB_W + (FA_IDS.length - 1) * F_GAP; // 9*74+8*5=666+40=706
+const FA_X0 = (SVG_W - FA_TOT) / 2;  // = 57
 
-const FA_IDS: string[] = ["98","99","100","102","104","106","108","110","112"];
-const FA_TOTAL = FA_IDS.length * FBOOTH_W + (FA_IDS.length - 1) * FGAP;
-const FA_X0    = CX0 + Math.floor((CW - FA_TOTAL) / 2);
-const FA_Y     = 44;
+const HALL_Y = FA_Y + FB_H + 4;   // = 86
+const HALL_H = 16;
 
-// Hallway between main classrooms
-const HALL_Y = FA_Y + FBOOTH_H + 4;
-const HALL_H = 28;
+const FC_Y  = HALL_Y + HALL_H + 4;  // = 106  (foyer bottom row)
+const FC_IDS = ["101","103","105","107","109","111"];
+const FC_X0 = FA_X0 + 3 * (FB_W + F_GAP);  // starts under "102" → 57+237=294
 
-// Bottom foyer row — aligns under booths 102-112 (index 3–8 of top row)
-const FB_IDS: string[] = ["101","103","105","107","109","111"];
-const FB_X0   = FA_X0 + 3 * (FBOOTH_W + FGAP);   // starts under "102"
-const FB_Y    = HALL_Y + HALL_H + 4;
+// Transition (foyer→ballroom): door arcs live here
+const TRANS_Y = FC_Y + FB_H + 8;   // = 166
+const TRANS_H = 70;
 
-// ─── Transition gap (foyer → ballroom, contains main doors) ─────────────────
-const TRANS_Y = FB_Y + FBOOTH_H + 10;
-const TRANS_H = 54;
+// Ballroom start
+const BALL_Y0 = TRANS_Y + TRANS_H;  // = 236
 
-// ─── BALLROOM ─────────────────────────────────────────────────────────────────
-const BALL_Y0 = TRANS_Y + TRANS_H;
+// Wall strips
+const LW_X = 8;   const LW_W = 76;  // left wall main booths
+const RW_W = 76;  const RW_X = SVG_W - 8 - RW_W;  // = 736
+const NW   = 20;  // narrow booth width (302, 401, 315, 415)
 
-// ── Top-wall row: 202, 204, 206, 210  (centered in CW) ──────────────────────
-const TOP_BW  = 108;  // each top-wall booth width
-const TOP_BH  = 78;
-const TOP_GAP = 6;
-const TOP_IDS: string[] = ["202","204","206","210"];
-const TOP_ALL_W = TOP_IDS.length * TOP_BW + (TOP_IDS.length - 1) * TOP_GAP;
-const TOP_X0  = CX0 + Math.floor((CW - TOP_ALL_W) / 2);  // center the 4 booths
+// Center island area
+const CX0   = LW_X + LW_W + 6;              // = 90
+const CX1   = RW_X - 6;                     // = 730
+const CW    = CX1 - CX0;                    // = 640
+// Islands are further inset (past the narrow booths)
+const IX0   = CX0 + NW + 8;                 // = 118
+const IX1   = CX1 - NW - 8;                 // = 702
+const IW    = IX1 - IX0;                    // = 584
 
-const topWall: BoothDef[] = TOP_IDS.map((id, i) => ({
-  id,
-  x: TOP_X0 + i * (TOP_BW + TOP_GAP),
-  y: BALL_Y0,
-  w: TOP_BW,
-  h: TOP_BH,
-  cat: "perimeter",
-}));
+// Top-wall booths (202, 204, 206, 210)
+const TW_BW = 90;  const TW_BH = 54;  const TW_GAP = 8;
+const TW_IDS = ["202","204","206","210"];
+const TW_TOT = TW_IDS.length * TW_BW + (TW_IDS.length - 1) * TW_GAP; // 360+24=384
+const TW_X0  = CX0 + Math.floor((CW - TW_TOT) / 2);   // = 90+128=218
 
-// Door arrow x positions (left door: left of 202, right door: right of 210)
-const LDOOR_X = CX0 + Math.floor((TOP_X0 - CX0) / 2);
-const RDOOR_X = TOP_X0 + TOP_ALL_W + Math.floor((CX1 - (TOP_X0 + TOP_ALL_W)) / 2);
+// Island rows
+const IB_W = 82;  const IB_H = 58;  const I_GAP = 7;
+const PA    = 10;   // aisle between back-to-back pair rows
+const RG    = 40;   // gap between pairs
 
-// ── Island booth dimensions ──────────────────────────────────────────────────
-const ISL_BW    = 120;
-const ISL_BH    = 72;
-const ISL_GAP   = 6;
-const PAIR_AISL = 10;   // aisle between facing pair rows
-const ROW_GAP   = 46;   // gap between pairs
+const P1A_Y = BALL_Y0 + TW_BH + 24;              // = 236+54+24=314
+const P1B_Y = P1A_Y + IB_H + PA;                  // = 314+58+10=382
+const P2A_Y = P1B_Y + IB_H + RG;                  // = 382+58+40=480
+const P2B_Y = P2A_Y + IB_H + PA;                  // = 480+58+10=548
+const P3A_Y = P2B_Y + IB_H + RG;                  // = 548+58+40=646
+const P3B_Y = P3A_Y + IB_H + PA;                  // = 646+58+10=714
 
-function islandRow(ids: string[], y: number): BoothDef[] {
-  const rowW = ids.length * ISL_BW + (ids.length - 1) * ISL_GAP;
-  const x0   = CX0 + Math.floor((CW - rowW) / 2);
-  return ids.map((id, i) => ({
-    id,
-    x: x0 + i * (ISL_BW + ISL_GAP),
-    y,
-    w: ISL_BW,
-    h: ISL_BH,
-    cat: "island" as BoothCat,
-  }));
+const BOT_Y  = P3B_Y + IB_H + 34;                 // = 714+58+34=806
+const BOT_H  = 58;
+
+const SVG_H  = BOT_Y + BOT_H + 70;                // = 806+58+70=934
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+const C_BOOTH   = "#b3d4e8";
+const C_STROKE  = "#7aafc8";
+const C_VISITED = "#6ee7b7";
+const C_VIS_STR = "#059669";
+const C_BG      = "#dde3e9";
+const C_WALL    = "#b8c8d4";
+const C_DOOR    = "#8fa8b8";
+const C_TEXT_N  = "#1e293b";
+const C_TEXT_V  = "#064e3b";
+const RX        = 8;  // booth corner radius
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface BoothDef {
+  id: string; x: number; y: number; w: number; h: number;
+  narrow?: boolean; // rotated text
 }
 
-// Pair 1 — 5 booths each
-const P1A_Y = BALL_Y0 + TOP_BH + 32;
-const P1B_Y = P1A_Y + ISL_BH + PAIR_AISL;
-const pair1A = islandRow(["201","203","205","207","211"], P1A_Y);
-const pair1B = islandRow(["304","306","308","310","312"], P1B_Y);
+// ─── Text wrap helper ─────────────────────────────────────────────────────────
+function wrap(name: string, maxCh: number): string[] {
+  if (!name) return [];
+  if (name.length <= maxCh) return [name];
+  const mid = Math.floor(name.length / 2);
+  let sp = name.lastIndexOf(" ", mid);
+  if (sp < 2) sp = name.indexOf(" ");
+  if (sp < 0) return [name.slice(0, maxCh - 1) + "…"];
+  return [name.slice(0, sp), name.slice(sp + 1)];
+}
 
-// Pair 2 — 6 booths each
-const P2A_Y = P1B_Y + ISL_BH + ROW_GAP;
-const P2B_Y = P2A_Y + ISL_BH + PAIR_AISL;
-const pair2A = islandRow(["301","303","305","307","309","311"], P2A_Y);
-const pair2B = islandRow(["402","404","406","408","410","412"], P2B_Y);
+// ─── Island row factory ───────────────────────────────────────────────────────
+function iRow(ids: string[], y: number): BoothDef[] {
+  const n = ids.length;
+  const rowW = n * IB_W + (n - 1) * I_GAP;
+  const x0 = IX0 + Math.floor((IW - rowW) / 2);
+  return ids.map((id, i) => ({ id, x: x0 + i * (IB_W + I_GAP), y, w: IB_W, h: IB_H }));
+}
 
-// Pair 3 — 5 booths (A), 6 booths (B)
-const P3A_Y = P2B_Y + ISL_BH + ROW_GAP;
-const P3B_Y = P3A_Y + ISL_BH + PAIR_AISL;
-const pair3A = islandRow(["403","405","407","409","411"], P3A_Y);
-const pair3B = islandRow(["502","504","506","508","510","512"], P3B_Y);
+// ─── All booth definitions ────────────────────────────────────────────────────
+const LEFT_WALL: BoothDef[] = [
+  { id: "200", x: LW_X, y: BALL_Y0,   w: LW_W, h: P1A_Y - BALL_Y0 - 6 },
+  { id: "300", x: LW_X, y: P1A_Y,     w: LW_W, h: IB_H + PA / 2 },
+  { id: "400", x: LW_X, y: P2A_Y,     w: LW_W, h: IB_H * 2 + PA - 6 },
+  { id: "500", x: LW_X, y: P3A_Y,     w: LW_W, h: IB_H * 2 + PA - 6 },
+];
+// Narrow booths on left (protrude inward from main left wall)
+const LEFT_NARROW: BoothDef[] = [
+  { id: "302", x: CX0, y: P1B_Y + 4,      w: NW, h: IB_H - 10, narrow: true },
+  { id: "401", x: CX0, y: P2A_Y + 4,      w: NW, h: 44,         narrow: true },
+];
 
-// Bottom row — 501, 503, 505, 507, 509, 511 (left-aligned under pair 3)
-const BOT_Y  = P3B_Y + ISL_BH + 36;
-const BOT_BH = 76;
-const BOT_IDS: string[] = ["501","503","505","507","509","511"];
-const BOT_ALL_W = BOT_IDS.length * ISL_BW + (BOT_IDS.length - 1) * ISL_GAP;
-const BOT_X0 = CX0 + Math.floor((CW - BOT_ALL_W) / 2);
-const bottomRow: BoothDef[] = BOT_IDS.map((id, i) => ({
-  id,
-  x: BOT_X0 + i * (ISL_BW + ISL_GAP),
-  y: BOT_Y,
-  w: ISL_BW,
-  h: BOT_BH,
-  cat: "perimeter",
+const TOP_WALL: BoothDef[] = TW_IDS.map((id, i) => ({
+  id, x: TW_X0 + i * (TW_BW + TW_GAP), y: BALL_Y0, w: TW_BW, h: TW_BH,
 }));
 
-// ── LEFT WALL booths (x=0, width=LWALL_W) ───────────────────────────────────
-// Derived from floor plan: 200 at top, then 300, 302, 400, 500
-const LW_H200 = P1A_Y - BALL_Y0 - 6;
-const LW_H300 = ISL_BH + PAIR_AISL - 6;
-const LW_H302 = ISL_BH - 4;
-const LW_H400 = ISL_BH * 2 + PAIR_AISL + 4;
-const LW_H500 = ISL_BH * 2 + PAIR_AISL + 4;
-
-const leftWall: BoothDef[] = [
-  { id: "200", x: 0, y: BALL_Y0,             w: LWALL_W, h: LW_H200, cat: "corner" },
-  { id: "300", x: 0, y: P1A_Y,               w: LWALL_W, h: LW_H300, cat: "perimeter" },
-  { id: "302", x: 0, y: P1B_Y,               w: LWALL_W, h: LW_H302, cat: "perimeter" },
-  { id: "400", x: 0, y: P2A_Y,               w: LWALL_W, h: LW_H400, cat: "perimeter" },
-  { id: "500", x: 0, y: P3A_Y,               w: LWALL_W, h: LW_H500, cat: "perimeter" },
+const RIGHT_WALL: BoothDef[] = [
+  { id: "212", x: RW_X, y: BALL_Y0,   w: RW_W, h: TW_BH - 2 },
+  { id: "314", x: RW_X, y: P1A_Y,     w: RW_W, h: IB_H - 4 },
+  { id: "313", x: RW_X, y: P1B_Y,     w: RW_W, h: IB_H - 4 },
+  { id: "414", x: RW_X, y: P2A_Y,     w: RW_W, h: IB_H - 4 },
+  { id: "516", x: RW_X, y: P3A_Y,     w: RW_W, h: IB_H - 4 },
+  { id: "515", x: RW_X, y: P3B_Y,     w: RW_W, h: IB_H - 4 },
+];
+// Narrow booths on right
+const RIGHT_NARROW: BoothDef[] = [
+  { id: "315", x: CX1 - NW, y: P1A_Y + IB_H - 2, w: NW, h: PA + 18, narrow: true },
+  { id: "415", x: CX1 - NW, y: P2A_Y + IB_H - 2, w: NW, h: PA + 18, narrow: true },
 ];
 
-// ── RIGHT WALL booths (x=CX1+8, width=RWALL_W) ──────────────────────────────
-// Floor plan (top→bottom): 212, 314, 315, 313, 414, 415, 516, 515
-// Then bottom-right: 513, 514
-const RW_X     = CX1 + 10;
-const RW_UNIT  = Math.floor((ISL_BH * 2 + PAIR_AISL) / 3); // ~51
-const RW_H_212 = TOP_BH;
-const RW_H_sm  = RW_UNIT - 3;  // 314 & 315 (each)
-const RW_H_313 = ISL_BH - 4;
+const PAIR_1A = iRow(["201","203","205","207","211"], P1A_Y);
+const PAIR_1B = iRow(["304","306","308","310","312"], P1B_Y);
+const PAIR_2A = iRow(["301","303","305","307","309","311"], P2A_Y);
+const PAIR_2B = iRow(["402","404","406","408","410","412"], P2B_Y);
+const PAIR_3A = iRow(["403","405","407","409","411"], P3A_Y);
+const PAIR_3B = iRow(["502","504","506","508","510","512"], P3B_Y);
 
-const rightWall: BoothDef[] = [
-  { id: "212", x: RW_X, y: BALL_Y0,                        w: RWALL_W, h: RW_H_212,  cat: "corner" },
-  { id: "314", x: RW_X, y: P1A_Y,                          w: RWALL_W, h: RW_H_sm,   cat: "perimeter" },
-  { id: "315", x: RW_X, y: P1A_Y + RW_H_sm + 4,           w: RWALL_W, h: RW_H_sm,   cat: "perimeter" },
-  { id: "313", x: RW_X, y: P1B_Y,                          w: RWALL_W, h: RW_H_313,  cat: "perimeter" },
-  { id: "414", x: RW_X, y: P2A_Y,                          w: RWALL_W, h: ISL_BH,    cat: "perimeter" },
-  { id: "415", x: RW_X, y: P2B_Y,                          w: RWALL_W, h: ISL_BH,    cat: "perimeter" },
-  { id: "516", x: RW_X, y: P3A_Y,                          w: RWALL_W, h: ISL_BH,    cat: "perimeter" },
-  { id: "515", x: RW_X, y: P3B_Y,                          w: RWALL_W, h: ISL_BH,    cat: "perimeter" },
+// Bottom row + corner booths
+const BOT_IDS  = ["501","503","505","507","509","511"];
+const BOT_ROW  = iRow(BOT_IDS, BOT_Y);
+const BOT_BW   = Math.floor(RW_W / 2) - 2;
+const BOT_CORN: BoothDef[] = [
+  { id: "513", x: RW_X,             y: BOT_Y, w: BOT_BW, h: BOT_H },
+  { id: "514", x: RW_X + BOT_BW + 4, y: BOT_Y, w: BOT_BW, h: BOT_H },
 ];
 
-// 513, 514 — bottom-right corner booths (face north)
-const BR_W = Math.floor(RWALL_W / 2) - 2;
-const bottomRight: BoothDef[] = [
-  { id: "513", x: RW_X,           y: BOT_Y, w: BR_W, h: BOT_BH, cat: "perimeter" },
-  { id: "514", x: RW_X + BR_W + 4, y: BOT_Y, w: BR_W, h: BOT_BH, cat: "perimeter" },
-];
-
-// Foyer booths arrays
-const foyerTop: BoothDef[]    = FA_IDS.map((id, i) => ({ id, x: FA_X0 + i * (FBOOTH_W + FGAP), y: FA_Y, w: FBOOTH_W, h: FBOOTH_H, cat: "foyer" }));
-const foyerBottom: BoothDef[] = FB_IDS.map((id, i) => ({ id, x: FB_X0 + i * (FBOOTH_W + FGAP), y: FB_Y, w: FBOOTH_W, h: FBOOTH_H, cat: "foyer" }));
+const FOYER_TOP: BoothDef[] = FA_IDS.map((id, i) => ({
+  id, x: FA_X0 + i * (FB_W + F_GAP), y: FA_Y, w: FB_W, h: FB_H,
+}));
+const FOYER_BOT: BoothDef[] = FC_IDS.map((id, i) => ({
+  id, x: FC_X0 + i * (FB_W + F_GAP), y: FC_Y, w: FB_W, h: FB_H,
+}));
 
 const ALL_BOOTHS: BoothDef[] = [
-  ...foyerTop, ...foyerBottom,
-  ...topWall,
-  ...pair1A, ...pair1B,
-  ...pair2A, ...pair2B,
-  ...pair3A, ...pair3B,
-  ...bottomRow,
-  ...bottomRight,
-  ...leftWall,
-  ...rightWall,
+  ...FOYER_TOP, ...FOYER_BOT,
+  ...TOP_WALL,
+  ...PAIR_1A, ...PAIR_1B,
+  ...PAIR_2A, ...PAIR_2B,
+  ...PAIR_3A, ...PAIR_3B,
+  ...BOT_ROW, ...BOT_CORN,
+  ...LEFT_WALL, ...LEFT_NARROW,
+  ...RIGHT_WALL, ...RIGHT_NARROW,
 ];
 
-const SVG_H = BOT_Y + BOT_BH + 90;
-
-// ─── Text helpers ─────────────────────────────────────────────────────────────
-function wrapName(name: string, maxCh: number): string[] {
-  if (!name || name.length <= maxCh) return name ? [name] : [];
-  const mid = Math.floor(name.length / 2);
-  let split = name.lastIndexOf(" ", mid);
-  if (split < 2) split = name.indexOf(" ");
-  if (split < 0) return [name.slice(0, maxCh - 1) + "…"];
-  return [name.slice(0, split), name.slice(split + 1)];
+// ─── Door arc helper (quarter-circle swing) ───────────────────────────────────
+function DoorArc({ cx, cy, r, dir }: { cx: number; cy: number; r: number; dir: "down-right" | "down-left" }) {
+  // Draw a door leaf line and quarter-circle sweep
+  if (dir === "down-right") {
+    return (
+      <G>
+        <Path d={`M ${cx},${cy} L ${cx + r},${cy}`} stroke={C_DOOR} strokeWidth={1.5} fill="none" />
+        <Path d={`M ${cx + r},${cy} A ${r},${r} 0 0,1 ${cx},${cy + r}`} stroke={C_DOOR} strokeWidth={1.2} fill="none" strokeDasharray="3,2" />
+      </G>
+    );
+  }
+  return (
+    <G>
+      <Path d={`M ${cx},${cy} L ${cx - r},${cy}`} stroke={C_DOOR} strokeWidth={1.5} fill="none" />
+      <Path d={`M ${cx - r},${cy} A ${r},${r} 0 0,0 ${cx},${cy + r}`} stroke={C_DOOR} strokeWidth={1.2} fill="none" strokeDasharray="3,2" />
+    </G>
+  );
 }
 
-// ─── Booth renderer ───────────────────────────────────────────────────────────
-function BoothRect({ booth, visited }: { booth: BoothDef; visited: boolean }) {
-  const fill   = visited ? VISITED_FILL   : FILL[booth.cat];
-  const stroke = visited ? VISITED_STROKE : STROKE[booth.cat];
-  const cx     = booth.x + booth.w / 2;
-  const narrow = booth.w < 90;
-  const company = BOOTH_NAMES[booth.id] ?? "";
+// ─── Single booth renderer ────────────────────────────────────────────────────
+function Booth({ b, visited }: { b: BoothDef; visited: boolean }) {
+  const fill   = visited ? C_VISITED : C_BOOTH;
+  const stroke = visited ? C_VIS_STR : C_STROKE;
+  const tcol   = visited ? C_TEXT_V  : C_TEXT_N;
+  const cx     = b.x + b.w / 2;
+  const cy     = b.y + b.h / 2;
+  const name   = BOOTH_NAMES[b.id] ?? "";
 
-  const numSz  = narrow ? 11 : 13;
-  const nameSz = narrow ? 9  : 11;
+  if (b.narrow) {
+    // Rotated narrow booth — number and name sideways
+    return (
+      <G>
+        <Rect x={b.x} y={b.y} width={b.w} height={b.h} rx={5}
+          fill={fill} stroke={stroke} strokeWidth={1.2} />
+        <SvgText
+          x={cx} y={cy}
+          fontSize={9} fontWeight="700" fill={tcol}
+          textAnchor="middle" alignmentBaseline="middle"
+          transform={`rotate(-90 ${cx} ${cy})`}>
+          {b.id}
+        </SvgText>
+      </G>
+    );
+  }
 
-  const numY = company
-    ? booth.y + (narrow ? 20 : 22)
-    : booth.y + booth.h / 2;
+  const narrow     = b.w < 88;
+  const numSize    = narrow ? 10 : 12;
+  const nameSize   = narrow ? 7.5 : 9;
+  const maxCh      = narrow ? 10 : 13;
+  const nameLines  = wrap(name, maxCh);
+  const totalLines = nameLines.length;
 
-  const nameLines = wrapName(company, narrow ? 11 : 14);
+  // Vertical centering: stack number + name lines
+  const lineH      = nameSize + 2;
+  const blockH     = numSize + (totalLines > 0 ? 3 + totalLines * lineH : 0);
+  const topY       = cy - blockH / 2 + numSize / 2;
 
   return (
     <G>
-      <Rect x={booth.x} y={booth.y} width={booth.w} height={booth.h}
-        rx={4} fill={fill} stroke={stroke} strokeWidth={1.5} />
+      <Rect x={b.x} y={b.y} width={b.w} height={b.h} rx={RX}
+        fill={fill} stroke={stroke} strokeWidth={1.4} />
 
-      {visited && (
-        <Rect x={booth.x + booth.w - 18} y={booth.y + 3}
-          width={15} height={15} rx={3} fill={VISITED_STROKE} />
-      )}
-
-      <SvgText x={cx} y={numY} fontSize={numSz} fontWeight="700"
-        fill={visited ? "#065f46" : "#1e293b"}
+      {/* Booth number */}
+      <SvgText x={cx} y={topY}
+        fontSize={numSize} fontWeight="700" fill={tcol}
         textAnchor="middle" alignmentBaseline="middle">
-        {booth.id}
+        {b.id}
       </SvgText>
 
+      {/* Vendor name lines */}
       {nameLines.map((line, i) => (
         <SvgText key={i}
-          x={cx}
-          y={numY + numSz * 0.9 + i * (nameSz + 2) + 5}
-          fontSize={nameSz} fontWeight="400"
-          fill={visited ? "#065f46" : "#334155"}
+          x={cx} y={topY + numSize * 0.6 + 3 + i * lineH + lineH / 2}
+          fontSize={nameSize} fill={tcol}
           textAnchor="middle" alignmentBaseline="middle">
           {line}
         </SvgText>
       ))}
 
+      {/* Visited check */}
       {visited && (
-        <SvgText x={booth.x + booth.w - 10} y={booth.y + 11}
-          fontSize={9} fontWeight="700" fill="#fff"
+        <SvgText x={b.x + b.w - 9} y={b.y + 10}
+          fontSize={9} fontWeight="900" fill={C_VIS_STR}
           textAnchor="middle" alignmentBaseline="middle">
           ✓
         </SvgText>
@@ -342,124 +297,118 @@ function BoothRect({ booth, visited }: { booth: BoothDef; visited: boolean }) {
   );
 }
 
-// ─── Door arrow helper ────────────────────────────────────────────────────────
-function DoorArrow({ x, y, label }: { x: number; y: number; label: string }) {
-  const AW = 20;
-  const AH = 18;
-  return (
-    <G>
-      <Polygon
-        points={`${x},${y + AH} ${x - AW / 2},${y} ${x + AW / 2},${y}`}
-        fill="#dc2626"
-        opacity={0.85}
-      />
-      <SvgText x={x} y={y - 6} fontSize={8} fontWeight="700"
-        fill="#dc2626" textAnchor="middle" alignmentBaseline="middle">
-        {label}
-      </SvgText>
-    </G>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function ExhibitHallMap({ visitedBooths, scale = 1 }: ExhibitHallMapProps) {
-  const visitedSet = new Set(visitedBooths.map(String));
+interface Props { visitedBooths: string[]; scale?: number; }
 
-  // Derived geometry
-  const FOYER_BG_Y  = FA_Y - 20;
-  const FOYER_BG_H  = FB_Y + FBOOTH_H - FA_Y + 28;
-  const BALL_BG_Y   = BALL_Y0 - 6;
-  const BALL_BG_H   = SVG_H - BALL_BG_Y - 20;
+export default function ExhibitHallMap({ visitedBooths, scale = 1 }: Props) {
+  const visited = new Set(visitedBooths.map(String));
+
+  // Door arc positions (top entrance into ballroom)
+  const LDOOR_X = Math.floor((LW_X + LW_W + TW_X0) / 2);  // between 200 and 202
+  const RDOOR_X = Math.floor((TW_X0 + TW_TOT + RW_X) / 2); // between 210 and 212
+
+  // Bottom door positions (exits near 505 and 511)
+  const bot505 = BOT_ROW.find(b => b.id === "505");
+  const bot511 = BOT_ROW.find(b => b.id === "511");
+  const BDOOR1_X = bot505 ? bot505.x + bot505.w / 2 : 0;
+  const BDOOR2_X = bot511 ? bot511.x + bot511.w / 2 : 0;
 
   return (
-    <Svg width={SVG_W * scale} height={SVG_H * scale} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
+    <Svg width={SVG_W * scale} height={SVG_H * scale}
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}>
 
-      {/* ── FOYER background ─────────────────────────────────────── */}
-      <Rect x={CX0 - 6} y={FOYER_BG_Y} width={CW + 12} height={FOYER_BG_H}
-        rx={8} fill="#f5f3ff" stroke="#7c3aed" strokeWidth={1.5} />
+      {/* ── Building background ─────────────────────────────────── */}
+      <Rect x={0} y={0} width={SVG_W} height={SVG_H} rx={12}
+        fill={C_BG} stroke={C_WALL} strokeWidth={2} />
 
-      {/* Hallway strip */}
-      <Rect x={CX0 - 6} y={HALL_Y} width={CW + 12} height={HALL_H}
-        fill="#e8e5f4" opacity={0.9} />
-
-      {/* FOYER section title */}
-      <SvgText x={SVG_W / 2} y={FA_Y - 8}
-        fontSize={12} fontWeight="700" fill="#5b21b6"
+      {/* ── FOYER section label ─────────────────────────────────── */}
+      <SvgText x={SVG_W / 2} y={FA_Y - 14}
+        fontSize={10} fontWeight="700" fill="#4b5563"
         textAnchor="middle" alignmentBaseline="middle">
         JORDANELLE FOYER — HALLWAY (outside exhibit hall)
       </SvgText>
 
-      {/* Load in doors label — top left */}
-      <SvgText x={8} y={FA_Y + 18} fontSize={8} fontWeight="700"
-        fill="#dc2626" textAnchor="start" alignmentBaseline="middle">
-        ↓ Load-in Doors
-      </SvgText>
+      {/* Foyer background */}
+      <Rect x={FA_X0 - 6} y={FA_Y - 6}
+        width={FA_TOT + 12}
+        height={FC_Y + FB_H - FA_Y + 12}
+        rx={6} fill="#ccd8e2" stroke={C_WALL} strokeWidth={1} />
 
-      {/* Hallway label */}
-      <SvgText x={SVG_W / 2} y={HALL_Y + HALL_H / 2}
-        fontSize={8} fontWeight="600" fill="#7c3aed"
+      {/* Hallway strip */}
+      <Rect x={FA_X0 - 6} y={HALL_Y} width={FA_TOT + 12} height={HALL_H}
+        fill="#b8c8d4" opacity={0.6} />
+      <SvgText x={FA_X0 + FA_TOT / 2} y={HALL_Y + HALL_H / 2}
+        fontSize={7.5} fontWeight="600" fill="#374151"
         textAnchor="middle" alignmentBaseline="middle">
         ← 8' Hallway between main classrooms →
       </SvgText>
 
-      {/* ── BALLROOM background ────────────────────────────────────── */}
-      <Rect x={0} y={BALL_BG_Y} width={SVG_W} height={BALL_BG_H}
-        rx={8} fill="#eff6ff" stroke="#3b82f6" strokeWidth={1.5} />
+      {/* Load-in doors label */}
+      <SvgText x={10} y={FA_Y + FB_H / 2}
+        fontSize={7.5} fontWeight="700" fill="#dc2626"
+        textAnchor="start" alignmentBaseline="middle">
+        ↓ Load-in Doors
+      </SvgText>
 
-      {/* Ballroom label */}
-      <SvgText x={SVG_W / 2} y={P2A_Y + (P2B_Y - P2A_Y + ISL_BH) / 2}
-        fontSize={14} fontWeight="700" fill="#1d4ed830"
+      {/* ── Transition / Door area ─────────────────────────────── */}
+      <Rect x={LW_X} y={TRANS_Y} width={SVG_W - LW_X * 2} height={TRANS_H}
+        rx={4} fill="#cdd6de" opacity={0.5} />
+      <SvgText x={SVG_W / 2} y={TRANS_Y + TRANS_H / 2}
+        fontSize={8.5} fontWeight="600" fill="#374151"
+        textAnchor="middle" alignmentBaseline="middle">
+        — Main Ballroom Lobby —
+      </SvgText>
+
+      {/* Door arcs (top) */}
+      <DoorArc cx={LDOOR_X} cy={BALL_Y0} r={28} dir="down-right" />
+      <DoorArc cx={RDOOR_X} cy={BALL_Y0} r={28} dir="down-left" />
+
+      {/* ── Ballroom background ─────────────────────────────────── */}
+      <Rect x={LW_X} y={BALL_Y0 - 4} width={SVG_W - LW_X * 2} height={SVG_H - BALL_Y0 - 20}
+        rx={6} fill="#d6e0e8" stroke={C_WALL} strokeWidth={1.2} />
+
+      {/* Ballroom label (watermark) */}
+      <SvgText x={SVG_W / 2} y={P2A_Y + IB_H + PA / 2}
+        fontSize={13} fontWeight="700" fill="#b8c8d430"
         textAnchor="middle" alignmentBaseline="middle">
         JORDANELLE BALLROOM
       </SvgText>
 
-      {/* Registration Desk label — left wall */}
-      <SvgText x={4} y={P2A_Y - 12} fontSize={7} fontWeight="600"
-        fill="#16a34a" textAnchor="start" alignmentBaseline="middle"
-        transform={`rotate(-90, 4, ${P2A_Y - 12})`}>
-        Registration Desk →
+      {/* Registration Desk label (left side) */}
+      <SvgText
+        x={LW_X + 4} y={(P1B_Y + P2A_Y) / 2}
+        fontSize={6.5} fontWeight="600" fill="#16a34a"
+        textAnchor="middle" alignmentBaseline="middle"
+        transform={`rotate(-90 ${LW_X + 4} ${(P1B_Y + P2A_Y) / 2})`}>
+        Registration Desk
       </SvgText>
 
-      {/* Entrance from hotel lobby — bottom left */}
-      <SvgText x={8} y={BOT_Y + BOT_BH + 18} fontSize={8} fontWeight="600"
-        fill="#dc2626" textAnchor="start" alignmentBaseline="middle">
-        ← Entrance from hotel lobby
-      </SvgText>
-      <SvgText x={8} y={BOT_Y + BOT_BH + 32} fontSize={8} fontWeight="600"
-        fill="#7c3aed" textAnchor="start" alignmentBaseline="middle">
-        ESCALATORS ↑
+      {/* Entrance from hotel lobby label */}
+      <SvgText x={LW_X + 4} y={BOT_Y + BOT_H + 20}
+        fontSize={7} fontWeight="700" fill="#dc2626"
+        textAnchor="start" alignmentBaseline="middle">
+        ← Entrance / Escalators
       </SvgText>
 
-      {/* ── TRANSITION / MAIN DOORS ──────────────────────────────────── */}
-      <Rect x={CX0 - 6} y={TRANS_Y} width={CW + 12} height={TRANS_H}
-        rx={4} fill="#e2e8f0" opacity={0.7} />
-      <SvgText x={SVG_W / 2} y={TRANS_Y + TRANS_H / 2}
-        fontSize={9} fontWeight="600" fill="#475569"
-        textAnchor="middle" alignmentBaseline="middle">
-        ← Main Ballroom Lobby →
-      </SvgText>
-
-      {/* Main Door arrows (two doors into the ballroom from the foyer) */}
-      <DoorArrow x={LDOOR_X} y={BALL_Y0 - 2} label="Main Doors" />
-      <DoorArrow x={RDOOR_X} y={BALL_Y0 - 2} label="Main Doors" />
-
-      {/* ── All booths ────────────────────────────────────────────── */}
-      {ALL_BOOTHS.map((b) => (
-        <BoothRect key={b.id} booth={b} visited={visitedSet.has(b.id)} />
-      ))}
+      {/* Door arcs (bottom exits at 505 & 511) */}
+      {bot505 && (
+        <DoorArc cx={BDOOR1_X} cy={BOT_Y + BOT_H} r={22} dir="down-right" />
+      )}
+      {bot511 && (
+        <DoorArc cx={BDOOR2_X} cy={BOT_Y + BOT_H} r={22} dir="down-left" />
+      )}
 
       {/* ── Aisle labels ─────────────────────────────────────────── */}
-      {[
-        P1A_Y + ISL_BH + PAIR_AISL / 2,
-        P2A_Y + ISL_BH + PAIR_AISL / 2,
-        P3A_Y + ISL_BH + PAIR_AISL / 2,
-      ].map((ay, i) => (
+      {[P1A_Y + IB_H + PA / 2, P2A_Y + IB_H + PA / 2, P3A_Y + IB_H + PA / 2].map((ay, i) => (
         <SvgText key={i} x={SVG_W / 2} y={ay}
-          fontSize={7} fill="#94a3b8"
+          fontSize={6.5} fill="#94a3b8"
           textAnchor="middle" alignmentBaseline="middle">
           ← aisle →
         </SvgText>
       ))}
+
+      {/* ── All booths ────────────────────────────────────────────── */}
+      {ALL_BOOTHS.map(b => <Booth key={b.id} b={b} visited={visited.has(b.id)} />)}
 
     </Svg>
   );
