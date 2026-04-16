@@ -32,6 +32,19 @@ function NativeTabLayout() {
         <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
         <Label>More</Label>
       </NativeTabs.Trigger>
+      {/* Hidden screens accessible from More menu */}
+      <NativeTabs.Trigger name="para" style={{ display: "none" }}>
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Para</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="speakers" style={{ display: "none" }}>
+        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
+        <Label>Speakers</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="venue" style={{ display: "none" }}>
+        <Icon sf={{ default: "location", selected: "location.fill" }} />
+        <Label>Venue</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
