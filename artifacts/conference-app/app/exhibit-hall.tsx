@@ -239,8 +239,13 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
                   top:   z.y * imgScale,
                   width: z.w * imgScale,
                   height:z.h * imgScale,
+                  borderWidth: 1.5,
+                  borderColor: "rgba(255,60,60,0.7)",
+                  backgroundColor: "rgba(255,60,60,0.12)",
                 }}
-              />
+              >
+                <Text style={{ fontSize: 6, color: "rgba(200,0,0,0.8)", fontWeight: "bold", lineHeight: 8 }}>{z.id}</Text>
+              </Pressable>
             ))}
           </View>
         </Animated.View>
