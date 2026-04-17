@@ -109,7 +109,7 @@ export default function HomeScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: insets.top + 4,
+          paddingTop: insets.top,
           paddingBottom: insets.bottom + 100,
         },
       ]}
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroSection: {
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 8,
     gap: 8,
     marginBottom: 4,
