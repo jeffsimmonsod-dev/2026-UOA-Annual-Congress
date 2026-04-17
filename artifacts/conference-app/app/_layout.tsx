@@ -35,6 +35,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="exhibit-hall" options={{ headerShown: false }} />
       <Stack.Screen name="session/[id]" options={{ title: "Session" }} />
       <Stack.Screen name="speaker/[id]" options={{ title: "Speaker" }} />
       <Stack.Screen name="my-schedule" options={{ title: "My Schedule" }} />

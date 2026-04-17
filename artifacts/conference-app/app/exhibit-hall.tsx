@@ -503,7 +503,7 @@ export default function ExhibitHallScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
-        <View style={{ flex: 1 }} />
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Exhibit Hall</Text>
         <View style={{ width: 40 }} />
       </View>
 
