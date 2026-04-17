@@ -31,7 +31,8 @@
         "NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -51,6 +52,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "78c58011-2ce2-4113-80cc-da38f4de6e59"
+      }
     }
   }
 }
