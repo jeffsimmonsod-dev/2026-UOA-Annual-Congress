@@ -102,16 +102,23 @@ const BOOTH_ZONES: { id: string; x: number; y: number; w: number; h: number }[] 
 ];
 
 function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
-  const win = Dimensions.get("window");
-  const W = win.width;
-  const H = win.height * 0.78;
+  // Measure the actual rendered container so overlay pixels line up exactly
+  const [containerW, setContainerW] = useState(0);
+  const [containerH, setContainerH] = useState(0);
 
-  // How the image fits inside W×H with resizeMode="contain"
-  const imgScale  = Math.min(W / IMG_W, H / IMG_H);
-  const dispW     = IMG_W * imgScale;
-  const dispH     = IMG_H * imgScale;
-  const dispX0    = (W - dispW) / 2;
-  const dispY0    = (H - dispH) / 2;
+  const W = containerW;
+  const H = containerH;
+
+  // Derived layout — only valid once container has been measured
+  const imgScale = W > 0 && H > 0 ? Math.min(W / IMG_W, H / IMG_H) : 0;
+  const dispW  = IMG_W * imgScale;
+  const dispH  = IMG_H * imgScale;
+  const dispX0 = (W - dispW) / 2;
+  const dispY0 = (H - dispH) / 2;
+
+  // Shared values for pan bounds — updated from JS whenever layout changes
+  const svW = useSharedValue(0);
+  const svH = useSharedValue(0);
 
   const [selectedBooth, setSelectedBooth] = useState<string | null>(null);
 
@@ -134,8 +141,8 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
 
   const clamp = (x: number, y: number, s: number) => {
     "worklet";
-    const mx = Math.max(0, (W * (s - 1)) / 2);
-    const my = Math.max(0, (H * (s - 1)) / 2);
+    const mx = Math.max(0, (svW.value * (s - 1)) / 2);
+    const my = Math.max(0, (svH.value * (s - 1)) / 2);
     return { x: Math.min(mx, Math.max(-mx, x)), y: Math.min(my, Math.max(-my, y)) };
   };
 
@@ -147,7 +154,7 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
     .onUpdate((e) => {
       const ns = Math.min(6, Math.max(1, savedScale.value * e.scale));
       scale.value = ns;
-      const fx = e.focalX - W / 2, fy = e.focalY - H / 2;
+      const fx = e.focalX - svW.value / 2, fy = e.focalY - svH.value / 2;
       const d  = ns / savedScale.value - 1;
       const c  = clamp(savedX.value - fx * d, savedY.value - fy * d, ns);
       offsetX.value = c.x; offsetY.value = c.y;
@@ -177,7 +184,7 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
         savedScale.value = 1; savedX.value = 0; savedY.value = 0;
       } else {
         const ns = 3;
-        const fx = e.x - W / 2, fy = e.y - H / 2;
+        const fx = e.x - svW.value / 2, fy = e.y - svH.value / 2;
         const c = clamp(-fx * (ns - 1), -fy * (ns - 1), ns);
         scale.value = withTiming(ns, ZOOM_CFG);
         offsetX.value = withTiming(c.x, ZOOM_CFG);
@@ -196,7 +203,18 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
   const selectedName = selectedBooth ? (BOOTH_NAMES[selectedBooth] ?? "") : "";
 
   return (
-    <View style={{ flex: 1, overflow: "hidden" }}>
+    <View
+      style={{ flex: 1, overflow: "hidden" }}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setContainerW(width);
+        setContainerH(height);
+        svW.value = width;
+        svH.value = height;
+      }}
+    >
+      {/* Only render once we have real dimensions */}
+      {W > 0 && H > 0 && (
       <GestureDetector gesture={gesture}>
         <Animated.View style={[{ width: W, height: H }, animStyle]}>
           {/* Map image */}
@@ -205,7 +223,7 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
             style={{ width: W, height: H }}
             resizeMode="contain"
           />
-          {/* Invisible booth tap zones, positioned to match contained image */}
+          {/* Tap zones — positioned relative to the "contain"-fitted image area */}
           <View style={{
             position: "absolute",
             left: dispX0, top: dispY0,
@@ -227,6 +245,8 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
           </View>
         </Animated.View>
       </GestureDetector>
+      )}
+
 
       {/* Booth tooltip */}
       {selectedBooth && (
