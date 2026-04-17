@@ -173,18 +173,6 @@ export default function HomeScreen() {
         </Pressable>
       )}
 
-      <Pressable
-        onPress={() => router.push("/exhibit-hall?scan=true" as any)}
-        style={({ pressed }) => [
-          styles.scanQrBtn,
-          { backgroundColor: "#f59e0b", opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Ionicons name="qr-code-outline" size={22} color="#fff" />
-        <Text style={styles.scanQrBtnText}>Scan Booth QR Code</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
-      </Pressable>
-
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         My Next Session
       </Text>
@@ -256,6 +244,18 @@ export default function HomeScreen() {
           </View>
         </Pressable>
       )}
+
+      <Pressable
+        onPress={() => router.push("/exhibit-hall?scan=true" as any)}
+        style={({ pressed }) => [
+          styles.scanQrBtn,
+          { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+        ]}
+      >
+        <Ionicons name="qr-code-outline" size={22} color="#fff" />
+        <Text style={styles.scanQrBtnText}>Scan Booth QR Code</Text>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+      </Pressable>
 
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         Our Sponsors
