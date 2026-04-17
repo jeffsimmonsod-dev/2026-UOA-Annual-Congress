@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
+import { router } from "expo-router";
 import React from "react";
 import {
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +17,6 @@ import { VENUE } from "@/services/data";
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === "web";
 
   const openMap = () => {
     Linking.openURL(VENUE.mapsUrl);
@@ -31,14 +30,19 @@ export default function VenueScreen() {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={[styles.navHeader, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
+        </Pressable>
+        <Text style={[styles.navTitle, { color: colors.foreground }]}>Venue & Hotel</Text>
+        <View style={{ width: 40 }} />
+      </View>
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.container,
-        {
-          paddingTop: isWeb ? insets.top + 16 : 16,
-          paddingBottom: isWeb ? insets.bottom + 100 : 100,
-        },
+        { paddingTop: 16, paddingBottom: insets.bottom + 100 },
       ]}
       showsVerticalScrollIndicator={false}
     >
@@ -129,6 +133,7 @@ export default function VenueScreen() {
         ))}
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -150,6 +155,15 @@ function SectionHeader({
 }
 
 const styles = StyleSheet.create({
+  navHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: { width: 40, alignItems: "flex-start" },
+  navTitle: { flex: 1, fontSize: 18, fontWeight: "700", textAlign: "center" },
   container: {
     paddingHorizontal: 16,
     gap: 14,

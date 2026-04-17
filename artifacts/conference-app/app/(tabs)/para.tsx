@@ -1,6 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,22 +21,28 @@ export default function ParaScreen() {
   const [activeDay, setActiveDay] = useState("Thu, June 4");
   const sessionsByDay = getParaSessionsByDay();
   const sessions = sessionsByDay[activeDay] ?? [];
-  const isWeb = Platform.OS === "web";
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View
         style={[
           styles.headerBanner,
-          { backgroundColor: colors.primary + "12", borderBottomColor: colors.primary + "30" },
+          { backgroundColor: colors.primary + "12", borderBottomColor: colors.primary + "30", paddingTop: insets.top + 12 },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.primary }]}>
-          Paraoptometric Education
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
-          2026 UOA Annual Congress · ABO/CPC Credit Available
-        </Text>
+        <View style={styles.headerRow}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={colors.primary} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: colors.primary }]}>
+              Paraoptometric Education
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
+              2026 UOA Annual Congress · ABO/CPC Credit Available
+            </Text>
+          </View>
+        </View>
       </View>
 
       <View
@@ -96,7 +103,7 @@ export default function ParaScreen() {
         contentContainerStyle={[
           styles.list,
           {
-            paddingBottom: isWeb ? insets.bottom + 100 : 100,
+            paddingBottom: insets.bottom + 100,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -119,10 +126,16 @@ export default function ParaScreen() {
 const styles = StyleSheet.create({
   headerBanner: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     gap: 2,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+  },
+  backBtn: { width: 36, alignItems: "flex-start", paddingTop: 2 },
   headerTitle: {
     fontSize: 15,
     fontWeight: "700",

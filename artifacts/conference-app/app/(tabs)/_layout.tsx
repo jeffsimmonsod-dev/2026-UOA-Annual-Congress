@@ -140,9 +140,9 @@ function ClassicTabLayout() {
         }}
       />
       {/* Hidden from tab bar — accessible via router.push from more.tsx */}
-      <Tabs.Screen name="para"     options={{ href: null, title: "Para Education" }} />
-      <Tabs.Screen name="speakers" options={{ href: null, title: "Speakers" }} />
-      <Tabs.Screen name="venue"    options={{ href: null, title: "Venue & Hotel" }} />
+      <Tabs.Screen name="para"     options={{ href: null, title: "Para Education", headerShown: false }} />
+      <Tabs.Screen name="speakers" options={{ href: null, title: "Speakers", headerShown: false }} />
+      <Tabs.Screen name="venue"    options={{ href: null, title: "Venue & Hotel", headerShown: false }} />
     </Tabs>
   );
 }
