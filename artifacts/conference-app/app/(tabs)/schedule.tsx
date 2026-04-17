@@ -27,7 +27,7 @@ export default function ScheduleScreen() {
       <View
         style={[
           styles.headerBanner,
-          { backgroundColor: colors.primary + "12", borderBottomColor: colors.primary + "30" },
+          { backgroundColor: colors.primary + "12", borderBottomColor: colors.primary + "30", paddingTop: insets.top + 12 },
         ]}
       >
         <Text style={[styles.headerTitle, { color: colors.primary }]}>

@@ -92,7 +92,6 @@ const useMenuItems = (): MenuItem[] => {
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const isWeb = Platform.OS === "web";
   const menuItems = useMenuItems();
 
   return (
@@ -101,8 +100,8 @@ export default function MoreScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: isWeb ? insets.top + 16 : 16,
-          paddingBottom: isWeb ? insets.bottom + 100 : 100,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 100,
         },
       ]}
       showsVerticalScrollIndicator={false}

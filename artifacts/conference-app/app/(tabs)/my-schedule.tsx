@@ -17,7 +17,6 @@ export default function MyScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { savedIds } = useSchedule();
-  const isWeb = Platform.OS === "web";
 
   const allSessions = [...SESSIONS, ...PARA_SESSIONS];
   const savedSessions = allSessions.filter((s) => savedIds.has(s.id));
@@ -34,8 +33,8 @@ export default function MyScheduleScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: isWeb ? insets.top + 16 : 16,
-          paddingBottom: isWeb ? insets.bottom + 100 : 100,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 100,
         },
       ]}
       showsVerticalScrollIndicator={false}

@@ -109,8 +109,8 @@ export default function HomeScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: isWeb ? insets.top + 20 : 16,
-          paddingBottom: isWeb ? insets.bottom + 80 : 100,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 100,
         },
       ]}
       showsVerticalScrollIndicator={false}

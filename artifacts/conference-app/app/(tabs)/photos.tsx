@@ -410,8 +410,8 @@ export default function PhotosScreen() {
         contentContainerStyle={[
           styles.list,
           {
-            paddingTop: isWeb ? insets.top + 16 : 16,
-            paddingBottom: isWeb ? insets.bottom + 100 : 100,
+            paddingTop: insets.top + 16,
+            paddingBottom: insets.bottom + 100,
           },
         ]}
         refreshControl={
