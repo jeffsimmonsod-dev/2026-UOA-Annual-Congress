@@ -4,14 +4,14 @@
     "slug": "conference-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/uoa-logo.png",
     "scheme": "conference-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/uoa-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f8fafc"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": false,
@@ -23,8 +23,8 @@
       "package": "org.utaheyedoc.congress2026",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#f8fafc"
+        "foregroundImage": "./assets/images/uoa-logo.png",
+        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "NOTIFICATIONS",
@@ -34,7 +34,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/uoa-logo.png"
     },
     "plugins": [
       [
