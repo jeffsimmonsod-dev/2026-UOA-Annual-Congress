@@ -4,16 +4,23 @@ import fs from "fs";
 
 const router = Router();
 
-// Serve the map image
+// Serve the map image — resolve relative to workspace root, not __dirname
 router.get("/admin/map-img", (_req: Request, res: Response) => {
+  // process.cwd() == artifacts/api-server at runtime; go up two levels to workspace root
   const imgPath = path.resolve(
-    __dirname,
-    "../../../../conference-app/assets/images/exhibit-hall-map.png"
+    process.cwd(),
+    "../../conference-app/assets/images/exhibit-hall-map.png"
   );
   if (fs.existsSync(imgPath)) {
     res.sendFile(imgPath);
   } else {
-    res.status(404).send("Image not found");
+    // Fallback: try absolute workspace path
+    const fallback = "/home/runner/workspace/artifacts/conference-app/assets/images/exhibit-hall-map.png";
+    if (fs.existsSync(fallback)) {
+      res.sendFile(fallback);
+    } else {
+      res.status(404).send("Image not found at: " + imgPath);
+    }
   }
 });
 
