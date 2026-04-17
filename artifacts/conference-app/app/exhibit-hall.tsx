@@ -407,7 +407,7 @@ export default function ExhibitHallScreen() {
               <Text style={styles.scanBtnText}>Scan QR Code</Text>
             </Pressable>
             <Pressable
-              onPress={() => { setMapZoom(1); setMapTab("map"); setMapVisible(true); }}
+              onPress={() => { setMapTab("map"); setMapVisible(true); }}
               style={({ pressed }) => [
                 styles.mapBtn,
                 { backgroundColor: colors.card, borderColor: colors.primary, opacity: pressed ? 0.85 : 1 },
