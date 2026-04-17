@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "org.utaheyedoc.congress2026",
       "infoPlist": {
         "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall"
       }
