@@ -31,11 +31,89 @@ import { useColors } from "@/hooks/useColors";
 import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
 
 const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
+// Actual pixel dimensions of exhibit-hall-map.png
+const IMG_W = 1824;
+const IMG_H = 2362;
+
+// Booth tap zones in original image pixel coordinates (x, y, w, h)
+// Each entry defines a tappable region over the corresponding booth
+const BOOTH_ZONES: { id: string; x: number; y: number; w: number; h: number }[] = [
+  // ── Foyer top row (98–112) ──────────────────────────────────────────────────
+  { id:"98",  x:355, y:65,  w:132, h:205 }, { id:"99",  x:493, y:65,  w:132, h:205 },
+  { id:"100", x:631, y:65,  w:132, h:205 }, { id:"102", x:769, y:65,  w:132, h:205 },
+  { id:"104", x:905, y:65,  w:132, h:205 }, { id:"106", x:1041,y:65,  w:132, h:205 },
+  { id:"108", x:1177,y:65,  w:132, h:205 }, { id:"110", x:1313,y:65,  w:132, h:205 },
+  { id:"112", x:1449,y:65,  w:132, h:205 },
+  // ── Foyer bottom row (101–111) ──────────────────────────────────────────────
+  { id:"101", x:670, y:330, w:132, h:200 }, { id:"103", x:808, y:330, w:132, h:200 },
+  { id:"105", x:946, y:330, w:132, h:200 }, { id:"107", x:1082,y:330, w:132, h:200 },
+  { id:"109", x:1218,y:330, w:132, h:200 }, { id:"111", x:1354,y:330, w:132, h:200 },
+  // ── Top ballroom row (202, 204, 206, 210) ──────────────────────────────────
+  { id:"202", x:670, y:615, w:175, h:155 }, { id:"204", x:856, y:615, w:175, h:155 },
+  { id:"206", x:1025,y:615, w:135, h:155 }, { id:"210", x:1255,y:615, w:175, h:155 },
+  // ── Left wall ───────────────────────────────────────────────────────────────
+  { id:"200", x:110, y:635, w:178, h:250 },
+  { id:"300", x:110, y:1065,w:178, h:205 },
+  { id:"400", x:110, y:1362,w:178, h:225 },
+  { id:"500", x:110, y:1745,w:178, h:205 },
+  // ── Narrow left (302, 401) ──────────────────────────────────────────────────
+  { id:"302", x:295, y:1178,w:72,  h:150 },
+  { id:"401", x:295, y:1505,w:72,  h:150 },
+  // ── Right wall ──────────────────────────────────────────────────────────────
+  { id:"212", x:1648,y:635, w:178, h:195 },
+  { id:"314", x:1648,y:1050,w:178, h:155 },
+  { id:"313", x:1648,y:1218,w:178, h:155 },
+  { id:"414", x:1648,y:1400,w:178, h:155 },
+  { id:"516", x:1648,y:1790,w:178, h:145 },
+  { id:"515", x:1648,y:1965,w:178, h:145 },
+  // ── Narrow right (315, 415) ─────────────────────────────────────────────────
+  { id:"315", x:1570,y:1230,w:72,  h:130 },
+  { id:"415", x:1570,y:1508,w:72,  h:130 },
+  // ── Island row P1a (201, 203, 205, 207, 211) ────────────────────────────────
+  { id:"201", x:595, y:888, w:155, h:155 }, { id:"203", x:757, y:888, w:155, h:155 },
+  { id:"205", x:917, y:888, w:155, h:155 }, { id:"207", x:1077,y:888, w:155, h:155 },
+  { id:"211", x:1317,y:888, w:155, h:155 },
+  // ── Island row P1b (304, 306, 308, 310, 312) ────────────────────────────────
+  { id:"304", x:757, y:1052,w:155, h:155 }, { id:"306", x:917, y:1052,w:155, h:155 },
+  { id:"308", x:1077,y:1052,w:155, h:155 }, { id:"310", x:1240,y:1052,w:155, h:155 },
+  { id:"312", x:1402,y:1052,w:155, h:155 },
+  // ── Island row P2a (301, 303, 305, 307, 309, 311) ───────────────────────────
+  { id:"301", x:575, y:1315,w:152, h:155 }, { id:"303", x:733, y:1315,w:152, h:155 },
+  { id:"305", x:891, y:1315,w:152, h:155 }, { id:"307", x:1050,y:1315,w:152, h:155 },
+  { id:"309", x:1210,y:1315,w:152, h:155 }, { id:"311", x:1370,y:1315,w:152, h:155 },
+  // ── Island row P2b (402, 404, 406, 408, 410, 412) ───────────────────────────
+  { id:"402", x:575, y:1478,w:152, h:155 }, { id:"404", x:733, y:1478,w:152, h:155 },
+  { id:"406", x:891, y:1478,w:152, h:155 }, { id:"408", x:1050,y:1478,w:152, h:155 },
+  { id:"410", x:1210,y:1478,w:152, h:155 }, { id:"412", x:1370,y:1478,w:152, h:155 },
+  // ── Island row P3a (403, 405, 407, 409, 411) ────────────────────────────────
+  { id:"403", x:733, y:1730,w:152, h:155 }, { id:"405", x:891, y:1730,w:152, h:155 },
+  { id:"407", x:1050,y:1730,w:152, h:155 }, { id:"409", x:1210,y:1730,w:152, h:155 },
+  { id:"411", x:1370,y:1730,w:152, h:155 },
+  // ── Island row P3b (502, 504, 506, 508, 510, 512) ───────────────────────────
+  { id:"502", x:575, y:1895,w:152, h:155 }, { id:"504", x:733, y:1895,w:152, h:155 },
+  { id:"506", x:891, y:1895,w:152, h:155 }, { id:"508", x:1050,y:1895,w:152, h:155 },
+  { id:"510", x:1210,y:1895,w:152, h:155 }, { id:"512", x:1370,y:1895,w:152, h:155 },
+  // ── Bottom row (501, 503, 505, 507, 509, 511) ───────────────────────────────
+  { id:"501", x:380, y:2130,w:140, h:145 }, { id:"503", x:528, y:2130,w:140, h:145 },
+  { id:"505", x:678, y:2130,w:140, h:145 }, { id:"507", x:1000,y:2130,w:140, h:145 },
+  { id:"509", x:1148,y:2130,w:140, h:145 }, { id:"511", x:1254,y:2130,w:140, h:145 },
+  // ── Corner booths (513, 514) ─────────────────────────────────────────────────
+  { id:"513", x:1562,y:2130,w:130, h:145 }, { id:"514", x:1698,y:2130,w:130, h:145 },
+];
 
 function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
   const win = Dimensions.get("window");
   const W = win.width;
   const H = win.height * 0.78;
+
+  // How the image fits inside W×H with resizeMode="contain"
+  const imgScale  = Math.min(W / IMG_W, H / IMG_H);
+  const dispW     = IMG_W * imgScale;
+  const dispH     = IMG_H * imgScale;
+  const dispX0    = (W - dispW) / 2;
+  const dispY0    = (H - dispH) / 2;
+
+  const [selectedBooth, setSelectedBooth] = useState<string | null>(null);
 
   const scale      = useSharedValue(1);
   const offsetX    = useSharedValue(0);
@@ -81,7 +159,7 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
     });
 
   const pan = Gesture.Pan()
-    .averageTouches(true).minDistance(4)
+    .averageTouches(true).minDistance(8)
     .onBegin(() => { savedX.value = offsetX.value; savedY.value = offsetY.value; })
     .onUpdate((e) => {
       if (scale.value <= 1.05) return;
@@ -114,25 +192,64 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
     transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: scale.value }],
   }));
 
-  const visited = visitedBooths.filter(Boolean);
+  const visited = new Set(visitedBooths.filter(Boolean));
+  const selectedName = selectedBooth ? (BOOTH_NAMES[selectedBooth] ?? "") : "";
 
   return (
     <View style={{ flex: 1, overflow: "hidden" }}>
       <GestureDetector gesture={gesture}>
-        <Animated.Image
-          source={MAP_IMAGE}
-          style={[{ width: W, height: H }, animStyle]}
-          resizeMode="contain"
-        />
+        <Animated.View style={[{ width: W, height: H }, animStyle]}>
+          {/* Map image */}
+          <Animated.Image
+            source={MAP_IMAGE}
+            style={{ width: W, height: H }}
+            resizeMode="contain"
+          />
+          {/* Invisible booth tap zones, positioned to match contained image */}
+          <View style={{
+            position: "absolute",
+            left: dispX0, top: dispY0,
+            width: dispW, height: dispH,
+          }}>
+            {BOOTH_ZONES.map((z) => (
+              <Pressable
+                key={z.id}
+                onPress={() => setSelectedBooth((prev) => prev === z.id ? null : z.id)}
+                style={{
+                  position: "absolute",
+                  left:  z.x * imgScale,
+                  top:   z.y * imgScale,
+                  width: z.w * imgScale,
+                  height:z.h * imgScale,
+                }}
+              />
+            ))}
+          </View>
+        </Animated.View>
       </GestureDetector>
-      {visited.length > 0 && (
-        <View style={styles.visitedBadge}>
-          <Text style={styles.visitedBadgeText}>
-            ✓ {visited.length} booth{visited.length !== 1 ? "s" : ""} visited: {visited.join(", ")}
-          </Text>
-        </View>
+
+      {/* Booth tooltip */}
+      {selectedBooth && (
+        <Pressable
+          onPress={() => setSelectedBooth(null)}
+          style={styles.boothTooltip}
+        >
+          <View style={styles.boothTooltipInner}>
+            <View style={styles.boothTooltipBadge}>
+              <Text style={styles.boothTooltipNum}>Booth {selectedBooth}</Text>
+            </View>
+            <Text style={styles.boothTooltipName} numberOfLines={2}>
+              {selectedName || "(no exhibitor assigned)"}
+            </Text>
+            {visited.has(selectedBooth) && (
+              <Text style={styles.boothTooltipVisited}>✓ Visited</Text>
+            )}
+            <Text style={styles.boothTooltipDismiss}>Tap to dismiss</Text>
+          </View>
+        </Pressable>
       )}
-      <Text style={styles.zoomHint}>Pinch to zoom · Double-tap to zoom in/out</Text>
+
+      <Text style={styles.zoomHint}>Tap a booth · Pinch to zoom · Double-tap to zoom in/out</Text>
     </View>
   );
 }
@@ -787,26 +904,60 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  visitedBadge: {
-    marginHorizontal: 12,
-    marginTop: 6,
-    backgroundColor: "#d1fae5",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "#6ee7b7",
-  },
-  visitedBadgeText: {
-    fontSize: 12,
-    color: "#065f46",
-    fontWeight: "600",
-  },
   zoomHint: {
     textAlign: "center",
     fontSize: 11,
     color: "#94a3b8",
     paddingVertical: 6,
+  },
+  boothTooltip: {
+    position: "absolute",
+    bottom: 32,
+    left: 16,
+    right: 16,
+    alignItems: "center",
+  },
+  boothTooltipInner: {
+    backgroundColor: "#1e293b",
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    alignItems: "center",
+    gap: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    minWidth: 200,
+  },
+  boothTooltipBadge: {
+    backgroundColor: "#4f46e5",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  boothTooltipNum: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  boothTooltipName: {
+    color: "#f1f5f9",
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  boothTooltipVisited: {
+    color: "#6ee7b7",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  boothTooltipDismiss: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 2,
   },
   mapTabBar: {
     flexDirection: "row",
