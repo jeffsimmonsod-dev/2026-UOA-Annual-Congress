@@ -32,19 +32,7 @@ function NativeTabLayout() {
         <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
         <Label>More</Label>
       </NativeTabs.Trigger>
-      {/* Hidden screens accessible from More menu */}
-      <NativeTabs.Trigger name="para" style={{ display: "none" }}>
-        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-        <Label>Para</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="speakers" style={{ display: "none" }}>
-        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
-        <Label>Speakers</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="venue" style={{ display: "none" }}>
-        <Icon sf={{ default: "location", selected: "location.fill" }} />
-        <Label>Venue</Label>
-      </NativeTabs.Trigger>
+      {/* para / speakers / venue are reached via router.push from more.tsx — no triggers needed */}
     </NativeTabs>
   );
 }
@@ -128,18 +116,6 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="para"
-        options={{
-          title: "Para",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="person.2" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="people-outline" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="photos"
         options={{
           title: "Photos",
@@ -163,20 +139,10 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="speakers"
-        options={{
-          href: null,
-          title: "Speakers",
-        }}
-      />
-      <Tabs.Screen
-        name="venue"
-        options={{
-          href: null,
-          title: "Venue",
-        }}
-      />
+      {/* Hidden from tab bar — accessible via router.push from more.tsx */}
+      <Tabs.Screen name="para"     options={{ href: null, title: "Para Education" }} />
+      <Tabs.Screen name="speakers" options={{ href: null, title: "Speakers" }} />
+      <Tabs.Screen name="venue"    options={{ href: null, title: "Venue & Hotel" }} />
     </Tabs>
   );
 }
