@@ -1,10 +1,12 @@
 const fs = require("fs");
+const net = require("net");
 const path = require("path");
 const { spawn } = require("child_process");
 const { Readable } = require("stream");
 const { pipeline } = require("stream/promises");
 
 let metroProcess = null;
+let metroPort = 8081;
 
 const projectRoot = path.resolve(__dirname, "..");
 
@@ -112,9 +114,29 @@ function clearMetroCache() {
   console.log("Cache cleared");
 }
 
+function findFreePort(startPort) {
+  return new Promise((resolve, reject) => {
+    const tryPort = (port) => {
+      const server = net.createServer();
+      server.once("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          tryPort(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+      server.once("listening", () => {
+        server.close(() => resolve(port));
+      });
+      server.listen(port, "127.0.0.1");
+    };
+    tryPort(startPort);
+  });
+}
+
 async function checkMetroHealth() {
   try {
-    const response = await fetch("http://localhost:8081/status", {
+    const response = await fetch(`http://localhost:${metroPort}/status`, {
       signal: AbortSignal.timeout(5000),
     });
     return response.ok;
@@ -128,6 +150,9 @@ function getExpoPublicReplId() {
 }
 
 async function startMetro(expoPublicDomain, expoPublicReplId) {
+  metroPort = await findFreePort(8081);
+  console.log(`Using Metro port ${metroPort}`);
+
   const isRunning = await checkMetroHealth();
   if (isRunning) {
     console.log("Metro already running");
@@ -155,6 +180,8 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
       "--no-dev",
       "--minify",
       "--localhost",
+      "--port",
+      String(metroPort),
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
@@ -230,7 +257,7 @@ async function downloadFile(url, outputPath) {
 async function downloadBundle(platform, timestamp) {
   const entryPath = path.resolve(projectRoot, "node_modules", "expo-router", "entry");
   const bundlePath = path.relative(workspaceRoot, entryPath);
-  const url = new URL(`http://localhost:8081/${bundlePath}.bundle`);
+  const url = new URL(`http://localhost:${metroPort}/${bundlePath}.bundle`);
   url.searchParams.set("platform", platform);
   url.searchParams.set("dev", "false");
   url.searchParams.set("hot", "false");
@@ -258,7 +285,7 @@ async function downloadManifest(platform) {
 
   try {
     console.log(`Fetching ${platform} manifest...`);
-    const response = await fetch("http://localhost:8081/manifest", {
+    const response = await fetch(`http://localhost:${metroPort}/manifest`, {
       headers: { "expo-platform": platform },
       signal: controller.signal,
     });
