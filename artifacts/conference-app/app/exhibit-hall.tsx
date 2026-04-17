@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -365,6 +365,7 @@ export default function ExhibitHallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const deviceId = useRef(getDeviceId()).current;
+  const params = useLocalSearchParams<{ scan?: string }>();
 
   const [passport, setPassport] = useState<PassportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -413,6 +414,14 @@ export default function ExhibitHallScreen() {
     setScanned(false);
     setScannerVisible(true);
   };
+
+  // Auto-open scanner when navigated from home screen with ?scan=true
+  useEffect(() => {
+    if (params.scan === "true" && !loading) {
+      handleOpenScanner();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.scan, loading]);
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
     if (scanned) return;
