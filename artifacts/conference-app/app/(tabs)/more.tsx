@@ -100,7 +100,7 @@ export default function MoreScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: insets.top + 16,
+          paddingTop: insets.top,
           paddingBottom: insets.bottom + 100,
         },
       ]}

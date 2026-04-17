@@ -132,6 +132,7 @@ function ClassicTabLayout() {
         name="more"
         options={{
           title: "More",
+          headerShown: false,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="ellipsis" tintColor={color} size={24} />
