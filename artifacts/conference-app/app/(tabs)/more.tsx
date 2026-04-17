@@ -52,13 +52,6 @@ const useMenuItems = (): MenuItem[] => {
       description: "Faculty & course presenters",
     },
     {
-      label: "Venue & Hotel",
-      icon: "location-outline",
-      color: "#14b8a6",
-      route: "/(tabs)/venue",
-      description: "Grand Hyatt Deer Valley",
-    },
-    {
       label: "Sponsors & Exhibitors",
       icon: "ribbon-outline",
       color: "#f59e0b",
@@ -71,6 +64,13 @@ const useMenuItems = (): MenuItem[] => {
       color: "#ef4444",
       route: "/updates",
       description: "Announcements & alerts",
+    },
+    {
+      label: "Venue & Hotel",
+      icon: "location-outline",
+      color: "#14b8a6",
+      route: "/(tabs)/venue",
+      description: "Grand Hyatt Deer Valley",
     },
     {
       label: "FAQ",
