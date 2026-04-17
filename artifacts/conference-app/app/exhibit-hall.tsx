@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,9 +18,124 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import ExhibitHallMap from "@/components/ExhibitHallMap";
+import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
+
+const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
+
+function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
+  const win = Dimensions.get("window");
+  const W = win.width;
+  const H = win.height * 0.78;
+
+  const scale      = useSharedValue(1);
+  const offsetX    = useSharedValue(0);
+  const offsetY    = useSharedValue(0);
+  const savedScale = useSharedValue(1);
+  const savedX     = useSharedValue(0);
+  const savedY     = useSharedValue(0);
+
+  const ZOOM_CFG = { duration: 260, easing: Easing.out(Easing.cubic) };
+
+  const resetToFit = () => {
+    "worklet";
+    scale.value   = withSpring(1, { damping: 15 });
+    offsetX.value = withSpring(0, { damping: 15 });
+    offsetY.value = withSpring(0, { damping: 15 });
+    savedScale.value = 1; savedX.value = 0; savedY.value = 0;
+  };
+
+  const clamp = (x: number, y: number, s: number) => {
+    "worklet";
+    const mx = Math.max(0, (W * (s - 1)) / 2);
+    const my = Math.max(0, (H * (s - 1)) / 2);
+    return { x: Math.min(mx, Math.max(-mx, x)), y: Math.min(my, Math.max(-my, y)) };
+  };
+
+  const pinch = Gesture.Pinch()
+    .onBegin(() => {
+      savedScale.value = scale.value;
+      savedX.value = offsetX.value; savedY.value = offsetY.value;
+    })
+    .onUpdate((e) => {
+      const ns = Math.min(6, Math.max(1, savedScale.value * e.scale));
+      scale.value = ns;
+      const fx = e.focalX - W / 2, fy = e.focalY - H / 2;
+      const d  = ns / savedScale.value - 1;
+      const c  = clamp(savedX.value - fx * d, savedY.value - fy * d, ns);
+      offsetX.value = c.x; offsetY.value = c.y;
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      savedX.value = offsetX.value; savedY.value = offsetY.value;
+      if (scale.value < 1.05) resetToFit();
+    });
+
+  const pan = Gesture.Pan()
+    .averageTouches(true).minDistance(4)
+    .onBegin(() => { savedX.value = offsetX.value; savedY.value = offsetY.value; })
+    .onUpdate((e) => {
+      if (scale.value <= 1.05) return;
+      const c = clamp(savedX.value + e.translationX, savedY.value + e.translationY, scale.value);
+      offsetX.value = c.x; offsetY.value = c.y;
+    })
+    .onEnd(() => { savedX.value = offsetX.value; savedY.value = offsetY.value; });
+
+  const doubleTap = Gesture.Tap().numberOfTaps(2).maxDelay(300).maxDuration(500)
+    .onEnd((e) => {
+      if (scale.value > 1.5) {
+        scale.value = withTiming(1, ZOOM_CFG);
+        offsetX.value = withTiming(0, ZOOM_CFG);
+        offsetY.value = withTiming(0, ZOOM_CFG);
+        savedScale.value = 1; savedX.value = 0; savedY.value = 0;
+      } else {
+        const ns = 3;
+        const fx = e.x - W / 2, fy = e.y - H / 2;
+        const c = clamp(-fx * (ns - 1), -fy * (ns - 1), ns);
+        scale.value = withTiming(ns, ZOOM_CFG);
+        offsetX.value = withTiming(c.x, ZOOM_CFG);
+        offsetY.value = withTiming(c.y, ZOOM_CFG);
+        savedScale.value = ns; savedX.value = c.x; savedY.value = c.y;
+      }
+    });
+
+  const gesture = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: scale.value }],
+  }));
+
+  const visited = visitedBooths.filter(Boolean);
+
+  return (
+    <View style={{ flex: 1, overflow: "hidden" }}>
+      <GestureDetector gesture={gesture}>
+        <Animated.Image
+          source={MAP_IMAGE}
+          style={[{ width: W, height: H }, animStyle]}
+          resizeMode="contain"
+        />
+      </GestureDetector>
+      {visited.length > 0 && (
+        <View style={styles.visitedBadge}>
+          <Text style={styles.visitedBadgeText}>
+            ✓ {visited.length} booth{visited.length !== 1 ? "s" : ""} visited: {visited.join(", ")}
+          </Text>
+        </View>
+      )}
+      <Text style={styles.zoomHint}>Pinch to zoom · Double-tap to zoom in/out</Text>
+    </View>
+  );
+}
 
 // Full exhibitor directory from CSV (booth number → full company name)
 const EXHIBITOR_DIRECTORY: { booth: string; company: string }[] = [
@@ -125,12 +241,7 @@ export default function ExhibitHallScreen() {
 
   const [permission, requestPermission] = useCameraPermissions();
   const [mapVisible, setMapVisible] = useState(false);
-  const [mapZoom, setMapZoom] = useState(1);
   const [mapTab, setMapTab] = useState<"map" | "directory">("map");
-
-  const zoomIn = () => setMapZoom((z) => Math.min(z + 0.25, 2.5));
-  const zoomOut = () => setMapZoom((z) => Math.max(z - 0.25, 0.5));
-  const zoomReset = () => setMapZoom(1);
 
   // Build alphabetical sections for directory
   const directorySections = useMemo(() => {
@@ -394,46 +505,9 @@ export default function ExhibitHallScreen() {
           </View>
 
           {mapTab === "map" ? (
-            <>
-              {/* Legend + zoom controls */}
-              <View style={[styles.mapLegendBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                <View style={styles.legend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: "#c4b5fd", borderColor: "#7c3aed" }]} />
-                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Foyer</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" }]} />
-                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Islands</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: "#fde68a", borderColor: "#d97706" }]} />
-                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Perimeter</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: "#6ee7b7", borderColor: "#059669" }]} />
-                    <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>Visited</Text>
-                  </View>
-                </View>
-                <View style={styles.zoomControls}>
-                  <Pressable onPress={zoomOut} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Ionicons name="remove" size={18} color={colors.foreground} />
-                  </Pressable>
-                  <Pressable onPress={zoomReset} style={[styles.zoomResetBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Text style={[styles.zoomLabel, { color: colors.foreground }]}>{Math.round(mapZoom * 100)}%</Text>
-                  </Pressable>
-                  <Pressable onPress={zoomIn} style={[styles.zoomBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                    <Ionicons name="add" size={18} color={colors.foreground} />
-                  </Pressable>
-                </View>
-              </View>
-              {/* Scrollable + zoomable map */}
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }} showsVerticalScrollIndicator>
-                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-                  <ExhibitHallMap visitedBooths={visitedBoothNumbers} scale={mapZoom} />
-                </ScrollView>
-              </ScrollView>
-            </>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <ZoomableMap visitedBooths={visitedBoothNumbers} />
+            </GestureHandlerRootView>
           ) : (
             <SectionList
               sections={directorySections}
@@ -713,51 +787,27 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  mapLegendBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  legend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    flex: 1,
-  },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-    borderWidth: 1.5,
-  },
-  legendLabel: { fontSize: 10 },
-  zoomControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  zoomBtn: {
-    width: 32,
-    height: 32,
+  visitedBadge: {
+    marginHorizontal: 12,
+    marginTop: 6,
+    backgroundColor: "#d1fae5",
     borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: "#6ee7b7",
   },
-  zoomResetBtn: {
-    paddingHorizontal: 8,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  visitedBadgeText: {
+    fontSize: 12,
+    color: "#065f46",
+    fontWeight: "600",
   },
-  zoomLabel: { fontSize: 12, fontWeight: "600" },
+  zoomHint: {
+    textAlign: "center",
+    fontSize: 11,
+    color: "#94a3b8",
+    paddingVertical: 6,
+  },
   mapTabBar: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
