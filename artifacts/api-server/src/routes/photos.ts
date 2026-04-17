@@ -11,6 +11,29 @@ const router = Router();
 const objectStorageService = new ObjectStorageService();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+async function ensureTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS congress_photos (
+      id                 TEXT PRIMARY KEY,
+      object_path        TEXT NOT NULL,
+      uploader_name      TEXT NOT NULL,
+      uploader_device_id TEXT NOT NULL,
+      caption            TEXT NOT NULL DEFAULT '',
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS congress_photo_likes (
+      photo_id   TEXT NOT NULL REFERENCES congress_photos(id) ON DELETE CASCADE,
+      device_id  TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (photo_id, device_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_congress_photos_created ON congress_photos(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_congress_photo_likes_photo ON congress_photo_likes(photo_id);
+  `);
+}
+
+ensureTables().catch(console.error);
+
 function photoToJSON(row: any, deviceId?: string) {
   return {
     id: row.id,
