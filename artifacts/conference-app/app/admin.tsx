@@ -23,6 +23,7 @@ const CORRECT_PIN = "Chanae2026!";
 
 type Step = "pin" | "dashboard";
 type AdminTab = "notifications" | "booths";
+type SendMode = "now" | "schedule";
 
 interface Booth {
   id: number;
@@ -34,12 +35,28 @@ interface Booth {
   visit_count: number;
 }
 
+interface ScheduledAnnouncement {
+  id: number;
+  title: string;
+  body: string;
+  scheduled_for: string;
+  sent_at: string | null;
+}
+
 function qrUrl(data: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`;
 }
 
 function boothQrData(booth: Booth) {
   return `uoa2026:booth:${booth.id}:${booth.secret_token}`;
+}
+
+function formatScheduledDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
 }
 
 export default function AdminScreen() {
@@ -55,6 +72,13 @@ export default function AdminScreen() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+
+  const [sendMode, setSendMode] = useState<SendMode>("now");
+  const [schedDate, setSchedDate] = useState("");
+  const [schedTime, setSchedTime] = useState("");
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduledList, setScheduledList] = useState<ScheduledAnnouncement[]>([]);
+  const [scheduledLoading, setScheduledLoading] = useState(false);
 
   const [booths, setBooths] = useState<Booth[]>([]);
   const [boothsLoading, setBoothsLoading] = useState(false);
@@ -92,6 +116,87 @@ export default function AdminScreen() {
     }
   };
 
+  const handleSchedule = async () => {
+    if (!title.trim() || !body.trim()) {
+      Alert.alert("Missing fields", "Please enter both a title and a message.");
+      return;
+    }
+    if (!schedDate || !schedTime) {
+      Alert.alert("Missing date/time", "Please enter both a date and a time.");
+      return;
+    }
+
+    const dt = new Date(`${schedDate}T${schedTime}:00`);
+    if (isNaN(dt.getTime())) {
+      Alert.alert("Invalid date/time", "Use YYYY-MM-DD for date and HH:MM for time (24-hour).");
+      return;
+    }
+    if (dt <= new Date()) {
+      Alert.alert("Invalid time", "Scheduled time must be in the future.");
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/push/schedule`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-pin": CORRECT_PIN,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          scheduledFor: dt.toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        Alert.alert("Scheduled!", `"${title.trim()}" will be sent on ${formatScheduledDate(dt.toISOString())}.`, [
+          { text: "OK", onPress: () => { setTitle(""); setBody(""); setSchedDate(""); setSchedTime(""); setSendMode("now"); } },
+        ]);
+        fetchScheduled();
+      } else {
+        const err = await res.json();
+        Alert.alert("Error", err.error || "Could not schedule announcement.");
+      }
+    } catch {
+      Alert.alert("Error", "Could not reach the server.");
+    }
+    setScheduling(false);
+  };
+
+  const fetchScheduled = useCallback(async () => {
+    setScheduledLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/push/scheduled`, {
+        headers: { "x-admin-pin": CORRECT_PIN },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScheduledList(data.announcements);
+      }
+    } catch {}
+    setScheduledLoading(false);
+  }, []);
+
+  const handleCancelScheduled = (item: ScheduledAnnouncement) => {
+    Alert.alert("Cancel Announcement", `Remove "${item.title}" scheduled for ${formatScheduledDate(item.scheduled_for)}?`, [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Cancel It",
+        style: "destructive",
+        onPress: async () => {
+          await fetch(`${API_BASE}/api/push/scheduled/${item.id}`, {
+            method: "DELETE",
+            headers: { "x-admin-pin": CORRECT_PIN },
+          });
+          fetchScheduled();
+        },
+      },
+    ]);
+  };
+
   const fetchBooths = useCallback(async () => {
     setBoothsLoading(true);
     try {
@@ -121,11 +226,14 @@ export default function AdminScreen() {
   }, []);
 
   useEffect(() => {
+    if (step === "dashboard" && activeTab === "notifications") {
+      fetchScheduled();
+    }
     if (step === "dashboard" && activeTab === "booths") {
       fetchBooths();
       fetchRaffle();
     }
-  }, [step, activeTab, fetchBooths, fetchRaffle]);
+  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled]);
 
   const handleAddBooth = async () => {
     if (!newBoothName.trim() || !newBoothCompany.trim()) {
@@ -175,6 +283,9 @@ export default function AdminScreen() {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}&margin=20`;
     Linking.openURL(url);
   };
+
+  const pending = scheduledList.filter((a) => !a.sent_at);
+  const sent = scheduledList.filter((a) => a.sent_at);
 
   if (step === "pin") {
     return (
@@ -235,52 +346,183 @@ export default function AdminScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {activeTab === "notifications" && (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.label, { color: colors.foreground }]}>Announcement Title</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="e.g., Lunch is now being served"
-              placeholderTextColor={colors.mutedForeground}
-              value={title}
-              onChangeText={setTitle}
-              returnKeyType="next"
-              maxLength={80}
-            />
-            <Text style={[styles.label, { color: colors.foreground, marginTop: 4 }]}>Message</Text>
-            <TextInput
-              style={[styles.textArea, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="Detailed message for attendees..."
-              placeholderTextColor={colors.mutedForeground}
-              value={body}
-              onChangeText={setBody}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              maxLength={300}
-            />
-            <Text style={[styles.charCount, { color: colors.mutedForeground }]}>{body.length}/300</Text>
-            <View style={styles.quickFills}>
-              <Text style={[styles.quickFillLabel, { color: colors.mutedForeground }]}>Quick fill:</Text>
-              {[
-                { t: "Lunch Now Served", b: "Lunch is now being served in the Grand Ballroom. Please make your way to the dining area." },
-                { t: "Session Starting Soon", b: "The next CE session begins in 5 minutes. Please make your way to your assigned room." },
-                { t: "Exhibitor Hall Open", b: "The exhibitor hall is now open! Visit our sponsors and partners in the main exhibit area." },
-              ].map((q) => (
-                <Pressable key={q.t} onPress={() => { setTitle(q.t); setBody(q.b); }} style={[styles.quickFillChip, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-                  <Text style={[styles.quickFillText, { color: colors.primary }]}>{q.t}</Text>
+          <>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.label, { color: colors.foreground }]}>Announcement Title</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+                placeholder="e.g., Lunch is now being served"
+                placeholderTextColor={colors.mutedForeground}
+                value={title}
+                onChangeText={setTitle}
+                returnKeyType="next"
+                maxLength={80}
+              />
+              <Text style={[styles.label, { color: colors.foreground, marginTop: 4 }]}>Message</Text>
+              <TextInput
+                style={[styles.textArea, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
+                placeholder="Detailed message for attendees..."
+                placeholderTextColor={colors.mutedForeground}
+                value={body}
+                onChangeText={setBody}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                maxLength={300}
+              />
+              <Text style={[styles.charCount, { color: colors.mutedForeground }]}>{body.length}/300</Text>
+
+              <View style={styles.quickFills}>
+                <Text style={[styles.quickFillLabel, { color: colors.mutedForeground }]}>Quick fill:</Text>
+                {[
+                  { t: "Lunch Now Served", b: "Lunch is now being served in the Grand Ballroom. Please make your way to the dining area." },
+                  { t: "Session Starting Soon", b: "The next CE session begins in 5 minutes. Please make your way to your assigned room." },
+                  { t: "Exhibitor Hall Open", b: "The exhibitor hall is now open! Visit our sponsors and partners in the main exhibit area." },
+                ].map((q) => (
+                  <Pressable key={q.t} onPress={() => { setTitle(q.t); setBody(q.b); }} style={[styles.quickFillChip, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                    <Text style={[styles.quickFillText, { color: colors.primary }]}>{q.t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={[styles.sendModeRow, { borderColor: colors.border }]}>
+                <Pressable
+                  onPress={() => setSendMode("now")}
+                  style={[styles.sendModeBtn, sendMode === "now" && { backgroundColor: colors.primary }, { borderColor: sendMode === "now" ? colors.primary : colors.border }]}
+                >
+                  <Ionicons name="send-outline" size={14} color={sendMode === "now" ? "#fff" : colors.mutedForeground} />
+                  <Text style={[styles.sendModeBtnText, { color: sendMode === "now" ? "#fff" : colors.mutedForeground }]}>Send Now</Text>
                 </Pressable>
-              ))}
+                <Pressable
+                  onPress={() => setSendMode("schedule")}
+                  style={[styles.sendModeBtn, sendMode === "schedule" && { backgroundColor: colors.primary }, { borderColor: sendMode === "schedule" ? colors.primary : colors.border }]}
+                >
+                  <Ionicons name="time-outline" size={14} color={sendMode === "schedule" ? "#fff" : colors.mutedForeground} />
+                  <Text style={[styles.sendModeBtnText, { color: sendMode === "schedule" ? "#fff" : colors.mutedForeground }]}>Schedule</Text>
+                </Pressable>
+              </View>
+
+              {sendMode === "schedule" && (
+                <View style={[styles.scheduleForm, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                  <Text style={[styles.scheduleFormTitle, { color: colors.foreground }]}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.foreground} /> When to send
+                  </Text>
+                  <View style={styles.scheduleRow}>
+                    <View style={{ flex: 1.4 }}>
+                      <Text style={[styles.scheduleFieldLabel, { color: colors.mutedForeground }]}>Date (YYYY-MM-DD)</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
+                        placeholder="2026-06-05"
+                        placeholderTextColor={colors.mutedForeground}
+                        value={schedDate}
+                        onChangeText={setSchedDate}
+                        keyboardType="numbers-and-punctuation"
+                        maxLength={10}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.scheduleFieldLabel, { color: colors.mutedForeground }]}>Time (HH:MM)</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
+                        placeholder="09:30"
+                        placeholderTextColor={colors.mutedForeground}
+                        value={schedTime}
+                        onChangeText={setSchedTime}
+                        keyboardType="numbers-and-punctuation"
+                        maxLength={5}
+                      />
+                    </View>
+                  </View>
+                  <Text style={[styles.scheduleHint, { color: colors.mutedForeground }]}>
+                    Time is in your local timezone · 24-hour format (e.g. 14:30 = 2:30 PM)
+                  </Text>
+                </View>
+              )}
+
+              {sendMode === "now" ? (
+                <Pressable onPress={handleSend} disabled={sending} style={[styles.button, { backgroundColor: sending ? colors.muted : colors.primary }]}>
+                  <Ionicons name="send-outline" size={16} color={sending ? colors.mutedForeground : "#fff"} />
+                  <Text style={[styles.buttonText, { color: sending ? colors.mutedForeground : "#fff" }]}>
+                    {sending ? "Sending..." : "Send to All Attendees"}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={handleSchedule} disabled={scheduling} style={[styles.button, { backgroundColor: scheduling ? colors.muted : colors.primary }]}>
+                  <Ionicons name="time-outline" size={16} color={scheduling ? colors.mutedForeground : "#fff"} />
+                  <Text style={[styles.buttonText, { color: scheduling ? colors.mutedForeground : "#fff" }]}>
+                    {scheduling ? "Scheduling..." : "Schedule Announcement"}
+                  </Text>
+                </Pressable>
+              )}
+
+              <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
+                <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>
+              </Pressable>
             </View>
-            <Pressable onPress={handleSend} disabled={sending} style={[styles.button, { backgroundColor: sending ? colors.muted : colors.primary }]}>
-              <Ionicons name="send-outline" size={16} color={sending ? colors.mutedForeground : "#fff"} />
-              <Text style={[styles.buttonText, { color: sending ? colors.mutedForeground : "#fff" }]}>
-                {sending ? "Sending..." : "Send to All Attendees"}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
-              <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>
-            </Pressable>
-          </View>
+
+            {/* Scheduled announcements list */}
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.scheduledHeader}>
+                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Text style={[styles.label, { color: colors.foreground, flex: 1 }]}>Scheduled Announcements</Text>
+                <Pressable onPress={fetchScheduled} style={styles.refreshBtn}>
+                  <Ionicons name="refresh" size={16} color={colors.primary} />
+                </Pressable>
+              </View>
+
+              {scheduledLoading ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
+              ) : pending.length === 0 && sent.length === 0 ? (
+                <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 8 }]}>
+                  No scheduled announcements yet.
+                </Text>
+              ) : (
+                <>
+                  {pending.length > 0 && (
+                    <>
+                      <Text style={[styles.scheduledSectionLabel, { color: colors.mutedForeground }]}>UPCOMING</Text>
+                      {pending.map((item) => (
+                        <View key={item.id} style={[styles.scheduledItem, { borderColor: colors.border, backgroundColor: colors.primary + "08" }]}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.scheduledItemTitle, { color: colors.foreground }]}>{item.title}</Text>
+                            <Text style={[styles.scheduledItemBody, { color: colors.mutedForeground }]} numberOfLines={1}>{item.body}</Text>
+                            <View style={styles.scheduledItemTimeRow}>
+                              <Ionicons name="time-outline" size={12} color={colors.primary} />
+                              <Text style={[styles.scheduledItemTime, { color: colors.primary }]}>
+                                {formatScheduledDate(item.scheduled_for)}
+                              </Text>
+                            </View>
+                          </View>
+                          <Pressable onPress={() => handleCancelScheduled(item)} style={styles.cancelBtn}>
+                            <Ionicons name="close-circle-outline" size={22} color="#ef4444" />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </>
+                  )}
+
+                  {sent.length > 0 && (
+                    <>
+                      <Text style={[styles.scheduledSectionLabel, { color: colors.mutedForeground, marginTop: pending.length > 0 ? 12 : 0 }]}>SENT</Text>
+                      {sent.map((item) => (
+                        <View key={item.id} style={[styles.scheduledItem, { borderColor: colors.border, opacity: 0.6 }]}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.scheduledItemTitle, { color: colors.foreground }]}>{item.title}</Text>
+                            <View style={styles.scheduledItemTimeRow}>
+                              <Ionicons name="checkmark-circle-outline" size={12} color="#10b981" />
+                              <Text style={[styles.scheduledItemTime, { color: "#10b981" }]}>
+                                Sent {formatScheduledDate(item.sent_at!)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+            </View>
+          </>
         )}
 
         {activeTab === "booths" && (
@@ -482,6 +724,52 @@ const styles = StyleSheet.create({
   quickFillChip: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   quickFillText: { fontSize: 13, fontWeight: "500" },
   backLink: { fontSize: 13, textAlign: "center", marginTop: 4 },
+  sendModeRow: {
+    flexDirection: "row",
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+    marginTop: -4,
+  },
+  sendModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  sendModeBtnText: { fontSize: 13, fontWeight: "700" },
+  scheduleForm: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+    marginTop: -4,
+  },
+  scheduleFormTitle: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
+  scheduleRow: { flexDirection: "row", gap: 10 },
+  scheduleFieldLabel: { fontSize: 11, fontWeight: "600", marginBottom: 4 },
+  scheduleHint: { fontSize: 11, lineHeight: 16 },
+  scheduledHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  scheduledSectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, marginBottom: 4 },
+  scheduledItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
+    marginTop: 6,
+  },
+  scheduledItemTitle: { fontSize: 14, fontWeight: "600" },
+  scheduledItemBody: { fontSize: 12, marginTop: 2 },
+  scheduledItemTimeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  scheduledItemTime: { fontSize: 12, fontWeight: "500" },
+  cancelBtn: { padding: 4 },
+  refreshBtn: { padding: 4 },
   raffleCard: {
     borderRadius: 16,
     borderWidth: 1.5,
@@ -490,7 +778,6 @@ const styles = StyleSheet.create({
   },
   raffleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   raffleTitle: { flex: 1, fontSize: 15, fontWeight: "700" },
-  refreshBtn: { padding: 4 },
   raffleEmpty: { fontSize: 13 },
   raffleCount: { fontSize: 16, fontWeight: "700" },
   raffleEntry: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, marginTop: 4 },
