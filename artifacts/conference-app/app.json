@@ -49,6 +49,9 @@
       "expo-web-browser",
       "expo-camera"
     ],
+    "updates": {
+      "enabled": false
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
