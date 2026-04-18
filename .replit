@@ -35,6 +35,10 @@ externalPort = 3000
 localPort = 22516
 externalPort = 80
 
+[[ports]]
+localPort = 22517
+externalPort = 3001
+
 [nix]
 channel = "stable-25_05"
 packages = ["eas-cli"]
