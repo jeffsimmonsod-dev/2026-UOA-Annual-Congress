@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
   Image,
   Linking,
@@ -76,22 +76,21 @@ export default function HomeScreen() {
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
   const nextSession: Session | null = savedSessions[0] ?? null;
   const trackColor = nextSession ? (TRACK_COLORS[nextSession.track] ?? colors.primary) : colors.primary;
-  const [logoTapCount, setLogoTapCount] = useState(0);
+  const logoTapCountRef = useRef(0);
   const logoTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LOGO_TAPS_REQUIRED = 7;
 
   const handleLogoTap = () => {
-    setLogoTapCount((prev) => {
-      const next = prev + 1;
-      if (logoTapTimerRef.current) clearTimeout(logoTapTimerRef.current);
-      if (next >= LOGO_TAPS_REQUIRED) {
-        setLogoTapCount(0);
-        router.push("/admin");
-        return 0;
-      }
-      logoTapTimerRef.current = setTimeout(() => setLogoTapCount(0), 3000);
-      return next;
-    });
+    if (logoTapTimerRef.current) clearTimeout(logoTapTimerRef.current);
+    logoTapCountRef.current += 1;
+    if (logoTapCountRef.current >= LOGO_TAPS_REQUIRED) {
+      logoTapCountRef.current = 0;
+      router.push("/admin");
+      return;
+    }
+    logoTapTimerRef.current = setTimeout(() => {
+      logoTapCountRef.current = 0;
+    }, 3000);
   };
 
   const latestUpdate = [...UPDATES].sort(
