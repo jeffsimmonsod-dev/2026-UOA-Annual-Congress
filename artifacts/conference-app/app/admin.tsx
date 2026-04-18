@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -6,6 +7,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -74,8 +76,9 @@ export default function AdminScreen() {
   const [sending, setSending] = useState(false);
 
   const [sendMode, setSendMode] = useState<SendMode>("now");
-  const [schedDate, setSchedDate] = useState("");
-  const [schedTime, setSchedTime] = useState("");
+  const [schedDateTime, setSchedDateTime] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduledList, setScheduledList] = useState<ScheduledAnnouncement[]>([]);
   const [scheduledLoading, setScheduledLoading] = useState(false);
@@ -121,17 +124,11 @@ export default function AdminScreen() {
       Alert.alert("Missing fields", "Please enter both a title and a message.");
       return;
     }
-    if (!schedDate || !schedTime) {
-      Alert.alert("Missing date/time", "Please enter both a date and a time.");
+    if (!schedDateTime) {
+      Alert.alert("Missing date/time", "Please pick a date and time.");
       return;
     }
-
-    const dt = new Date(`${schedDate}T${schedTime}:00`);
-    if (isNaN(dt.getTime())) {
-      Alert.alert("Invalid date/time", "Use YYYY-MM-DD for date and HH:MM for time (24-hour).");
-      return;
-    }
-    if (dt <= new Date()) {
+    if (schedDateTime <= new Date()) {
       Alert.alert("Invalid time", "Scheduled time must be in the future.");
       return;
     }
@@ -147,13 +144,13 @@ export default function AdminScreen() {
         body: JSON.stringify({
           title: title.trim(),
           body: body.trim(),
-          scheduledFor: dt.toISOString(),
+          scheduledFor: schedDateTime.toISOString(),
         }),
       });
 
       if (res.ok) {
-        Alert.alert("Scheduled!", `"${title.trim()}" will be sent on ${formatScheduledDate(dt.toISOString())}.`, [
-          { text: "OK", onPress: () => { setTitle(""); setBody(""); setSchedDate(""); setSchedTime(""); setSendMode("now"); } },
+        Alert.alert("Scheduled!", `"${title.trim()}" will be sent on ${formatScheduledDate(schedDateTime.toISOString())}.`, [
+          { text: "OK", onPress: () => { setTitle(""); setBody(""); setSchedDateTime(null); setSendMode("now"); } },
         ]);
         fetchScheduled();
       } else {
@@ -165,6 +162,38 @@ export default function AdminScreen() {
     }
     setScheduling(false);
   };
+
+  const onDateChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowDatePicker(false);
+    if (selected) {
+      setSchedDateTime((prev) => {
+        const base = prev ?? new Date();
+        const next = new Date(base);
+        next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+        return next;
+      });
+    }
+  };
+
+  const onTimeChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") setShowTimePicker(false);
+    if (selected) {
+      setSchedDateTime((prev) => {
+        const base = prev ?? new Date();
+        const next = new Date(base);
+        next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+        return next;
+      });
+    }
+  };
+
+  const formattedDate = schedDateTime
+    ? schedDateTime.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  const formattedTime = schedDateTime
+    ? schedDateTime.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : null;
 
   const fetchScheduled = useCallback(async () => {
     setScheduledLoading(true);
@@ -404,40 +433,95 @@ export default function AdminScreen() {
 
               {sendMode === "schedule" && (
                 <View style={[styles.scheduleForm, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Text style={[styles.scheduleFormTitle, { color: colors.foreground }]}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.foreground} /> When to send
-                  </Text>
+                  <Text style={[styles.scheduleFormTitle, { color: colors.foreground }]}>When to send</Text>
                   <View style={styles.scheduleRow}>
-                    <View style={{ flex: 1.4 }}>
-                      <Text style={[styles.scheduleFieldLabel, { color: colors.mutedForeground }]}>Date (YYYY-MM-DD)</Text>
-                      <TextInput
-                        style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
-                        placeholder="2026-06-05"
-                        placeholderTextColor={colors.mutedForeground}
-                        value={schedDate}
-                        onChangeText={setSchedDate}
-                        keyboardType="numbers-and-punctuation"
-                        maxLength={10}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.scheduleFieldLabel, { color: colors.mutedForeground }]}>Time (HH:MM)</Text>
-                      <TextInput
-                        style={[styles.input, { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border }]}
-                        placeholder="09:30"
-                        placeholderTextColor={colors.mutedForeground}
-                        value={schedTime}
-                        onChangeText={setSchedTime}
-                        keyboardType="numbers-and-punctuation"
-                        maxLength={5}
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => setShowDatePicker(true)}
+                      style={[styles.pickerBtn, { backgroundColor: colors.background, borderColor: formattedDate ? colors.primary : colors.border }]}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={formattedDate ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.pickerBtnText, { color: formattedDate ? colors.foreground : colors.mutedForeground }]}>
+                        {formattedDate ?? "Pick date"}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowTimePicker(true)}
+                      style={[styles.pickerBtn, { backgroundColor: colors.background, borderColor: formattedTime ? colors.primary : colors.border }]}
+                    >
+                      <Ionicons name="time-outline" size={16} color={formattedTime ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.pickerBtnText, { color: formattedTime ? colors.foreground : colors.mutedForeground }]}>
+                        {formattedTime ?? "Pick time"}
+                      </Text>
+                    </Pressable>
                   </View>
-                  <Text style={[styles.scheduleHint, { color: colors.mutedForeground }]}>
-                    Time is in your local timezone · 24-hour format (e.g. 14:30 = 2:30 PM)
-                  </Text>
+                  {schedDateTime && (
+                    <Text style={[styles.scheduleHint, { color: colors.primary }]}>
+                      Sends on {formatScheduledDate(schedDateTime.toISOString())}
+                    </Text>
+                  )}
                 </View>
               )}
+
+              {/* Android pickers render as native dialogs when visible */}
+              {Platform.OS === "android" && showDatePicker && (
+                <DateTimePicker
+                  value={schedDateTime ?? new Date()}
+                  mode="date"
+                  display="calendar"
+                  minimumDate={new Date()}
+                  onChange={onDateChange}
+                />
+              )}
+              {Platform.OS === "android" && showTimePicker && (
+                <DateTimePicker
+                  value={schedDateTime ?? new Date()}
+                  mode="time"
+                  display="clock"
+                  onChange={onTimeChange}
+                />
+              )}
+
+              {/* iOS/web: modal with inline calendar or spinner */}
+              <Modal visible={showDatePicker && Platform.OS !== "android"} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+                <Pressable style={styles.pickerBackdrop} onPress={() => setShowDatePicker(false)}>
+                  <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={() => {}}>
+                    <View style={styles.pickerSheetHandle} />
+                    <Text style={[styles.pickerSheetTitle, { color: colors.foreground }]}>Select Date</Text>
+                    <DateTimePicker
+                      value={schedDateTime ?? new Date()}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      minimumDate={new Date()}
+                      onChange={onDateChange}
+                      style={{ width: "100%" }}
+                      accentColor={colors.primary}
+                    />
+                    <Pressable onPress={() => setShowDatePicker(false)} style={[styles.pickerDoneBtn, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.pickerDoneBtnText}>Done</Text>
+                    </Pressable>
+                  </Pressable>
+                </Pressable>
+              </Modal>
+
+              <Modal visible={showTimePicker && Platform.OS !== "android"} transparent animationType="slide" onRequestClose={() => setShowTimePicker(false)}>
+                <Pressable style={styles.pickerBackdrop} onPress={() => setShowTimePicker(false)}>
+                  <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card }]} onPress={() => {}}>
+                    <View style={styles.pickerSheetHandle} />
+                    <Text style={[styles.pickerSheetTitle, { color: colors.foreground }]}>Select Time</Text>
+                    <DateTimePicker
+                      value={schedDateTime ?? new Date()}
+                      mode="time"
+                      display={Platform.OS === "ios" ? "spinner" : "default"}
+                      onChange={onTimeChange}
+                      style={{ width: "100%" }}
+                      accentColor={colors.primary}
+                    />
+                    <Pressable onPress={() => setShowTimePicker(false)} style={[styles.pickerDoneBtn, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.pickerDoneBtnText}>Done</Text>
+                    </Pressable>
+                  </Pressable>
+                </Pressable>
+              </Modal>
 
               {sendMode === "now" ? (
                 <Pressable onPress={handleSend} disabled={sending} style={[styles.button, { backgroundColor: sending ? colors.muted : colors.primary }]}>
@@ -752,7 +836,47 @@ const styles = StyleSheet.create({
   scheduleFormTitle: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
   scheduleRow: { flexDirection: "row", gap: 10 },
   scheduleFieldLabel: { fontSize: 11, fontWeight: "600", marginBottom: 4 },
-  scheduleHint: { fontSize: 11, lineHeight: 16 },
+  scheduleHint: { fontSize: 12, lineHeight: 16 },
+  pickerBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 13,
+  },
+  pickerBtnText: { fontSize: 14, fontWeight: "500", flex: 1 },
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: "#00000055",
+    justifyContent: "flex-end",
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 36,
+    gap: 12,
+    alignItems: "center",
+  },
+  pickerSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#cbd5e1",
+    marginBottom: 4,
+  },
+  pickerSheetTitle: { fontSize: 16, fontWeight: "700", alignSelf: "flex-start" },
+  pickerDoneBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  pickerDoneBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   scheduledHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   scheduledSectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.5, marginBottom: 4 },
   scheduledItem: {
