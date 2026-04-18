@@ -19,9 +19,14 @@ function getApiBase(): string | null {
   return `https://${domain}`;
 }
 
+// Expo Go on Android does not support remote push notifications (SDK 53+).
+// The real EAS build works fine — this guard is for dev-only Expo Go testing.
+const isExpoGo = Constants.appOwnership === "expo";
+
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null;
   if (!Device.isDevice) return null;
+  if (isExpoGo && Platform.OS === "android") return null;
 
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
