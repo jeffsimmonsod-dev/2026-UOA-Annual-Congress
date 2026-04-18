@@ -592,7 +592,9 @@ export default function ExhibitHallScreen() {
                     <Text style={[styles.boothName, { color: colors.foreground }]}>
                       {booth.booth_number ? `#${booth.booth_number} · ` : ""}{booth.company}
                     </Text>
-                    <Text style={[styles.boothCompany, { color: colors.mutedForeground }]}>{booth.name}</Text>
+                    {booth.name && booth.name !== booth.company && (
+                      <Text style={[styles.boothCompany, { color: colors.mutedForeground }]}>{booth.name}</Text>
+                    )}
                   </View>
                   {booth.visited && (
                     <Ionicons name="checkmark-circle" size={20} color="#10b981" />
