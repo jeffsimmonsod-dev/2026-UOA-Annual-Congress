@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import multer from "multer";
 import pg from "pg";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage";
+import { uploadPhotoToDrive } from "../lib/googleDrive";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -87,11 +88,20 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     }
 
     const id = Date.now().toString() + Math.random().toString(36).slice(2, 7);
+    const cleanName = uploaderName.trim().slice(0, 50);
+    const cleanCaption = (caption ?? "").trim().slice(0, 200);
+
     await pool.query(
       `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, objectPath, uploaderName.trim().slice(0, 50), deviceId, (caption ?? "").trim().slice(0, 200)]
+      [id, objectPath, cleanName, deviceId, cleanCaption]
     );
+
+    // Mirror to Google Drive (non-blocking — failure does not affect the response)
+    const ext = req.file.mimetype?.includes("png") ? "png" : "jpg";
+    const driveFileName = `${new Date().toISOString().replace(/[:.]/g, "-")}_${cleanName.replace(/\s+/g, "_")}.${ext}`;
+    uploadPhotoToDrive(req.file.buffer, req.file.mimetype || "image/jpeg", driveFileName, cleanName, cleanCaption)
+      .catch((err) => console.error("[photos] Drive mirror failed:", err));
 
     const row = {
       id,
