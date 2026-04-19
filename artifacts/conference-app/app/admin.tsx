@@ -11,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -24,8 +25,28 @@ const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 const CORRECT_PIN = "Chanae2026!";
 
 type Step = "pin" | "dashboard";
-type AdminTab = "notifications" | "booths";
+type AdminTab = "notifications" | "booths" | "analytics";
 type SendMode = "now" | "schedule";
+
+interface BoothVisitor {
+  attendee_name: string | null;
+  visited_at: string;
+  device_id: string;
+}
+
+interface BoothAnalytics {
+  id: number;
+  company: string;
+  booth_number: string | null;
+  visit_count: number;
+  visitors: BoothVisitor[];
+}
+
+interface AnalyticsData {
+  booths: BoothAnalytics[];
+  totalVisits: number;
+  uniqueAttendees: number;
+}
 
 interface Booth {
   id: number;
@@ -93,6 +114,10 @@ export default function AdminScreen() {
   const [newBoothNumber, setNewBoothNumber] = useState("");
   const [addingBooth, setAddingBooth] = useState(false);
   const [expandedBoothId, setExpandedBoothId] = useState<number | null>(null);
+
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [expandedAnalyticsId, setExpandedAnalyticsId] = useState<number | null>(null);
 
   const handlePinSubmit = () => {
     if (pin === CORRECT_PIN) {
@@ -254,6 +279,45 @@ export default function AdminScreen() {
     setRaffleLoading(false);
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/booths/admin/analytics`, {
+        headers: { "x-admin-pin": CORRECT_PIN },
+      });
+      if (res.ok) {
+        setAnalyticsData(await res.json());
+      }
+    } catch {}
+    setAnalyticsLoading(false);
+  }, []);
+
+  const handleExportCSV = async () => {
+    if (!analyticsData) return;
+    const lines: string[] = ["Company,Booth #,Attendee Name,Visit Time"];
+    for (const booth of analyticsData.booths) {
+      if (booth.visitors.length === 0) {
+        lines.push(`"${booth.company}","${booth.booth_number ?? ""}","(no visits)",""`);
+      } else {
+        for (const v of booth.visitors) {
+          const name = v.attendee_name || "(no name)";
+          const time = new Date(v.visited_at).toLocaleString(undefined, {
+            month: "short", day: "numeric", year: "numeric",
+            hour: "numeric", minute: "2-digit",
+          });
+          lines.push(`"${booth.company}","${booth.booth_number ?? ""}","${name}","${time}"`);
+        }
+      }
+    }
+    const csv = lines.join("\n");
+    try {
+      await Share.share({
+        title: "UOA Congress 2026 – Sponsor Visit Report",
+        message: csv,
+      });
+    } catch {}
+  };
+
   useEffect(() => {
     if (step === "dashboard" && activeTab === "notifications") {
       fetchScheduled();
@@ -262,7 +326,10 @@ export default function AdminScreen() {
       fetchBooths();
       fetchRaffle();
     }
-  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled]);
+    if (step === "dashboard" && activeTab === "analytics") {
+      fetchAnalytics();
+    }
+  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled, fetchAnalytics]);
 
   const handleAddBooth = async () => {
     if (!newBoothName.trim() || !newBoothCompany.trim()) {
@@ -356,8 +423,9 @@ export default function AdminScreen() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         {([
-          { key: "notifications", label: "Notifications", icon: "megaphone-outline" },
-          { key: "booths", label: "Exhibit Hall", icon: "storefront-outline" },
+          { key: "notifications", label: "Alerts", icon: "megaphone-outline" },
+          { key: "booths", label: "Booths", icon: "storefront-outline" },
+          { key: "analytics", label: "Analytics", icon: "bar-chart-outline" },
         ] as const).map((tab) => (
           <Pressable
             key={tab.key}
@@ -741,6 +809,132 @@ export default function AdminScreen() {
             </Pressable>
           </>
         )}
+
+        {activeTab === "analytics" && (
+          <>
+            {analyticsLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+            ) : !analyticsData ? (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: "center" }]}>
+                  Could not load analytics.
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* Summary stats */}
+                <View style={styles.analyticsStatsRow}>
+                  <View style={[styles.analyticsStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.analyticsStatNum, { color: colors.primary }]}>{analyticsData.totalVisits}</Text>
+                    <Text style={[styles.analyticsStatLabel, { color: colors.mutedForeground }]}>Total Scans</Text>
+                  </View>
+                  <View style={[styles.analyticsStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.analyticsStatNum, { color: colors.primary }]}>{analyticsData.uniqueAttendees}</Text>
+                    <Text style={[styles.analyticsStatLabel, { color: colors.mutedForeground }]}>Unique Attendees</Text>
+                  </View>
+                  <View style={[styles.analyticsStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.analyticsStatNum, { color: colors.primary }]}>
+                      {analyticsData.booths.filter((b) => Number(b.visit_count) > 0).length}
+                    </Text>
+                    <Text style={[styles.analyticsStatLabel, { color: colors.mutedForeground }]}>Active Booths</Text>
+                  </View>
+                </View>
+
+                {/* Export button */}
+                <Pressable
+                  onPress={handleExportCSV}
+                  style={({ pressed }) => [
+                    styles.exportBtn,
+                    { backgroundColor: "#10b981", opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <Ionicons name="download-outline" size={18} color="#fff" />
+                  <Text style={styles.exportBtnText}>Export Full Report as CSV</Text>
+                </Pressable>
+
+                {/* Per-booth breakdown */}
+                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.scheduledHeader}>
+                    <Ionicons name="bar-chart-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.label, { color: colors.foreground, flex: 1 }]}>Booth Visitor Breakdown</Text>
+                    <Pressable onPress={fetchAnalytics} style={styles.refreshBtn}>
+                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                    </Pressable>
+                  </View>
+                  <Text style={[styles.hint, { color: colors.mutedForeground, marginTop: -4 }]}>
+                    Sorted by most visited · Tap a booth to see attendees
+                  </Text>
+
+                  {analyticsData.booths.map((booth) => {
+                    const isExpanded = expandedAnalyticsId === booth.id;
+                    const count = Number(booth.visit_count);
+                    return (
+                      <View key={booth.id} style={[styles.boothItem, { borderColor: colors.border, marginTop: 8 }]}>
+                        <Pressable
+                          onPress={() => setExpandedAnalyticsId(isExpanded ? null : booth.id)}
+                          style={styles.boothItemHeader}
+                        >
+                          <View style={[
+                            styles.visitCountBadge,
+                            { backgroundColor: count > 0 ? colors.primary + "18" : colors.muted },
+                          ]}>
+                            <Text style={[styles.visitCountNum, { color: count > 0 ? colors.primary : colors.mutedForeground }]}>
+                              {count}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.boothItemName, { color: colors.foreground }]}>
+                              {booth.booth_number ? `#${booth.booth_number} · ` : ""}{booth.company}
+                            </Text>
+                            <Text style={[styles.boothItemSub, { color: colors.mutedForeground }]}>
+                              {count === 0 ? "No scans yet" : `${count} scan${count !== 1 ? "s" : ""}`}
+                            </Text>
+                          </View>
+                          <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.mutedForeground} />
+                        </Pressable>
+
+                        {isExpanded && (
+                          <View style={[styles.boothExpanded, { borderTopColor: colors.border, alignItems: "stretch" }]}>
+                            {booth.visitors.length === 0 ? (
+                              <Text style={[styles.hint, { color: colors.mutedForeground }]}>No scans recorded yet.</Text>
+                            ) : (
+                              booth.visitors.map((v, i) => (
+                                <View
+                                  key={i}
+                                  style={[
+                                    styles.visitorRow,
+                                    i < booth.visitors.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                                  ]}
+                                >
+                                  <Ionicons name="person-outline" size={14} color={colors.primary} />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={[styles.visitorName, { color: colors.foreground }]}>
+                                      {v.attendee_name || "(no name)"}
+                                    </Text>
+                                    <Text style={[styles.visitorTime, { color: colors.mutedForeground }]}>
+                                      {new Date(v.visited_at).toLocaleString(undefined, {
+                                        month: "short", day: "numeric",
+                                        hour: "numeric", minute: "2-digit",
+                                      })}
+                                    </Text>
+                                  </View>
+                                </View>
+                              ))
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
+              <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -923,4 +1117,40 @@ const styles = StyleSheet.create({
   boothActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", justifyContent: "center" },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   actionBtnText: { fontSize: 13, fontWeight: "600" },
+  analyticsStatsRow: { flexDirection: "row", gap: 10 },
+  analyticsStatCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    alignItems: "center",
+    gap: 4,
+  },
+  analyticsStatNum: { fontSize: 26, fontWeight: "800" },
+  analyticsStatLabel: { fontSize: 11, fontWeight: "600", textAlign: "center" },
+  exportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  exportBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  visitCountBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  visitCountNum: { fontSize: 18, fontWeight: "800" },
+  visitorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+  },
+  visitorName: { fontSize: 14, fontWeight: "600" },
+  visitorTime: { fontSize: 11, marginTop: 1 },
 });

@@ -104,6 +104,36 @@ router.get("/booths/admin", async (req: Request, res: Response) => {
   res.json({ booths: rows });
 });
 
+// GET /api/booths/admin/analytics — per-booth visitor details for sponsor reporting
+router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
+  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+  const { rows: booths } = await pool.query(
+    `SELECT b.id, b.name, b.company, b.booth_number,
+            (SELECT COUNT(*) FROM congress_booth_visits v WHERE v.booth_id = b.id) AS visit_count
+     FROM congress_booths b
+     ORDER BY visit_count DESC, b.booth_number ASC`
+  );
+  const { rows: visits } = await pool.query(
+    `SELECT v.booth_id, v.attendee_name, v.device_id, v.visited_at
+     FROM congress_booth_visits v
+     ORDER BY v.visited_at ASC`
+  );
+  const visitsByBooth: Record<number, typeof visits> = {};
+  for (const v of visits) {
+    if (!visitsByBooth[v.booth_id]) visitsByBooth[v.booth_id] = [];
+    visitsByBooth[v.booth_id].push(v);
+  }
+  const result = booths.map((b) => ({
+    ...b,
+    visitors: visitsByBooth[b.id] ?? [],
+  }));
+  const totalVisits = visits.length;
+  const uniqueAttendees = new Set(visits.map((v) => v.device_id)).size;
+  res.json({ booths: result, totalVisits, uniqueAttendees });
+});
+
 // GET /api/booths/admin/entries — raffle entries (devices that visited all booths)
 router.get("/booths/admin/entries", async (req: Request, res: Response) => {
   if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
