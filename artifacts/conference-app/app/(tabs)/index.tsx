@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: "100%",
-    height: 180,
+    height: 220,
   },
   badge: {
     flexDirection: "row",
