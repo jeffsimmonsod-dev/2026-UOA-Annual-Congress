@@ -317,8 +317,8 @@ const styles = StyleSheet.create({
   logoPill: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     width: "80%",
     alignItems: "center",
     shadowColor: "#000",
