@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import React from "react";
 import {
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,7 +23,6 @@ interface MenuItem {
 }
 
 const useMenuItems = (): MenuItem[] => {
-  const isIOS = Platform.OS === "ios";
   return [
     {
       label: "Exhibit Hall",
@@ -33,17 +31,6 @@ const useMenuItems = (): MenuItem[] => {
       route: "/exhibit-hall",
       description: "Booth passport & raffle entry",
     },
-    ...(isIOS
-      ? [
-          {
-            label: "Para Education",
-            icon: "people-outline" as keyof typeof Ionicons.glyphMap,
-            color: "#0ea5e9",
-            route: "/(tabs)/para",
-            description: "Paraoptometric CE schedule",
-          },
-        ]
-      : []),
     {
       label: "Speakers",
       icon: "person-circle-outline",
