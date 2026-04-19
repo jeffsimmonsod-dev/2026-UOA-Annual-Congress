@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroSection: {
-    paddingTop: 0,
+    paddingTop: 20,
     paddingBottom: 8,
     gap: 8,
     marginBottom: 4,
