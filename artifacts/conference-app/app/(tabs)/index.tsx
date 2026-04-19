@@ -316,10 +316,10 @@ const styles = StyleSheet.create({
   },
   logoPill: {
     backgroundColor: "#ffffff",
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    width: "92%",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    width: "80%",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: "100%",
-    height: 210,
+    height: 180,
   },
   badge: {
     flexDirection: "row",
