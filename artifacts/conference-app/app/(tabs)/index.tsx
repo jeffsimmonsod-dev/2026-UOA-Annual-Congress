@@ -116,11 +116,13 @@ export default function HomeScreen() {
     >
       <View style={styles.heroSection}>
         <Pressable onPress={handleLogoTap} hitSlop={8} style={styles.logoWrapper}>
-          <Image
-            source={require("../../assets/images/uoa-logo.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <View style={styles.logoPill}>
+            <Image
+              source={require("../../assets/images/uoa-logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
         </Pressable>
         <View style={[styles.badge, { backgroundColor: colors.accent }]}>
           <Ionicons name="eye-outline" size={13} color={colors.primary} />
@@ -310,10 +312,24 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     width: "100%",
+    alignItems: "center",
+  },
+  logoPill: {
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    width: "88%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   logo: {
     width: "100%",
-    height: 200,
+    height: 160,
   },
   badge: {
     flexDirection: "row",
