@@ -5,11 +5,15 @@ const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
 
-const pushTokens = new Set<string>();
 const ADMIN_PIN = "Chanae2026!";
 
 async function ensureTables() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS congress_push_tokens (
+      token      TEXT PRIMARY KEY,
+      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     CREATE TABLE IF NOT EXISTS congress_scheduled_announcements (
       id SERIAL PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
@@ -24,7 +28,8 @@ async function ensureTables() {
 ensureTables().catch(console.error);
 
 async function sendToAll(title: string, body: string) {
-  const tokens = Array.from(pushTokens);
+  const { rows } = await pool.query(`SELECT token FROM congress_push_tokens`);
+  const tokens = rows.map((r: { token: string }) => r.token);
   if (tokens.length === 0) return { sent: 0 };
 
   const messages = tokens.map((to) => ({
@@ -76,14 +81,20 @@ async function processScheduled() {
 
 setInterval(processScheduled, 30_000);
 
-router.post("/push/register", (req, res) => {
+router.post("/push/register", async (req, res) => {
   const { token } = req.body as { token?: string };
   if (!token || typeof token !== "string") {
     res.status(400).json({ error: "token required" });
     return;
   }
-  pushTokens.add(token);
-  res.json({ success: true, registered: pushTokens.size });
+  await pool.query(
+    `INSERT INTO congress_push_tokens (token, last_seen)
+     VALUES ($1, NOW())
+     ON CONFLICT (token) DO UPDATE SET last_seen = NOW()`,
+    [token]
+  );
+  const { rows } = await pool.query(`SELECT COUNT(*) AS cnt FROM congress_push_tokens`);
+  res.json({ success: true, registered: parseInt(rows[0].cnt, 10) });
 });
 
 router.post("/push/send", async (req, res) => {
@@ -181,8 +192,9 @@ router.delete("/push/scheduled/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/push/stats", (req, res) => {
-  res.json({ registeredDevices: pushTokens.size });
+router.get("/push/stats", async (req, res) => {
+  const { rows } = await pool.query(`SELECT COUNT(*) AS cnt FROM congress_push_tokens`);
+  res.json({ registeredDevices: parseInt(rows[0].cnt, 10) });
 });
 
 export default router;
