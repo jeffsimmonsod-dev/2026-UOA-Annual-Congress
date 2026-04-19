@@ -28,6 +28,10 @@ async function ensureTables() {
       UNIQUE(booth_id, device_id)
     );
   `);
+  await pool.query(`
+    ALTER TABLE congress_booth_visits
+    ADD COLUMN IF NOT EXISTS attendee_email VARCHAR(255);
+  `);
 }
 
 ensureTables().catch(console.error);
@@ -50,11 +54,12 @@ router.get("/booths", async (req: Request, res: Response) => {
 
 // POST /api/booths/checkin — scan QR and check in
 router.post("/booths/checkin", async (req: Request, res: Response) => {
-  const { boothId, secretToken, deviceId, attendeeName } = req.body as {
+  const { boothId, secretToken, deviceId, attendeeName, attendeeEmail } = req.body as {
     boothId: number;
     secretToken: string;
     deviceId: string;
     attendeeName?: string;
+    attendeeEmail?: string;
   };
 
   if (!boothId || !secretToken || !deviceId) {
@@ -76,12 +81,18 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
 
   try {
     await pool.query(
-      `INSERT INTO congress_booth_visits (booth_id, device_id, attendee_name)
-       VALUES ($1, $2, $3)`,
-      [boothId, deviceId, attendeeName || null]
+      `INSERT INTO congress_booth_visits (booth_id, device_id, attendee_name, attendee_email)
+       VALUES ($1, $2, $3, $4)`,
+      [boothId, deviceId, attendeeName || null, attendeeEmail || null]
     );
   } catch (err: any) {
     if (err.code === "23505") {
+      await pool.query(
+        `UPDATE congress_booth_visits
+         SET attendee_name = $3, attendee_email = $4
+         WHERE booth_id = $1 AND device_id = $2`,
+        [boothId, deviceId, attendeeName || null, attendeeEmail || null]
+      );
       return res.json({ success: true, alreadyVisited: true, booth: { id: booth.id, name: booth.name, company: booth.company } });
     }
     throw err;
@@ -116,7 +127,7 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
      ORDER BY visit_count DESC, b.booth_number ASC`
   );
   const { rows: visits } = await pool.query(
-    `SELECT v.booth_id, v.attendee_name, v.device_id, v.visited_at
+    `SELECT v.booth_id, v.attendee_name, v.attendee_email, v.device_id, v.visited_at
      FROM congress_booth_visits v
      ORDER BY v.visited_at ASC`
   );

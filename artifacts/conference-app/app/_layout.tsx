@@ -15,6 +15,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import OnboardingModal from "@/components/OnboardingModal";
+import { ProfileProvider } from "@/context/ProfileContext";
 import { ScheduleProvider } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
 import { registerForPushNotificationsAsync } from "@/services/pushNotifications";
@@ -75,13 +77,16 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <ScheduleProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </ScheduleProvider>
+          <ProfileProvider>
+            <ScheduleProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                  <OnboardingModal />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </ScheduleProvider>
+          </ProfileProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

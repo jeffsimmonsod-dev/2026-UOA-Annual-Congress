@@ -7,15 +7,12 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -28,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useProfile } from "@/context/ProfileContext";
 import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
 
 const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
@@ -364,16 +362,14 @@ interface PassportData {
 export default function ExhibitHallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { profile } = useProfile();
   const deviceId = useRef(getDeviceId()).current;
   const params = useLocalSearchParams<{ scan?: string }>();
 
   const [passport, setPassport] = useState<PassportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [scannerVisible, setScannerVisible] = useState(false);
-  const [nameModalVisible, setNameModalVisible] = useState(false);
-  const [attendeeName, setAttendeeName] = useState("");
   const [scanned, setScanned] = useState(false);
-  const [pendingScan, setPendingScan] = useState<{ boothId: number; secretToken: string } | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -439,21 +435,16 @@ export default function ExhibitHallScreen() {
     const boothId = parseInt(parts[0], 10);
     const secretToken = parts[1];
     setScannerVisible(false);
-    setPendingScan({ boothId, secretToken });
-    if (!attendeeName.trim()) {
-      setNameModalVisible(true);
-    } else {
-      doCheckin(boothId, secretToken, attendeeName);
-    }
+    doCheckin(boothId, secretToken, profile?.name ?? "", profile?.email ?? "");
   };
 
-  const doCheckin = async (boothId: number, secretToken: string, name: string) => {
+  const doCheckin = async (boothId: number, secretToken: string, name: string, email: string = "") => {
     setCheckingIn(true);
     try {
       const res = await fetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name }),
+        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name, attendeeEmail: email || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -477,14 +468,6 @@ export default function ExhibitHallScreen() {
       Alert.alert("Error", "Could not connect to server. Please try again.");
     }
     setCheckingIn(false);
-    setPendingScan(null);
-  };
-
-  const handleNameSubmit = () => {
-    setNameModalVisible(false);
-    if (pendingScan) {
-      doCheckin(pendingScan.boothId, pendingScan.secretToken, attendeeName);
-    }
   };
 
   const booths = passport?.booths ?? [];
@@ -719,35 +702,6 @@ export default function ExhibitHallScreen() {
         </View>
       </Modal>
 
-      <Modal visible={nameModalVisible} transparent animationType="fade" onRequestClose={() => setNameModalVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalBackdrop}>
-          <View style={[styles.nameModal, { backgroundColor: colors.card }]}>
-            <Text style={[styles.nameModalTitle, { color: colors.foreground }]}>Enter Your Name</Text>
-            <Text style={[styles.nameModalSubtitle, { color: colors.mutedForeground }]}>
-              So we can identify you for the raffle
-            </Text>
-            <TextInput
-              style={[styles.nameInput, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="Your full name"
-              placeholderTextColor={colors.mutedForeground}
-              value={attendeeName}
-              onChangeText={setAttendeeName}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleNameSubmit}
-            />
-            <Pressable
-              onPress={handleNameSubmit}
-              style={({ pressed }) => [styles.nameSubmitBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
-            >
-              <Text style={styles.nameSubmitText}>Check In</Text>
-            </Pressable>
-            <Pressable onPress={() => { setNameModalVisible(false); if (pendingScan) doCheckin(pendingScan.boothId, pendingScan.secretToken, ""); }}>
-              <Text style={[styles.skipText, { color: colors.mutedForeground }]}>Skip (no name)</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
@@ -879,39 +833,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   scannerHint: { color: "#ffffffcc", fontSize: 14, textAlign: "center", paddingHorizontal: 40 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "#00000060",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  nameModal: {
-    width: "100%",
-    borderRadius: 20,
-    padding: 24,
-    gap: 12,
-    alignItems: "center",
-  },
-  nameModalTitle: { fontSize: 18, fontWeight: "700" },
-  nameModalSubtitle: { fontSize: 14, textAlign: "center" },
-  nameInput: {
-    width: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    fontSize: 16,
-    marginTop: 4,
-  },
-  nameSubmitBtn: {
-    width: "100%",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  nameSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  skipText: { fontSize: 13, marginTop: 4 },
   actionRow: {
     flexDirection: "row",
     gap: 10,

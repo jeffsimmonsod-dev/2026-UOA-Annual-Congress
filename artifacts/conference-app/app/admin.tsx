@@ -30,6 +30,7 @@ type SendMode = "now" | "schedule";
 
 interface BoothVisitor {
   attendee_name: string | null;
+  attendee_email: string | null;
   visited_at: string;
   device_id: string;
 }
@@ -294,18 +295,19 @@ export default function AdminScreen() {
 
   const handleExportCSV = async () => {
     if (!analyticsData) return;
-    const lines: string[] = ["Company,Booth #,Attendee Name,Visit Time"];
+    const lines: string[] = ["Company,Booth #,Attendee Name,Attendee Email,Visit Time"];
     for (const booth of analyticsData.booths) {
       if (booth.visitors.length === 0) {
-        lines.push(`"${booth.company}","${booth.booth_number ?? ""}","(no visits)",""`);
+        lines.push(`"${booth.company}","${booth.booth_number ?? ""}","(no visits)","",""`);
       } else {
         for (const v of booth.visitors) {
           const name = v.attendee_name || "(no name)";
+          const email = v.attendee_email || "";
           const time = new Date(v.visited_at).toLocaleString(undefined, {
             month: "short", day: "numeric", year: "numeric",
             hour: "numeric", minute: "2-digit",
           });
-          lines.push(`"${booth.company}","${booth.booth_number ?? ""}","${name}","${time}"`);
+          lines.push(`"${booth.company}","${booth.booth_number ?? ""}","${name}","${email}","${time}"`);
         }
       }
     }
@@ -911,6 +913,11 @@ export default function AdminScreen() {
                                     <Text style={[styles.visitorName, { color: colors.foreground }]}>
                                       {v.attendee_name || "(no name)"}
                                     </Text>
+                                    {v.attendee_email ? (
+                                      <Text style={[styles.visitorTime, { color: colors.primary }]}>
+                                        {v.attendee_email}
+                                      </Text>
+                                    ) : null}
                                     <Text style={[styles.visitorTime, { color: colors.mutedForeground }]}>
                                       {new Date(v.visited_at).toLocaleString(undefined, {
                                         month: "short", day: "numeric",
