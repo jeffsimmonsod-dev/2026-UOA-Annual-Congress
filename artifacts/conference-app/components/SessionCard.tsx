@@ -17,7 +17,7 @@ const TRACK_COLORS: Record<string, string> = {
   "Retinal Disease": "#ef4444",
   "Neuro-Optometry": "#8b5cf6",
   Glaucoma: "#10b981",
-  Pharmacology: "#f59e0b",
+  Pharmacology: "#d946ef",
   "Practice Management": "#3b82f6",
   "Pediatrics & BV": "#ec4899",
   "Topical Diagnosis": "#14b8a6",
