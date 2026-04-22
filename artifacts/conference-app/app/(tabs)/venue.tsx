@@ -1,22 +1,42 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   Alert,
+  Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { VENUE } from "@/services/data";
 
+const FLOOR_PLANS = [
+  {
+    id: "lake",
+    label: "Lake Level",
+    subtitle: "Deer Creek Ballroom · Jordanelle Ballroom · Strawberry Conference Room",
+    source: require("@/assets/images/floorplan-lake-level.png"),
+  },
+  {
+    id: "mid",
+    label: "Mid Mountain Level",
+    subtitle: "Empire Conference Room · Big Dutch · Lady Morgan · Park Peak",
+    source: require("@/assets/images/floorplan-mid-mountain.png"),
+  },
+];
+
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
 
   const openMap = () => {
     Linking.openURL(VENUE.mapsUrl);
@@ -132,7 +152,69 @@ export default function VenueScreen() {
           </View>
         ))}
       </View>
+
+      {/* Floor Plans */}
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
+        <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
+          Tap a map to view full screen
+        </Text>
+        {FLOOR_PLANS.map((plan) => (
+          <Pressable
+            key={plan.id}
+            onPress={() => setLightbox(plan)}
+            style={({ pressed }) => [
+              styles.floorPlanCard,
+              { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
+            ]}
+          >
+            <Image
+              source={plan.source}
+              style={[styles.floorPlanThumb, { width: width - 64 }]}
+              resizeMode="contain"
+            />
+            <View style={[styles.floorPlanLabel, { backgroundColor: colors.background }]}>
+              <Text style={[styles.floorPlanTitle, { color: colors.foreground }]}>
+                {plan.label}
+              </Text>
+              <Text style={[styles.floorPlanSub, { color: colors.mutedForeground }]}>
+                {plan.subtitle}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
     </ScrollView>
+
+    {/* Lightbox */}
+    <Modal
+      visible={lightbox !== null}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setLightbox(null)}
+    >
+      <Pressable
+        style={styles.lightboxBackdrop}
+        onPress={() => setLightbox(null)}
+      >
+        <View style={[styles.lightboxContainer, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.lightboxHeader}>
+            <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
+            <Pressable onPress={() => setLightbox(null)} hitSlop={12}>
+              <Ionicons name="close-circle" size={28} color="#fff" />
+            </Pressable>
+          </View>
+          {lightbox && (
+            <Image
+              source={lightbox.source}
+              style={{ width: width - 24, height: width * 1.1 }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Pressable>
+    </Modal>
     </View>
   );
 }
@@ -251,5 +333,54 @@ const styles = StyleSheet.create({
   roomFeatures: {
     fontSize: 11,
     marginTop: 2,
+  },
+  floorPlanHint: {
+    fontSize: 12,
+    marginTop: -4,
+  },
+  floorPlanCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  floorPlanThumb: {
+    height: 220,
+    backgroundColor: "#f5f5f5",
+  },
+  floorPlanLabel: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  floorPlanTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  floorPlanSub: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lightboxContainer: {
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 12,
+  },
+  lightboxHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 4,
+  },
+  lightboxTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
