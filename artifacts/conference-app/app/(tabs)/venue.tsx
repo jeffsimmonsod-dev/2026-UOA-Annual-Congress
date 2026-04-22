@@ -13,6 +13,12 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { VENUE } from "@/services/data";
@@ -32,10 +38,84 @@ const FLOOR_PLANS = [
   },
 ];
 
+function ZoomableImage({
+  source,
+  imgWidth,
+  imgHeight,
+}: {
+  source: any;
+  imgWidth: number;
+  imgHeight: number;
+}) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const reset = () => {
+    scale.value = withSpring(1, { damping: 20 });
+    savedScale.value = 1;
+    translateX.value = withSpring(0, { damping: 20 });
+    translateY.value = withSpring(0, { damping: 20 });
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  const pinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(savedScale.value * e.scale, 1), 6);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
+
+  const pan = Gesture.Pan()
+    .minDistance(1)
+    .onUpdate((e) => {
+      translateX.value = savedTranslateX.value + e.translationX;
+      translateY.value = savedTranslateY.value + e.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      reset();
+    });
+
+  const composed = Gesture.Simultaneous(
+    Gesture.Race(doubleTap, pan),
+    pinch
+  );
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={composed}>
+      <Animated.Image
+        source={source}
+        style={[{ width: imgWidth, height: imgHeight }, animStyle]}
+        resizeMode="contain"
+      />
+    </GestureDetector>
+  );
+}
+
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
 
   const openMap = () => {
@@ -49,6 +129,9 @@ export default function VenueScreen() {
     );
   };
 
+  const imgW = width;
+  const imgH = height - insets.top - insets.bottom - 80;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.navHeader, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -58,163 +141,165 @@ export default function VenueScreen() {
         <Text style={[styles.navTitle, { color: colors.foreground }]}>Venue & Hotel</Text>
         <View style={{ width: 40 }} />
       </View>
-    <ScrollView
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: 16, paddingBottom: insets.bottom + 100 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.venueHeader}>
-          <View
-            style={[styles.iconBubble, { backgroundColor: colors.primary + "18" }]}
+
+      <ScrollView
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: 16, paddingBottom: insets.bottom + 100 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.venueHeader}>
+            <View style={[styles.iconBubble, { backgroundColor: colors.primary + "18" }]}>
+              <Ionicons name="business-outline" size={24} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.venueName, { color: colors.foreground }]}>
+                {VENUE.name}
+              </Text>
+              <Text style={[styles.venueAddress, { color: colors.mutedForeground }]}>
+                {VENUE.address}
+              </Text>
+              <Text style={[styles.venueAddress, { color: colors.mutedForeground }]}>
+                {VENUE.city}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            onPress={openMap}
+            style={({ pressed }) => [
+              styles.mapButton,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+            ]}
           >
-            <Ionicons name="business-outline" size={24} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.venueName, { color: colors.foreground }]}>
-              {VENUE.name}
-            </Text>
-            <Text style={[styles.venueAddress, { color: colors.mutedForeground }]}>
-              {VENUE.address}
-            </Text>
-            <Text style={[styles.venueAddress, { color: colors.mutedForeground }]}>
-              {VENUE.city}
-            </Text>
-          </View>
+            <Ionicons name="map-outline" size={16} color="#fff" />
+            <Text style={styles.mapButtonText}>Open in Maps</Text>
+          </Pressable>
         </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SectionHeader icon="car-outline" title="Parking & Transit" colors={colors} />
+          <Text style={[styles.bodyText, { color: colors.foreground }]}>
+            {VENUE.parkingInfo}
+          </Text>
+        </View>
+
         <Pressable
-          onPress={openMap}
+          onPress={copyWifi}
           style={({ pressed }) => [
-            styles.mapButton,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          <Ionicons name="map-outline" size={16} color="#fff" />
-          <Text style={styles.mapButtonText}>Open in Maps</Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SectionHeader icon="car-outline" title="Parking & Transit" colors={colors} />
-        <Text style={[styles.bodyText, { color: colors.foreground }]}>
-          {VENUE.parkingInfo}
-        </Text>
-      </View>
-
-      <Pressable
-        onPress={copyWifi}
-        style={({ pressed }) => [
-          styles.card,
-          { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <SectionHeader icon="wifi-outline" title="WiFi" colors={colors} />
-        <View style={styles.wifiRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Network</Text>
-            <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiNetwork}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Password</Text>
-            <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiPassword}</Text>
-          </View>
-          <Ionicons name="copy-outline" size={18} color={colors.mutedForeground} />
-        </View>
-      </Pressable>
-
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SectionHeader icon="layers-outline" title="Rooms" colors={colors} />
-        {VENUE.rooms.map((room, i) => (
-          <View
-            key={room.id}
-            style={[
-              styles.roomRow,
-              i < VENUE.rooms.length - 1 && {
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: colors.border,
-              },
-            ]}
-          >
+          <SectionHeader icon="wifi-outline" title="WiFi" colors={colors} />
+          <View style={styles.wifiRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.roomName, { color: colors.foreground }]}>
-                {room.name}
-              </Text>
-              <Text style={[styles.roomFloor, { color: colors.mutedForeground }]}>
-                {room.floor} · {room.capacity} seats
-              </Text>
-              <Text style={[styles.roomFeatures, { color: colors.mutedForeground }]}>
-                {room.features.join(" · ")}
-              </Text>
+              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Network</Text>
+              <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiNetwork}</Text>
             </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Password</Text>
+              <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiPassword}</Text>
+            </View>
+            <Ionicons name="copy-outline" size={18} color={colors.mutedForeground} />
           </View>
-        ))}
-      </View>
+        </Pressable>
 
-      {/* Floor Plans */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
-        <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
-          Tap a map to view full screen
-        </Text>
-        {FLOOR_PLANS.map((plan) => (
-          <Pressable
-            key={plan.id}
-            onPress={() => setLightbox(plan)}
-            style={({ pressed }) => [
-              styles.floorPlanCard,
-              { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
-            ]}
-          >
-            <Image
-              source={plan.source}
-              style={[styles.floorPlanThumb, { width: width - 64 }]}
-              resizeMode="contain"
-            />
-            <View style={[styles.floorPlanLabel, { backgroundColor: colors.background }]}>
-              <Text style={[styles.floorPlanTitle, { color: colors.foreground }]}>
-                {plan.label}
-              </Text>
-              <Text style={[styles.floorPlanSub, { color: colors.mutedForeground }]}>
-                {plan.subtitle}
-              </Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SectionHeader icon="layers-outline" title="Rooms" colors={colors} />
+          {VENUE.rooms.map((room, i) => (
+            <View
+              key={room.id}
+              style={[
+                styles.roomRow,
+                i < VENUE.rooms.length - 1 && {
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: colors.border,
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.roomName, { color: colors.foreground }]}>
+                  {room.name}
+                </Text>
+                <Text style={[styles.roomFloor, { color: colors.mutedForeground }]}>
+                  {room.floor} · {room.capacity} seats
+                </Text>
+                <Text style={[styles.roomFeatures, { color: colors.mutedForeground }]}>
+                  {room.features.join(" · ")}
+                </Text>
+              </View>
             </View>
-          </Pressable>
-        ))}
-      </View>
-    </ScrollView>
+          ))}
+        </View>
 
-    {/* Lightbox */}
-    <Modal
-      visible={lightbox !== null}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => setLightbox(null)}
-    >
-      <Pressable
-        style={styles.lightboxBackdrop}
-        onPress={() => setLightbox(null)}
+        {/* Floor Plans */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
+          <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
+            Tap to open · Pinch to zoom · Double-tap to reset
+          </Text>
+          {FLOOR_PLANS.map((plan) => (
+            <Pressable
+              key={plan.id}
+              onPress={() => setLightbox(plan)}
+              style={({ pressed }) => [
+                styles.floorPlanCard,
+                { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
+              ]}
+            >
+              <Image
+                source={plan.source}
+                style={[styles.floorPlanThumb, { width: width - 64 }]}
+                resizeMode="contain"
+              />
+              <View style={[styles.floorPlanLabel, { backgroundColor: colors.background }]}>
+                <Text style={[styles.floorPlanTitle, { color: colors.foreground }]}>
+                  {plan.label}
+                </Text>
+                <Text style={[styles.floorPlanSub, { color: colors.mutedForeground }]}>
+                  {plan.subtitle}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Lightbox with pinch-to-zoom */}
+      <Modal
+        visible={lightbox !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setLightbox(null)}
       >
-        <View style={[styles.lightboxContainer, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+        <View style={[styles.lightboxBackdrop, { paddingTop: insets.top }]}>
+          {/* Header */}
           <View style={styles.lightboxHeader}>
-            <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
-            <Pressable onPress={() => setLightbox(null)} hitSlop={12}>
-              <Ionicons name="close-circle" size={28} color="#fff" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
+              <Text style={styles.lightboxHint}>Pinch to zoom · Double-tap to reset</Text>
+            </View>
+            <Pressable onPress={() => setLightbox(null)} hitSlop={16} style={styles.closeBtn}>
+              <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
           </View>
-          {lightbox && (
-            <Image
-              source={lightbox.source}
-              style={{ width: width - 24, height: width * 1.1 }}
-              resizeMode="contain"
-            />
-          )}
+
+          {/* Zoomable image area */}
+          <View style={styles.lightboxImageArea}>
+            {lightbox && (
+              <ZoomableImage
+                source={lightbox.source}
+                imgWidth={imgW}
+                imgHeight={imgH}
+              />
+            )}
+          </View>
         </View>
-      </Pressable>
-    </Modal>
+      </Modal>
     </View>
   );
 }
@@ -344,7 +429,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   floorPlanThumb: {
-    height: 220,
+    height: 200,
     backgroundColor: "#f5f5f5",
   },
   floorPlanLabel: {
@@ -362,25 +447,37 @@ const styles = StyleSheet.create({
   },
   lightboxBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  lightboxContainer: {
-    alignItems: "center",
-    gap: 16,
-    paddingHorizontal: 12,
+    backgroundColor: "#000",
   },
   lightboxHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
   },
   lightboxTitle: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
+  },
+  lightboxHint: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lightboxImageArea: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
 });
