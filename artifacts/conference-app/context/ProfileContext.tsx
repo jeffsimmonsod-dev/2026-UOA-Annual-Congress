@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 export interface UserProfile {
   name: string;
   email: string;
+  emailConsent: boolean;
 }
 
 interface ProfileContextValue {
@@ -31,7 +32,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       .then((stored) => {
         if (stored) {
           try {
-            setProfile(JSON.parse(stored));
+            const parsed = JSON.parse(stored);
+            setProfile({
+              name: parsed.name ?? "",
+              email: parsed.email ?? "",
+              emailConsent: parsed.emailConsent ?? false,
+            });
           } catch {}
         }
       })

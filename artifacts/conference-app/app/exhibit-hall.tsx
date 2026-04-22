@@ -444,7 +444,7 @@ export default function ExhibitHallScreen() {
       const res = await fetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name, attendeeEmail: email || undefined }),
+        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
       });
       const data = await res.json();
       if (!res.ok) {

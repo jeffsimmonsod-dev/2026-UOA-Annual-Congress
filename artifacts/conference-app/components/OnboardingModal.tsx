@@ -23,21 +23,41 @@ export default function OnboardingModal() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [emailConsent, setEmailConsent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const visible = profileLoaded && !profile;
 
+  const validateEmail = (val: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+  };
+
   const handleSubmit = async () => {
+    let valid = true;
     if (!name.trim()) {
       setNameError("Please enter your name so we can track your passport.");
-      return;
+      valid = false;
+    } else {
+      setNameError("");
     }
-    setNameError("");
+    if (!email.trim()) {
+      setEmailError("Email is required to complete registration.");
+      valid = false;
+    } else if (!validateEmail(email)) {
+      setEmailError("Please enter a valid email address.");
+      valid = false;
+    } else {
+      setEmailError("");
+    }
+    if (!valid) return;
+
     setSaving(true);
-    await saveProfile({ name: name.trim(), email: email.trim() });
+    await saveProfile({ name: name.trim(), email: email.trim(), emailConsent });
     setSaving(false);
   };
+
 
   return (
     <Modal visible={visible} animationType="fade" statusBarTranslucent>
@@ -68,6 +88,7 @@ export default function OnboardingModal() {
             </Text>
           </View>
 
+          {/* Profile card */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.cardHeader}>
               <View style={[styles.iconWrap, { backgroundColor: colors.primary + "15" }]}>
@@ -75,17 +96,18 @@ export default function OnboardingModal() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                  Tell us who you are
+                  Create your attendee profile
                 </Text>
                 <Text style={[styles.cardSubtitle, { color: colors.mutedForeground }]}>
-                  Used for your exhibit hall passport and raffle entry. Only asked once.
+                  Used for your exhibit hall passport and raffle entry. Asked only once.
                 </Text>
               </View>
             </View>
 
+            {/* Name */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
-                Your Name <Text style={{ color: colors.primary }}>*</Text>
+                Your Name <Text style={{ color: "#ef4444" }}>*</Text>
               </Text>
               <TextInput
                 style={[
@@ -104,17 +126,13 @@ export default function OnboardingModal() {
                 returnKeyType="next"
                 autoFocus
               />
-              {nameError ? (
-                <Text style={styles.errorText}>{nameError}</Text>
-              ) : null}
+              {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
             </View>
 
+            {/* Email */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
-                Email Address{" "}
-                <Text style={[styles.optional, { color: colors.mutedForeground }]}>
-                  (optional)
-                </Text>
+                Email Address <Text style={{ color: "#ef4444" }}>*</Text>
               </Text>
               <TextInput
                 style={[
@@ -122,24 +140,55 @@ export default function OnboardingModal() {
                   {
                     backgroundColor: colors.muted,
                     color: colors.foreground,
-                    borderColor: colors.border,
+                    borderColor: emailError ? "#ef4444" : colors.border,
                   },
                 ]}
                 placeholder="jane@example.com"
                 placeholderTextColor={colors.mutedForeground}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => { setEmail(t); setEmailError(""); }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
                 onSubmitEditing={handleSubmit}
               />
-              <Text style={[styles.emailHint, { color: colors.mutedForeground }]}>
-                Allows sponsors to follow up and helps us contact raffle winners
-              </Text>
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
             </View>
 
+            {/* Consent toggle */}
+            <Pressable
+              onPress={() => setEmailConsent((v) => !v)}
+              style={[
+                styles.consentRow,
+                {
+                  backgroundColor: emailConsent ? colors.primary + "12" : colors.muted,
+                  borderColor: emailConsent ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    borderColor: emailConsent ? colors.primary : colors.mutedForeground,
+                    backgroundColor: emailConsent ? colors.primary : "transparent",
+                  },
+                ]}
+              >
+                {emailConsent && <Ionicons name="checkmark" size={13} color="#fff" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.consentTitle, { color: colors.foreground }]}>
+                  Share my contact info with vendor reps
+                </Text>
+                <Text style={[styles.consentSub, { color: colors.mutedForeground }]}>
+                  Allows sponsor representatives to follow up with you after the event. You can still participate in the passport program without consenting.
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* Submit */}
             <Pressable
               onPress={handleSubmit}
               disabled={saving}
@@ -155,10 +204,29 @@ export default function OnboardingModal() {
             </Pressable>
           </View>
 
+          {/* Notification awareness card */}
+          <View
+            style={[
+              styles.notifCard,
+              { backgroundColor: "#f0fdf4", borderColor: "#86efac" },
+            ]}
+          >
+            <Ionicons name="notifications" size={22} color="#16a34a" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={[styles.notifTitle, { color: "#15803d" }]}>
+                Enable notifications
+              </Text>
+              <Text style={[styles.notifBody, { color: "#166534" }]}>
+                We'll send real-time alerts for sponsored lunches, prize giveaways, raffle drawings, and schedule updates. You'll be prompted to allow notifications when you first open the app.
+              </Text>
+            </View>
+          </View>
+
+          {/* Feature list */}
           <View style={styles.featureList}>
             {[
               { icon: "map-outline", text: "Scan exhibitor booths to earn your passport" },
-              { icon: "notifications-outline", text: "Receive real-time announcements" },
+              { icon: "trophy-outline", text: "Complete your passport for raffle entry" },
               { icon: "camera-outline", text: "Share photos from the event" },
             ].map((item) => (
               <View key={item.text} style={styles.featureRow}>
@@ -237,10 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  optional: {
-    fontWeight: "400",
-    fontSize: 12,
-  },
   input: {
     borderRadius: 12,
     borderWidth: 1,
@@ -252,7 +316,30 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     fontSize: 12,
   },
-  emailHint: {
+  consentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  consentTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 3,
+  },
+  consentSub: {
     fontSize: 11,
     lineHeight: 16,
   },
@@ -269,6 +356,32 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  declineBtn: {
+    alignItems: "center",
+    paddingVertical: 4,
+    marginTop: -8,
+  },
+  declineBtnText: {
+    fontSize: 12,
+    textDecorationLine: "underline",
+  },
+  notifCard: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  notifTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  notifBody: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   featureList: {
     width: "100%",

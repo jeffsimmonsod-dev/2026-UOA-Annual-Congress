@@ -32,6 +32,10 @@ async function ensureTables() {
     ALTER TABLE congress_booth_visits
     ADD COLUMN IF NOT EXISTS attendee_email VARCHAR(255);
   `);
+  await pool.query(`
+    ALTER TABLE congress_booth_visits
+    ADD COLUMN IF NOT EXISTS email_consent BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
 }
 
 ensureTables().catch(console.error);
@@ -54,12 +58,13 @@ router.get("/booths", async (req: Request, res: Response) => {
 
 // POST /api/booths/checkin — scan QR and check in
 router.post("/booths/checkin", async (req: Request, res: Response) => {
-  const { boothId, secretToken, deviceId, attendeeName, attendeeEmail } = req.body as {
+  const { boothId, secretToken, deviceId, attendeeName, attendeeEmail, emailConsent } = req.body as {
     boothId: number;
     secretToken: string;
     deviceId: string;
     attendeeName?: string;
     attendeeEmail?: string;
+    emailConsent?: boolean;
   };
 
   if (!boothId || !secretToken || !deviceId) {
@@ -79,19 +84,20 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Invalid QR code" });
   }
 
+  const consent = emailConsent === true;
   try {
     await pool.query(
-      `INSERT INTO congress_booth_visits (booth_id, device_id, attendee_name, attendee_email)
-       VALUES ($1, $2, $3, $4)`,
-      [boothId, deviceId, attendeeName || null, attendeeEmail || null]
+      `INSERT INTO congress_booth_visits (booth_id, device_id, attendee_name, attendee_email, email_consent)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [boothId, deviceId, attendeeName || null, attendeeEmail || null, consent]
     );
   } catch (err: any) {
     if (err.code === "23505") {
       await pool.query(
         `UPDATE congress_booth_visits
-         SET attendee_name = $3, attendee_email = $4
+         SET attendee_name = $3, attendee_email = $4, email_consent = $5
          WHERE booth_id = $1 AND device_id = $2`,
-        [boothId, deviceId, attendeeName || null, attendeeEmail || null]
+        [boothId, deviceId, attendeeName || null, attendeeEmail || null, consent]
       );
       return res.json({ success: true, alreadyVisited: true, booth: { id: booth.id, name: booth.name, company: booth.company } });
     }
@@ -127,7 +133,9 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
      ORDER BY visit_count DESC, b.booth_number ASC`
   );
   const { rows: visits } = await pool.query(
-    `SELECT v.booth_id, v.attendee_name, v.attendee_email, v.device_id, v.visited_at
+    `SELECT v.booth_id, v.attendee_name,
+            CASE WHEN v.email_consent = TRUE THEN v.attendee_email ELSE NULL END AS attendee_email,
+            v.email_consent, v.device_id, v.visited_at
      FROM congress_booth_visits v
      ORDER BY v.visited_at ASC`
   );
