@@ -42,10 +42,12 @@ function ZoomableImage({
   source,
   imgWidth,
   imgHeight,
+  onReset,
 }: {
   source: any;
   imgWidth: number;
   imgHeight: number;
+  onReset?: (resetFn: () => void) => void;
 }) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -54,7 +56,8 @@ function ZoomableImage({
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  const reset = () => {
+  const doReset = () => {
+    "worklet";
     scale.value = withSpring(1, { damping: 20 });
     savedScale.value = 1;
     translateX.value = withSpring(0, { damping: 20 });
@@ -62,6 +65,17 @@ function ZoomableImage({
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
   };
+
+  React.useEffect(() => {
+    onReset?.(() => {
+      scale.value = withSpring(1, { damping: 20 });
+      savedScale.value = 1;
+      translateX.value = withSpring(0, { damping: 20 });
+      translateY.value = withSpring(0, { damping: 20 });
+      savedTranslateX.value = 0;
+      savedTranslateY.value = 0;
+    });
+  }, []);
 
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
@@ -72,7 +86,7 @@ function ZoomableImage({
     });
 
   const pan = Gesture.Pan()
-    .minDistance(1)
+    .averageTouches(true)
     .onUpdate((e) => {
       translateX.value = savedTranslateX.value + e.translationX;
       translateY.value = savedTranslateY.value + e.translationY;
@@ -85,13 +99,10 @@ function ZoomableImage({
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      reset();
+      doReset();
     });
 
-  const composed = Gesture.Simultaneous(
-    Gesture.Race(doubleTap, pan),
-    pinch
-  );
+  const composed = Gesture.Simultaneous(pinch, pan, doubleTap);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [
@@ -117,6 +128,7 @@ export default function VenueScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
+  const resetZoomRef = React.useRef<(() => void) | null>(null);
 
   const openMap = () => {
     Linking.openURL(VENUE.mapsUrl);
@@ -283,6 +295,13 @@ export default function VenueScreen() {
               <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
               <Text style={styles.lightboxHint}>Pinch to zoom · Double-tap to reset</Text>
             </View>
+            <Pressable
+              onPress={() => resetZoomRef.current?.()}
+              hitSlop={12}
+              style={[styles.closeBtn, { marginRight: 8 }]}
+            >
+              <Ionicons name="contract-outline" size={20} color="#fff" />
+            </Pressable>
             <Pressable onPress={() => setLightbox(null)} hitSlop={16} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
@@ -295,6 +314,7 @@ export default function VenueScreen() {
                 source={lightbox.source}
                 imgWidth={imgW}
                 imgHeight={imgH}
+                onReset={(fn) => { resetZoomRef.current = fn; }}
               />
             )}
           </View>
