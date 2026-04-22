@@ -28,6 +28,8 @@ const TRACK_COLORS: Record<string, string> = {
   Optical: "#a855f7",
   "Clinical Knowledge": "#84cc16",
   "Contact Lenses": "#06b6d4",
+  CPC: "#0ea5e9",
+  "Meal / Social": "#f59e0b",
 };
 
 export default function SessionCard({ session, showDay = false }: Props) {
