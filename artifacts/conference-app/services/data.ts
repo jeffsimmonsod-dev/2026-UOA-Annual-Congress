@@ -1133,6 +1133,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.jjvision.com",
     description:
       "As the only eye health company with health at its core, Johnson & Johnson Vision is uniquely positioned to reimagine the future of eye health with an all-encompassing portfolio of solutions.",
+    reps: [
+      { name: "Kirk Hall", phone: "801.380.4566", email: "khall5@its.jnj.com" },
+    ],
   },
   {
     id: "sp12",
@@ -1142,6 +1145,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.essilorluxottica.com/en/",
     description:
       "EssilorLuxottica is a global leader in the design, manufacturing, and distribution of advanced vision care products, eyewear, and med-tech solutions.",
+    reps: [
+      { name: "Kerinda Bedell", phone: "414.343.6668", email: "kbedell@luxotticaretail.com" },
+    ],
   },
   // ── Silver ────────────────────────────────────────────────
   {
