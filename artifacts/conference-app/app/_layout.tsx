@@ -8,18 +8,18 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import OnboardingModal from "@/components/OnboardingModal";
+import NotificationPromptModal from "@/components/NotificationPromptModal";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { ScheduleProvider } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
-import { registerForPushNotificationsAsync } from "@/services/pushNotifications";
+
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,20 +56,12 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  const registeredRef = useRef(false);
-
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  useEffect(() => {
-    if (!registeredRef.current && Platform.OS !== "web") {
-      registeredRef.current = true;
-      registerForPushNotificationsAsync().catch(console.error);
-    }
-  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
@@ -83,6 +75,7 @@ export default function RootLayout() {
                 <KeyboardProvider>
                   <RootLayoutNav />
                   <OnboardingModal />
+                  <NotificationPromptModal />
                 </KeyboardProvider>
               </GestureHandlerRootView>
             </ScheduleProvider>

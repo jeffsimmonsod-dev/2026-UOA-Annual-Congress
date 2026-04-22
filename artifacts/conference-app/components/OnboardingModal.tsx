@@ -204,24 +204,6 @@ export default function OnboardingModal() {
             </Pressable>
           </View>
 
-          {/* Notification awareness card */}
-          <View
-            style={[
-              styles.notifCard,
-              { backgroundColor: "#f0fdf4", borderColor: "#86efac" },
-            ]}
-          >
-            <Ionicons name="notifications" size={22} color="#16a34a" style={{ marginTop: 1 }} />
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={[styles.notifTitle, { color: "#15803d" }]}>
-                Enable notifications
-              </Text>
-              <Text style={[styles.notifBody, { color: "#166534" }]}>
-                We'll send real-time alerts for sponsored lunches, prize giveaways, raffle drawings, and schedule updates. You'll be prompted to allow notifications when you first open the app.
-              </Text>
-            </View>
-          </View>
-
           {/* Feature list */}
           <View style={styles.featureList}>
             {[
@@ -365,23 +347,6 @@ const styles = StyleSheet.create({
   declineBtnText: {
     fontSize: 12,
     textDecorationLine: "underline",
-  },
-  notifCard: {
-    width: "100%",
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "flex-start",
-  },
-  notifTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  notifBody: {
-    fontSize: 12,
-    lineHeight: 17,
   },
   featureList: {
     width: "100%",
