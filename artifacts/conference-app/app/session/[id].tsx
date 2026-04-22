@@ -37,6 +37,8 @@ const TRACK_COLORS: Record<string, string> = {
   "Practice Management": "#3b82f6",
   Glaucoma: "#10b981",
   CPC: "#0ea5e9",
+  CPO: "#0ea5e9",
+  "ABO/CPO": "#0ea5e9",
   "Meal / Social": "#f59e0b",
 };
 

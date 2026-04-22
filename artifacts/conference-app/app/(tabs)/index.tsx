@@ -39,6 +39,8 @@ const TRACK_COLORS: Record<string, string> = {
   "Clinical Knowledge": "#84cc16",
   "Contact Lenses": "#06b6d4",
   CPC: "#0ea5e9",
+  CPO: "#0ea5e9",
+  "ABO/CPO": "#0ea5e9",
   "Meal / Social": "#f59e0b",
 };
 
