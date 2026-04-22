@@ -26,6 +26,13 @@ export interface Session {
   copeId?: string;
 }
 
+export interface SponsorRep {
+  name: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface Sponsor {
   id: string;
   name: string;
@@ -34,6 +41,7 @@ export interface Sponsor {
   website: string;
   description: string;
   booth?: string;
+  reps?: SponsorRep[];
 }
 
 export interface Room {

@@ -603,6 +603,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.waitevision.com",
     description:
       "Waite Vision is the premier vision correction center utilizing the most advanced technology and surgical techniques, supporting optometrists in the community to achieve the highest quality of patient care.",
+    reps: [
+      { name: "Jen Martin", title: "Practice Administrator", phone: "801.876.6000", email: "jmartin@waitevision.com" },
+    ],
   },
   {
     id: "sp2",
@@ -612,6 +615,11 @@ export const SPONSORS: Sponsor[] = [
     website: "https://theeyeinstitute.com",
     description:
       "Known throughout the Intermountain West as a leader in eye care, The Eye Institute of Utah specializes in cataract surgery, LASIK, refractive procedures, glaucoma, dry eye, and corneal transplantation.",
+    reps: [
+      { name: "Ingrid Torres", title: "Co-Management Coordinator", phone: "801.263.5722", email: "itorres@theeyeinstitute.com" },
+      { name: "Tia Barnes", title: "Public Relations Consultant", phone: "801.870.5855", email: "tbarnes@theeyeinstitute.com" },
+      { name: "Alicia Williams", title: "LASIK & Refractive Coordinator", phone: "801.263.5723", email: "awilliams@theeyeinstitute.com" },
+    ],
   },
   {
     id: "sp3",
@@ -621,6 +629,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.vspproviderhub.com",
     description:
       "VSP Vision's business is helping you with yours, so you can focus on what you do best: providing high-quality eye care to your patients.",
+    reps: [
+      { name: "Shenai Alexander", email: "shenai.alexander@vsp.com" },
+    ],
   },
   {
     id: "sp4",
@@ -630,6 +641,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.hoopesvision.com",
     description:
       "Hoopes Vision is a leading surgical facility providing the newest, safest, and most innovative vision correction technology in an atmosphere of warm, personalized patient care.",
+    reps: [
+      { name: "Danyelle Madrid", phone: "801.793.5330", email: "danyelle@hoopesvision.com" },
+      { name: "Wes Madrid", phone: "801.988.7356", email: "wmadrid@hoopesvision.com" },
+    ],
   },
   {
     id: "sp5",
@@ -639,6 +654,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.utaheyecenters.com",
     description:
       "At Utah Eye Centers, our foremost goal is to ensure your eyes are healthy, combining expertise and state-of-the-art technology across ocular exams, macular degeneration screening, glaucoma treatment, cataracts, and LASIK.",
+    reps: [
+      { name: "McCall Kirk", title: "Business Development", phone: "801.409.9827", email: "mkirk@utaheyecenters.com" },
+      { name: "Jadyn Matthews", title: "Business Development", phone: "530.953.7508", email: "jmatthews@utaheyecenters.com" },
+    ],
   },
   // ── Gold ──────────────────────────────────────────────────
   {
@@ -649,6 +668,11 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.bausch.com",
     description:
       "Bausch + Lomb's mission is simple: helping you see better to live better all over the world. Through unwavering focus on innovation, quality, and craftsmanship, they protect and enhance the gift of sight.",
+    reps: [
+      { name: "Jason Howes", phone: "801.842.2255", email: "Jason.Howes@bausch.com" },
+      { name: "Chad Parks", phone: "435.300.1762", email: "Chad.Parks@bausch.com" },
+      { name: "Andrea Lee", phone: "602.677.7680", email: "andrea.lee@bausch.com" },
+    ],
   },
   {
     id: "sp7",
@@ -658,6 +682,11 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.glaukos.com",
     description:
       "Glaukos pioneers novel, dropless platforms that advance the standard of care for patients suffering from sight-threatening diseases including glaucoma, corneal disorders, and retinal disease.",
+    reps: [
+      { name: "Helen Havnaer", email: "hhavnaer@glaukos.com" },
+      { name: "AJ Ormond", email: "aormond@glaukos.com" },
+      { name: "Dawn Stokes", email: "dstokes@glaukos.com" },
+    ],
   },
   {
     id: "sp8",
@@ -667,6 +696,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.dompe.com",
     description:
       "Dompé pushes the understanding of science and pursues R&D in new areas to positively impact patients living with unmet medical needs.",
+    reps: [
+      { name: "Scott Mortensen", phone: "801.891.3769", email: "scott.mortensen@dompe.com" },
+      { name: "Rex Penza", phone: "312.961.1548", email: "rex.penza@dompe.com" },
+    ],
   },
   {
     id: "sp9",
@@ -676,6 +709,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.macuhealth.com",
     description:
       "MacuHealth is setting a new standard for nutritional vision supplements, developing cutting-edge macular health vitamins that reduce the risk of macular degeneration and significantly improve visual performance.",
+    reps: [
+      { name: "Ana de Lorme", phone: "414.759.5032", email: "adelorme@macuhealth.com" },
+    ],
   },
   {
     id: "sp10",
@@ -685,6 +721,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://stsutah.com",
     description:
       "IT4EYES specializes in tailored IT solutions exclusively for optometrists — from enhancing efficiency and ensuring data security to implementing cybersecurity measures that safeguard your practice.",
+    reps: [
+      { name: "John Siggard", phone: "435.525.8188", email: "john@stsutah.com" },
+      { name: "Garrick Poulsen", email: "garrick@stsutah.com" },
+    ],
   },
   {
     id: "sp11",
@@ -713,6 +753,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://idoc.net",
     description:
       "IDOC is a quietly powerful ally for independent optometrists, with over 3,200 OD members throughout the U.S., delivering scale, strategic support, and supply chain advantages to help members thrive.",
+    reps: [
+      { name: "Timothy Thornton", phone: "203.368.8484", email: "tthornton@idoc.net" },
+      { name: "Brian Kyle", phone: "203.400.9525", email: "bkyle@idoc.net" },
+    ],
   },
   {
     id: "sp14",
@@ -722,6 +766,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://lkc.com",
     description:
       "As leaders in visual electrophysiology, LKC arms eye care professionals with innovative, accessible technology to assess retinal function, fueling research and enhancing diagnostic capabilities.",
+    reps: [
+      { name: "Tyler Green", email: "tgreen@lkc.com" },
+    ],
   },
   {
     id: "sp15",
@@ -731,6 +778,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://www.coopervision.com",
     description:
       "CooperVision is one of the world's leading manufacturers of soft contact lenses, producing a full array of daily, two-week, and monthly lenses addressing astigmatism, presbyopia, and childhood myopia.",
+    reps: [
+      { name: "Jake Wood", phone: "801.710.6209", email: "jwood@coopervision.com" },
+      { name: "Alex Staten", phone: "801.243.4588", email: "astaten@coopervision.com" },
+    ],
   },
   {
     id: "sp16",
@@ -740,6 +791,10 @@ export const SPONSORS: Sponsor[] = [
     website: "https://lenz-tx.com",
     description:
       "LENZ Therapeutics focuses on commercializing VIZZ™ (aceclidine ophthalmologic solution) 1.44%, the first and only FDA-approved aceclidine-based eye drop for the treatment of presbyopia.",
+    reps: [
+      { name: "Germaine Nagel", phone: "970.989.0151", email: "germaine@lenz-tx.com" },
+      { name: "Ashley Schilleman", email: "ashley@lenz-tx.com" },
+    ],
   },
   {
     id: "sp17",
@@ -749,6 +804,9 @@ export const SPONSORS: Sponsor[] = [
     website: "https://adit.com",
     description:
       "Adit is the all-in-one AI-powered platform for faster practice growth — phones, texting, reminders, forms, scheduling, payments, reviews, and analytics, all amplified by optometry's most advanced AI agent.",
+    reps: [
+      { name: "Steven Marinkovich", phone: "281.763.7098", email: "steven@adit.com" },
+    ],
   },
 ];
 

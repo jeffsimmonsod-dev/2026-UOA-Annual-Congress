@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useSchedule } from "@/context/ScheduleContext";
 import { CONFERENCE, SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
-import type { Session } from "@/types";
+import type { Session, Sponsor } from "@/types";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -76,6 +77,7 @@ export default function HomeScreen() {
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
   const nextSession: Session | null = savedSessions[0] ?? null;
   const trackColor = nextSession ? (TRACK_COLORS[nextSession.track] ?? colors.primary) : colors.primary;
+  const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
   const logoTapCountRef = useRef(0);
   const logoTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LOGO_TAPS_REQUIRED = 7;
@@ -269,7 +271,7 @@ export default function HomeScreen() {
         {SPONSORS.map((sponsor) => (
           <Pressable
             key={sponsor.id}
-            onPress={() => sponsor.website && Linking.openURL(sponsor.website)}
+            onPress={() => setSelectedSponsor(sponsor)}
             style={({ pressed }) => [
               styles.sponsorCard,
               { backgroundColor: colors.card, borderColor: colors.border },
@@ -294,6 +296,85 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </ScrollView>
+
+      {/* Sponsor Detail Modal */}
+      <Modal
+        visible={!!selectedSponsor}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedSponsor(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedSponsor(null)} />
+        {selectedSponsor && (
+          <View style={[styles.sponsorSheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.sheetHandle} />
+
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              {/* Logo + name + tier */}
+              <View style={[styles.sheetLogoWrap, { backgroundColor: "#ffffff" }]}>
+                <Image source={{ uri: selectedSponsor.logo }} style={styles.sheetLogo} resizeMode="contain" />
+              </View>
+              <View style={styles.sheetHeader}>
+                <Text style={[styles.sheetName, { color: colors.foreground }]}>{selectedSponsor.name}</Text>
+                <View style={[styles.tierBadge, { backgroundColor: TIER_COLORS[selectedSponsor.tier]?.bg ?? "#f3f4f6" }]}>
+                  <Text style={[styles.tierText, { color: TIER_COLORS[selectedSponsor.tier]?.text ?? "#6b7280" }]}>
+                    {selectedSponsor.tier.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description */}
+              <Text style={[styles.sheetDesc, { color: colors.mutedForeground }]}>{selectedSponsor.description}</Text>
+
+              {/* Reps */}
+              {selectedSponsor.reps && selectedSponsor.reps.length > 0 && (
+                <View style={styles.repsSection}>
+                  <Text style={[styles.repsSectionTitle, { color: colors.foreground }]}>
+                    <Ionicons name="people-outline" size={14} /> Contact Reps
+                  </Text>
+                  {selectedSponsor.reps.map((rep, i) => (
+                    <View key={i} style={[styles.repCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Text style={[styles.repName, { color: colors.foreground }]}>{rep.name}</Text>
+                      {rep.title ? (
+                        <Text style={[styles.repTitle, { color: colors.mutedForeground }]}>{rep.title}</Text>
+                      ) : null}
+                      <View style={styles.repActions}>
+                        {rep.phone ? (
+                          <Pressable
+                            onPress={() => Linking.openURL(`tel:${rep.phone!.replace(/\./g, "")}`)}
+                            style={({ pressed }) => [styles.repBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.7 : 1 }]}
+                          >
+                            <Ionicons name="call-outline" size={14} color={colors.primary} />
+                            <Text style={[styles.repBtnText, { color: colors.primary }]}>{rep.phone}</Text>
+                          </Pressable>
+                        ) : null}
+                        {rep.email ? (
+                          <Pressable
+                            onPress={() => Linking.openURL(`mailto:${rep.email}`)}
+                            style={({ pressed }) => [styles.repBtn, { backgroundColor: colors.accent, opacity: pressed ? 0.7 : 1 }]}
+                          >
+                            <Ionicons name="mail-outline" size={14} color={colors.primary} />
+                            <Text style={[styles.repBtnText, { color: colors.primary }]} numberOfLines={1}>{rep.email}</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Visit website */}
+              <Pressable
+                onPress={() => { Linking.openURL(selectedSponsor.website); setSelectedSponsor(null); }}
+                style={({ pressed }) => [styles.websiteBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Ionicons name="globe-outline" size={16} color="#fff" />
+                <Text style={styles.websiteBtnText}>Visit Website</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        )}
+      </Modal>
     </ScrollView>
   );
 }
@@ -519,5 +600,109 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sponsorSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "80%",
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#d1d5db",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  sheetLogoWrap: {
+    width: 120,
+    height: 80,
+    borderRadius: 14,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  sheetLogo: {
+    width: 108,
+    height: 68,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  sheetName: {
+    fontSize: 18,
+    fontWeight: "800",
+    flex: 1,
+    marginRight: 10,
+  },
+  sheetDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  repsSection: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  repsSectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  repCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  repName: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  repTitle: {
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  repActions: {
+    gap: 6,
+  },
+  repBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  repBtnText: {
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+  },
+  websiteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 8,
+  },
+  websiteBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
