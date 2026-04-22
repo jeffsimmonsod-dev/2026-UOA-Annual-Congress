@@ -27,6 +27,17 @@ const TRACK_COLORS: Record<string, string> = {
   Optical: "#f97316",
   "Contact Lenses": "#06b6d4",
   "Clinical Knowledge": "#84cc16",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  "Neuro-Optometry": "#8b5cf6",
+  "Retinal Disease": "#ef4444",
+  "Pediatrics & BV": "#ec4899",
+  Pharmacology: "#f59e0b",
+  "Practice Management": "#3b82f6",
+  Glaucoma: "#10b981",
+  CPC: "#0ea5e9",
+  "Meal / Social": "#f59e0b",
 };
 
 export default function SessionDetailScreen() {
