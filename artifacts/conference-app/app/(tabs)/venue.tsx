@@ -13,12 +13,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { GestureDetector, Gesture } from "react-native-gesture-handler";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { VENUE } from "@/services/data";
@@ -38,119 +32,34 @@ const FLOOR_PLANS = [
   },
 ];
 
-function ZoomableImage({
-  source,
-  imgWidth,
-  imgHeight,
-  onReset,
-}: {
-  source: any;
-  imgWidth: number;
-  imgHeight: number;
-  onReset?: (resetFn: () => void) => void;
-}) {
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
-
-  const doReset = () => {
-    "worklet";
-    scale.value = withSpring(1, { damping: 20 });
-    savedScale.value = 1;
-    translateX.value = withSpring(0, { damping: 20 });
-    translateY.value = withSpring(0, { damping: 20 });
-    savedTranslateX.value = 0;
-    savedTranslateY.value = 0;
-  };
-
-  React.useEffect(() => {
-    onReset?.(() => {
-      scale.value = withSpring(1, { damping: 20 });
-      savedScale.value = 1;
-      translateX.value = withSpring(0, { damping: 20 });
-      translateY.value = withSpring(0, { damping: 20 });
-      savedTranslateX.value = 0;
-      savedTranslateY.value = 0;
-    });
-  }, []);
-
-  const pinch = Gesture.Pinch()
-    .onUpdate((e) => {
-      scale.value = Math.min(Math.max(savedScale.value * e.scale, 1), 6);
-    })
-    .onEnd(() => {
-      savedScale.value = scale.value;
-    });
-
-  const pan = Gesture.Pan()
-    .averageTouches(true)
-    .onUpdate((e) => {
-      translateX.value = savedTranslateX.value + e.translationX;
-      translateY.value = savedTranslateY.value + e.translationY;
-    })
-    .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-    });
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      doReset();
-    });
-
-  const composed = Gesture.Simultaneous(pinch, pan, doubleTap);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
-
-  return (
-    <GestureDetector gesture={composed}>
-      <Animated.Image
-        source={source}
-        style={[{ width: imgWidth, height: imgHeight }, animStyle]}
-        resizeMode="contain"
-      />
-    </GestureDetector>
-  );
-}
-
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
-  const resetZoomRef = React.useRef<(() => void) | null>(null);
-
-  const openMap = () => {
-    Linking.openURL(VENUE.mapsUrl);
-  };
-
-  const copyWifi = () => {
-    Alert.alert(
-      "WiFi Info",
-      `Network: ${VENUE.wifiNetwork}\nPassword: ${VENUE.wifiPassword}`
-    );
-  };
 
   const imgW = width;
   const imgH = height - insets.top - insets.bottom - 80;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.navHeader, { paddingTop: insets.top + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      {/* Nav header */}
+      <View
+        style={[
+          styles.navHeader,
+          {
+            paddingTop: insets.top + 12,
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
-        <Text style={[styles.navTitle, { color: colors.foreground }]}>Venue & Hotel</Text>
+        <Text style={[styles.navTitle, { color: colors.foreground }]}>
+          Venue & Hotel
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -162,6 +71,7 @@ export default function VenueScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Venue card */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.venueHeader}>
             <View style={[styles.iconBubble, { backgroundColor: colors.primary + "18" }]}>
@@ -180,7 +90,7 @@ export default function VenueScreen() {
             </View>
           </View>
           <Pressable
-            onPress={openMap}
+            onPress={() => Linking.openURL(VENUE.mapsUrl)}
             style={({ pressed }) => [
               styles.mapButton,
               { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
@@ -191,6 +101,7 @@ export default function VenueScreen() {
           </Pressable>
         </View>
 
+        {/* Parking */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="car-outline" title="Parking & Transit" colors={colors} />
           <Text style={[styles.bodyText, { color: colors.foreground }]}>
@@ -198,27 +109,46 @@ export default function VenueScreen() {
           </Text>
         </View>
 
+        {/* WiFi */}
         <Pressable
-          onPress={copyWifi}
+          onPress={() =>
+            Alert.alert(
+              "WiFi Info",
+              `Network: ${VENUE.wifiNetwork}\nPassword: ${VENUE.wifiPassword}`
+            )
+          }
           style={({ pressed }) => [
             styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: pressed ? 0.85 : 1,
+            },
           ]}
         >
           <SectionHeader icon="wifi-outline" title="WiFi" colors={colors} />
           <View style={styles.wifiRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Network</Text>
-              <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiNetwork}</Text>
+              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>
+                Network
+              </Text>
+              <Text style={[styles.wifiValue, { color: colors.foreground }]}>
+                {VENUE.wifiNetwork}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>Password</Text>
-              <Text style={[styles.wifiValue, { color: colors.foreground }]}>{VENUE.wifiPassword}</Text>
+              <Text style={[styles.wifiLabel, { color: colors.mutedForeground }]}>
+                Password
+              </Text>
+              <Text style={[styles.wifiValue, { color: colors.foreground }]}>
+                {VENUE.wifiPassword}
+              </Text>
             </View>
             <Ionicons name="copy-outline" size={18} color={colors.mutedForeground} />
           </View>
         </Pressable>
 
+        {/* Rooms */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="layers-outline" title="Rooms" colors={colors} />
           {VENUE.rooms.map((room, i) => (
@@ -251,7 +181,7 @@ export default function VenueScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
           <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
-            Tap to open · Pinch to zoom · Double-tap to reset
+            Tap to open · Pinch to zoom
           </Text>
           {FLOOR_PLANS.map((plan) => (
             <Pressable
@@ -280,10 +210,10 @@ export default function VenueScreen() {
         </View>
       </ScrollView>
 
-      {/* Lightbox with pinch-to-zoom */}
+      {/* Full-screen zoomable lightbox */}
       <Modal
         visible={lightbox !== null}
-        transparent
+        transparent={false}
         animationType="fade"
         statusBarTranslucent
         onRequestClose={() => setLightbox(null)}
@@ -293,31 +223,39 @@ export default function VenueScreen() {
           <View style={styles.lightboxHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
-              <Text style={styles.lightboxHint}>Pinch to zoom · Double-tap to reset</Text>
+              <Text style={styles.lightboxHint}>Pinch to zoom · Drag to pan</Text>
             </View>
             <Pressable
-              onPress={() => resetZoomRef.current?.()}
-              hitSlop={12}
-              style={[styles.closeBtn, { marginRight: 8 }]}
+              onPress={() => setLightbox(null)}
+              hitSlop={16}
+              style={styles.closeBtn}
             >
-              <Ionicons name="contract-outline" size={20} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => setLightbox(null)} hitSlop={16} style={styles.closeBtn}>
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
           </View>
 
-          {/* Zoomable image area */}
-          <View style={styles.lightboxImageArea}>
+          {/* Zoomable via ScrollView — native pinch on iOS & Android */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[
+              styles.lightboxImageArea,
+              { width: imgW, height: imgH },
+            ]}
+            maximumZoomScale={6}
+            minimumZoomScale={1}
+            centerContent
+            bouncesZoom
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+          >
             {lightbox && (
-              <ZoomableImage
+              <Image
                 source={lightbox.source}
-                imgWidth={imgW}
-                imgHeight={imgH}
-                onReset={(fn) => { resetZoomRef.current = fn; }}
+                style={{ width: imgW, height: imgH }}
+                resizeMode="contain"
               />
             )}
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -336,7 +274,9 @@ function SectionHeader({
   return (
     <View style={styles.sectionHeader}>
       <Ionicons name={icon} size={18} color={colors.primary} />
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+        {title}
+      </Text>
     </View>
   );
 }
@@ -350,7 +290,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { width: 40, alignItems: "flex-start" },
-  navTitle: { flex: 1, fontSize: 18, fontWeight: "700", textAlign: "center" },
+  navTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   container: {
     paddingHorizontal: 16,
     gap: 14,
@@ -373,14 +318,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  venueName: {
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  venueAddress: {
-    fontSize: 13,
-    marginTop: 2,
-  },
+  venueName: { fontSize: 17, fontWeight: "700" },
+  venueAddress: { fontSize: 13, marginTop: 2 },
   mapButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -389,24 +328,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
   },
-  mapButtonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  mapButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  bodyText: {
-    fontSize: 14,
-    lineHeight: 22,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: "700" },
+  bodyText: { fontSize: 14, lineHeight: 22 },
   wifiRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -419,30 +348,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 2,
   },
-  wifiValue: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  roomRow: {
-    paddingVertical: 12,
-    gap: 4,
-  },
-  roomName: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  roomFloor: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  roomFeatures: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  floorPlanHint: {
-    fontSize: 12,
-    marginTop: -4,
-  },
+  wifiValue: { fontSize: 15, fontWeight: "600" },
+  roomRow: { paddingVertical: 12, gap: 4 },
+  roomName: { fontSize: 14, fontWeight: "600" },
+  roomFloor: { fontSize: 12, marginTop: 2 },
+  roomFeatures: { fontSize: 11, marginTop: 2 },
+  floorPlanHint: { fontSize: 12, marginTop: -4 },
   floorPlanCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -457,14 +368,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 2,
   },
-  floorPlanTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  floorPlanSub: {
-    fontSize: 11,
-    lineHeight: 16,
-  },
+  floorPlanTitle: { fontSize: 14, fontWeight: "700" },
+  floorPlanSub: { fontSize: 11, lineHeight: 16 },
   lightboxBackdrop: {
     flex: 1,
     backgroundColor: "#000",
@@ -476,11 +381,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  lightboxTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  lightboxTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
   lightboxHint: {
     color: "rgba(255,255,255,0.5)",
     fontSize: 11,
@@ -495,9 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   lightboxImageArea: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
   },
 });
