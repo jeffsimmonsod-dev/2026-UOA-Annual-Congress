@@ -24,6 +24,7 @@ export interface Session {
   speakerIds: string[];
   tags?: string[];
   copeId?: string;
+  slidesUrl?: string;
 }
 
 export interface SponsorRep {

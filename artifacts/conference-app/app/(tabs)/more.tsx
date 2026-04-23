@@ -32,6 +32,13 @@ const useMenuItems = (): MenuItem[] => {
       description: "Booth passport & raffle entry",
     },
     {
+      label: "My Notes",
+      icon: "create-outline" as keyof typeof Ionicons.glyphMap,
+      color: "#6366f1",
+      route: "/my-notes",
+      description: "Session notes organized by day",
+    },
+    {
       label: "Speakers",
       icon: "person-circle-outline",
       color: "#6366f1",
