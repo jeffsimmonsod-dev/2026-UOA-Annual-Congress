@@ -46,7 +46,6 @@ function RootLayoutNav() {
       <Stack.Screen name="updates" options={{ title: "Updates" }} />
       <Stack.Screen name="faq" options={{ title: "FAQ" }} />
       <Stack.Screen name="admin" options={{ title: "Send Announcement" }} />
-      <Stack.Screen name="calibrate-overlays" options={{ headerShown: false }} />
     </Stack>
   );
 }
