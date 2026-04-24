@@ -8,7 +8,7 @@
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -32,6 +32,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getRoomColor } from "@/constants/roomColors";
+import { loadPlanOverlays, saveOverlaysForPlan, resetPlanOverlays } from "@/hooks/useOverlays";
 
 const SCREEN = Dimensions.get("window");
 
@@ -184,13 +185,21 @@ export default function CalibrateOverlaysScreen() {
   const insets = useSafeAreaInsets();
   const id = planId ?? "lake";
 
-  const plan = INITIAL_OVERLAYS[id] ?? INITIAL_OVERLAYS.lake;
-  const [rects, setRects] = useState<FlatRect[]>(() => flattenOverlays(plan.overlays));
+  const planMeta = INITIAL_OVERLAYS[id] ?? INITIAL_OVERLAYS.lake;
+  const [rects, setRects] = useState<FlatRect[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Load from storage on mount (reflects any previously saved adjustments)
+  useEffect(() => {
+    loadPlanOverlays(id).then((data) => {
+      setRects(flattenOverlays(data.overlays));
+    });
+  }, [id]);
 
   const displayW = SCREEN.width;
-  const displayH = (plan.nativeH / plan.nativeW) * displayW;
-  const scale = displayW / plan.nativeW;
+  const displayH = (planMeta.nativeH / planMeta.nativeW) * displayW;
+  const scale = displayW / planMeta.nativeW;
 
   const selectedFlat = rects.find((r) => `${r.room}-${r.rectIdx}` === selectedKey) ?? null;
 
@@ -211,6 +220,27 @@ export default function CalibrateOverlaysScreen() {
           : r
       )
     );
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await saveOverlaysForPlan(id, rebuildOverlays(rects));
+    setSaving(false);
+    router.back();
+  };
+
+  const handleReset = () => {
+    Alert.alert("Reset to Defaults", "Discard your changes and restore the original positions?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Reset",
+        style: "destructive",
+        onPress: async () => {
+          await resetPlanOverlays(id);
+          setRects(flattenOverlays((INITIAL_OVERLAYS[id] ?? INITIAL_OVERLAYS.lake).overlays));
+        },
+      },
+    ]);
   };
 
   const outputCode = useMemo(() => {
@@ -246,9 +276,27 @@ export default function CalibrateOverlaysScreen() {
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <Text style={styles.headerTitle}>
-            Overlay Calibrator — {id === "lake" ? "Lake Level" : id === "mid" ? "Mid Mountain" : "Main Level"}
+            {id === "lake" ? "Lake Level" : id === "mid" ? "Mid Mountain" : "Main Level"} Overlays
           </Text>
+          <Pressable onPress={handleReset} hitSlop={8} style={styles.resetBtn}>
+            <Text style={styles.resetBtnText}>Reset</Text>
+          </Pressable>
         </View>
+
+        {/* Save bar */}
+        <Pressable
+          onPress={handleSave}
+          disabled={saving}
+          style={({ pressed }) => [
+            styles.saveBar,
+            { opacity: saving || pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="checkmark-circle" size={18} color="#fff" />
+          <Text style={styles.saveBarText}>
+            {saving ? "Saving…" : "Save & Apply to Map"}
+          </Text>
+        </Pressable>
 
         <Text style={styles.hint}>
           Tap a box to select · Drag to move · Drag ◢ to resize · Use nudge buttons to fine-tune
@@ -345,6 +393,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { color: "#fff", fontSize: 15, fontWeight: "700", flex: 1 },
+  resetBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  resetBtnText: { color: "rgba(255,100,100,0.9)", fontSize: 13, fontWeight: "600" },
+  saveBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: 14,
+    marginBottom: 8,
+    backgroundColor: "#16a34a",
+    borderRadius: 14,
+    paddingVertical: 13,
+  },
+  saveBarText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   hint: {
     color: "rgba(255,255,255,0.45)",
     fontSize: 11,

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -24,68 +24,20 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
+import { DEFAULT_OVERLAYS, PlanData, RoomOverlay } from "@/constants/defaultOverlays";
+import { loadAllOverlays } from "@/hooks/useOverlays";
 import { VENUE } from "@/services/data";
 
 const SCREEN = Dimensions.get("window");
 
-// ── Room overlay rectangles in native image pixel coords ─────────────────────
-interface RoomOverlay {
-  room: string;
-  rects: Array<{ x: number; y: number; w: number; h: number }>;
-}
-
-// Lake Level: native 1000 × 880 px
-const LAKE_OVERLAYS: RoomOverlay[] = [
-  {
-    room: "Deer Creek Ballroom",
-    rects: [
-      { x: 70, y: 235, w: 232, h: 190 }, // upper section A
-      { x: 70, y: 425, w: 232, h: 275 }, // lower section B
-    ],
-  },
-  {
-    room: "Jordanelle Ballroom",
-    rects: [{ x: 370, y: 360, w: 310, h: 475 }],
-  },
-  {
-    room: "Strawberry Conference Room",
-    rects: [{ x: 718, y: 235, w: 252, h: 140 }],
-  },
-];
-
-// Mid Mountain Level: native 530 × 589 px
-const MID_OVERLAYS: RoomOverlay[] = [
-  {
-    room: "Empire Conference Room",
-    rects: [{ x: 78, y: 28, w: 192, h: 150 }],
-  },
-  {
-    room: "Dutch Conference Room",
-    rects: [{ x: 370, y: 413, w: 128, h: 115 }], // "Big Dutch"
-  },
-];
-
-// Main Level: native 1163 × 767 px
-const MAIN_OVERLAYS: RoomOverlay[] = [
-  {
-    room: "Hailstone Terrace",
-    rects: [{ x: 120, y: 75, w: 255, h: 245 }],
-  },
-  {
-    room: "Remington Hall Restaurant",
-    rects: [{ x: 440, y: 10, w: 178, h: 310 }],
-  },
-];
-
-// ── Floor plan data ───────────────────────────────────────────────────────────
-const FLOOR_PLANS = [
+// ── Static floor plan definitions (overlays loaded dynamically from storage) ──
+const FLOOR_PLANS_BASE = [
   {
     id: "lake",
     label: "Lake Level",
     source: require("@/assets/images/floorplan-lake-level.png"),
     nativeW: 1000,
     nativeH: 880,
-    overlays: LAKE_OVERLAYS,
     rooms: ["Deer Creek Ballroom", "Jordanelle Ballroom", "Strawberry Conference Room"],
   },
   {
@@ -94,7 +46,6 @@ const FLOOR_PLANS = [
     source: require("@/assets/images/floorplan-mid-mountain.png"),
     nativeW: 530,
     nativeH: 589,
-    overlays: MID_OVERLAYS,
     rooms: ["Empire Conference Room", "Dutch Conference Room"],
   },
   {
@@ -103,7 +54,6 @@ const FLOOR_PLANS = [
     source: require("@/assets/images/floorplan-main-level.png"),
     nativeW: 1163,
     nativeH: 767,
-    overlays: MAIN_OVERLAYS,
     rooms: ["Hailstone Terrace", "Remington Hall Restaurant"],
   },
 ];
@@ -157,7 +107,7 @@ function FloorPlanThumb({
   plan,
   displayWidth,
 }: {
-  plan: (typeof FLOOR_PLANS)[0];
+  plan: PlanEntry;
   displayWidth: number;
 }) {
   const aspectH = (plan.nativeH / plan.nativeW) * displayWidth;
@@ -345,12 +295,28 @@ function ZoomableImageWithOverlays({
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+type PlanEntry = (typeof FLOOR_PLANS_BASE)[0] & { overlays: RoomOverlay[] };
+
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width } = Dimensions.get("window");
-  const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
-  const thumbWidth = width - 64; // padding 16 + card padding 16 each side
+  const thumbWidth = width - 64;
+
+  // ── Overlay state: loaded from AsyncStorage, refreshed on every focus ────────
+  const [allOverlays, setAllOverlays] = useState<Record<string, PlanData>>(DEFAULT_OVERLAYS);
+  useFocusEffect(
+    useCallback(() => {
+      loadAllOverlays().then(setAllOverlays);
+    }, [])
+  );
+
+  const plans: PlanEntry[] = FLOOR_PLANS_BASE.map((p) => ({
+    ...p,
+    overlays: allOverlays[p.id]?.overlays ?? DEFAULT_OVERLAYS[p.id].overlays,
+  }));
+
+  const [lightbox, setLightbox] = useState<null | PlanEntry>(null);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -490,7 +456,7 @@ export default function VenueScreen() {
           <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
             Tap to open · Pinch to zoom · Long-press to adjust overlays
           </Text>
-          {FLOOR_PLANS.map((plan) => (
+          {plans.map((plan) => (
             <Pressable
               key={plan.id}
               onPress={() => setLightbox(plan)}
