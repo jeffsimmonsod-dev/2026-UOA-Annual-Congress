@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getParaSessionsByDay } from "@/services/data";
 
 const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
@@ -18,6 +19,7 @@ const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 export default function ParaScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const [activeDay, setActiveDay] = useState("Thu, June 4");
   const sessionsByDay = getParaSessionsByDay();
   const sessions = sessionsByDay[activeDay] ?? [];
@@ -105,6 +107,7 @@ export default function ParaScreen() {
           {
             paddingBottom: insets.bottom + 100,
           },
+          contentStyle,
         ]}
         showsVerticalScrollIndicator={false}
       >

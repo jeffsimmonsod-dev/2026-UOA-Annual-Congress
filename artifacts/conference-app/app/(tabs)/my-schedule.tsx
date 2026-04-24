@@ -11,11 +11,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { SESSIONS, PARA_SESSIONS } from "@/services/data";
 
 export default function MyScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
 
   const allSessions = [...SESSIONS, ...PARA_SESSIONS];
@@ -36,6 +38,7 @@ export default function MyScheduleScreen() {
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 100,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

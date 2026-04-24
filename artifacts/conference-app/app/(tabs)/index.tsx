@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useSchedule } from "@/context/ScheduleContext";
 import { CONFERENCE, SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
 import type { Session, Sponsor } from "@/types";
@@ -74,6 +75,7 @@ function sortSessions(sessions: Session[]): Session[] {
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
   const isWeb = Platform.OS === "web";
 
@@ -117,6 +119,7 @@ export default function HomeScreen() {
           paddingTop: insets.top,
           paddingBottom: insets.bottom + 100,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

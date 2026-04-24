@@ -27,6 +27,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 
 const SCREEN = Dimensions.get("window");
 
@@ -204,6 +205,7 @@ function timeAgo(iso: string): string {
 export default function PhotosScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle, numPhotoColumns } = useTabletLayout();
   const isWeb = Platform.OS === "web";
   const deviceId = useRef(getDeviceId()).current;
 
@@ -402,10 +404,11 @@ export default function PhotosScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
+        key={numPhotoColumns}
         data={photos}
         keyExtractor={(item) => item.id}
         renderItem={renderPhoto}
-        numColumns={2}
+        numColumns={numPhotoColumns}
         columnWrapperStyle={styles.row}
         contentContainerStyle={[
           styles.list,
@@ -413,6 +416,7 @@ export default function PhotosScreen() {
             paddingTop: insets.top + 16,
             paddingBottom: insets.bottom + 100,
           },
+          contentStyle,
         ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />

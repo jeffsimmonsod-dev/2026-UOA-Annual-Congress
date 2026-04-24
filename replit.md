@@ -52,6 +52,7 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - NativeTabs with liquid glass for iOS 26+, BlurView fallback for older iOS, Android
 - Indigo/navy color theme (`#4f46e5` primary)
 - `expo-notifications` + `expo-device` for push notification support
+- iPad support: `supportsTablet: true` in `app.json`; `hooks/useTabletLayout.ts` constrains content to max 720px wide, uses 4-column photo grid on tablet (2 on phone)
 
 **File structure:**
 ```

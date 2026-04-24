@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { CONFERENCE } from "@/services/data";
 
 interface MenuItem {
@@ -86,6 +87,7 @@ const useMenuItems = (): MenuItem[] => {
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const menuItems = useMenuItems();
 
   return (
@@ -97,6 +99,7 @@ export default function MoreScreen() {
           paddingTop: insets.top,
           paddingBottom: insets.bottom + 100,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

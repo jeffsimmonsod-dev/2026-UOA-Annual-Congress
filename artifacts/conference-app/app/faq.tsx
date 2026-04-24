@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { FAQ } from "@/services/data";
 
 function FaqItem({ item, colors }: { item: (typeof FAQ)[0]; colors: any }) {
@@ -77,6 +78,7 @@ function FaqItem({ item, colors }: { item: (typeof FAQ)[0]; colors: any }) {
 export default function FaqScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const isWeb = Platform.OS === "web";
 
   const categories = Array.from(new Set(FAQ.map((f) => f.category)));
@@ -90,6 +92,7 @@ export default function FaqScreen() {
           paddingTop: isWeb ? insets.top + 16 : 16,
           paddingBottom: isWeb ? insets.bottom + 40 : 40,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

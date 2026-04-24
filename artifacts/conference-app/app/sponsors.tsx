@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { SPONSORS } from "@/services/data";
 import type { Sponsor } from "@/types";
 
@@ -25,6 +26,7 @@ const TIER_CONFIG = {
 export default function SponsorsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const isWeb = Platform.OS === "web";
 
   const tiers = (["platinum", "gold", "silver", "bronze"] as const).filter(
@@ -40,6 +42,7 @@ export default function SponsorsScreen() {
           paddingTop: isWeb ? insets.top + 16 : 16,
           paddingBottom: isWeb ? insets.bottom + 40 : 40,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

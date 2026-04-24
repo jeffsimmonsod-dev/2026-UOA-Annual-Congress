@@ -5,11 +5,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SpeakerCard from "@/components/SpeakerCard";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { SPEAKERS } from "@/services/data";
 
 export default function SpeakersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -23,7 +25,7 @@ export default function SpeakersScreen() {
 
       <ScrollView
         style={{ backgroundColor: colors.background }}
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }, contentStyle]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.count, { color: colors.mutedForeground }]}>

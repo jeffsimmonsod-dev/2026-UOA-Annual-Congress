@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { UPDATES } from "@/services/data";
 import type { Update } from "@/types";
 
@@ -51,6 +52,7 @@ function formatDate(timestamp: string) {
 export default function UpdatesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const isWeb = Platform.OS === "web";
 
   return (
@@ -62,6 +64,7 @@ export default function UpdatesScreen() {
           paddingTop: isWeb ? insets.top + 16 : 16,
           paddingBottom: isWeb ? insets.bottom + 40 : 40,
         },
+        contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >

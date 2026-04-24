@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
+import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getSessionsByDay, getParaSessionsByDay } from "@/services/data";
 
 const DOCTOR_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
@@ -19,6 +20,7 @@ const TABS = [...DOCTOR_DAYS, "Para"];
 export default function ScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { contentStyle } = useTabletLayout();
   const [activeTab, setActiveTab] = useState("Thu, June 4");
   const doctorSessionsByDay = getSessionsByDay();
   const paraSessionsByDay = getParaSessionsByDay();
@@ -106,6 +108,7 @@ export default function ScheduleScreen() {
         contentContainerStyle={[
           styles.list,
           { paddingBottom: isWeb ? insets.bottom + 100 : 100 },
+          contentStyle,
         ]}
         showsVerticalScrollIndicator={false}
       >
