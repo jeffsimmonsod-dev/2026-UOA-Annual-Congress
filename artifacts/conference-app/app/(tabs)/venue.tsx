@@ -467,12 +467,19 @@ export default function VenueScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
           <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
-            Tap to open · Pinch to zoom · Double-tap to reset
+            Tap to open · Pinch to zoom · Long-press to adjust overlays
           </Text>
           {FLOOR_PLANS.map((plan) => (
             <Pressable
               key={plan.id}
               onPress={() => setLightbox(plan)}
+              onLongPress={() =>
+                router.push({
+                  pathname: "/calibrate-overlays",
+                  params: { planId: plan.id },
+                })
+              }
+              delayLongPress={600}
               style={({ pressed }) => [
                 styles.floorPlanCard,
                 { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
