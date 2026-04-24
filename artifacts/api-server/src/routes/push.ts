@@ -5,7 +5,7 @@ const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
 
-const ADMIN_PIN = "Chanae2026!";
+const ADMIN_PIN = process.env.ADMIN_PIN ?? "Chanae2026!";
 
 async function ensureTables() {
   await pool.query(`
