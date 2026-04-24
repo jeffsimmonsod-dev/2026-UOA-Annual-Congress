@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
+import { getRoomColor } from "@/constants/roomColors";
 import type { Session } from "@/types";
 import { getSpeakersForSession } from "@/services/data";
 
@@ -43,6 +44,7 @@ export default function SessionCard({ session, showDay = false }: Props) {
   const saved = isSaved(session.id);
   const speakers = getSpeakersForSession(session);
   const trackColor = TRACK_COLORS[session.track] ?? colors.primary;
+  const roomColor = getRoomColor(session.room);
 
   const handlePress = () => {
     router.push({ pathname: "/session/[id]", params: { id: session.id } });
@@ -110,8 +112,8 @@ export default function SessionCard({ session, showDay = false }: Props) {
               </Text>
             </View>
             <View style={styles.metaRow}>
-              <Ionicons name="location-outline" size={13} color={colors.mutedForeground} />
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+              <View style={[styles.roomDot, { backgroundColor: roomColor }]} />
+              <Text style={[styles.metaText, { color: roomColor, fontWeight: "600" }]}>
                 {session.room}
               </Text>
             </View>
@@ -228,6 +230,11 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
+  },
+  roomDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   speaker: {
     fontSize: 12,

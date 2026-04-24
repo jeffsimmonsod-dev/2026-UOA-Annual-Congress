@@ -22,6 +22,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { getRoomColor } from "@/constants/roomColors";
 import { VENUE } from "@/services/data";
 
 const SCREEN = Dimensions.get("window");
@@ -32,12 +33,21 @@ const FLOOR_PLANS = [
     label: "Lake Level",
     subtitle: "Deer Creek Ballroom · Jordanelle Ballroom · Strawberry Conference Room",
     source: require("@/assets/images/floorplan-lake-level.png"),
+    rooms: [
+      "Deer Creek Ballroom",
+      "Jordanelle Ballroom",
+      "Strawberry Conference Room",
+    ],
   },
   {
     id: "mid",
     label: "Mid Mountain Level",
-    subtitle: "Empire Conference Room · Big Dutch · Lady Morgan · Park Peak",
+    subtitle: "Empire Conference Room · Dutch Conference Room",
     source: require("@/assets/images/floorplan-mid-mountain.png"),
+    rooms: [
+      "Empire Conference Room",
+      "Dutch Conference Room",
+    ],
   },
 ];
 
@@ -280,28 +290,35 @@ export default function VenueScreen() {
         {/* Rooms */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="layers-outline" title="Rooms" colors={colors} />
-          {VENUE.rooms.map((room, i) => (
-            <View
-              key={room.id}
-              style={[
-                styles.roomRow,
-                i < VENUE.rooms.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: colors.border,
-                },
-              ]}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.roomName, { color: colors.foreground }]}>{room.name}</Text>
-                <Text style={[styles.roomFloor, { color: colors.mutedForeground }]}>
-                  {room.floor} · {room.capacity} seats
-                </Text>
-                <Text style={[styles.roomFeatures, { color: colors.mutedForeground }]}>
-                  {room.features.join(" · ")}
-                </Text>
+          {VENUE.rooms.map((room, i) => {
+            const roomColor = getRoomColor(room.name);
+            return (
+              <View
+                key={room.id}
+                style={[
+                  styles.roomRow,
+                  i < VENUE.rooms.length - 1 && {
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: colors.border,
+                  },
+                ]}
+              >
+                {/* Color bar */}
+                <View style={[styles.roomColorBar, { backgroundColor: roomColor }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roomName, { color: roomColor, fontWeight: "700" }]}>
+                    {room.name}
+                  </Text>
+                  <Text style={[styles.roomFloor, { color: colors.mutedForeground }]}>
+                    {room.floor} · {room.capacity} seats
+                  </Text>
+                  <Text style={[styles.roomFeatures, { color: colors.mutedForeground }]}>
+                    {room.features.join(" · ")}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Floor Plans */}
@@ -328,9 +345,23 @@ export default function VenueScreen() {
                 <Text style={[styles.floorPlanTitle, { color: colors.foreground }]}>
                   {plan.label}
                 </Text>
-                <Text style={[styles.floorPlanSub, { color: colors.mutedForeground }]}>
-                  {plan.subtitle}
-                </Text>
+                {/* Room color legend */}
+                <View style={styles.roomLegend}>
+                  {plan.rooms.map((roomName) => {
+                    const rc = getRoomColor(roomName);
+                    return (
+                      <View
+                        key={roomName}
+                        style={[styles.legendChip, { backgroundColor: rc + "20", borderColor: rc + "50" }]}
+                      >
+                        <View style={[styles.legendDot, { backgroundColor: rc }]} />
+                        <Text style={[styles.legendLabel, { color: rc }]} numberOfLines={1}>
+                          {roomName.replace(" Conference Room", "").replace(" Ballroom", "").replace(" Restaurant", "")}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             </Pressable>
           ))}
@@ -428,10 +459,23 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   wifiValue: { fontSize: 15, fontWeight: "600" },
-  roomRow: { paddingVertical: 12, gap: 4 },
+  roomRow: { paddingVertical: 12, gap: 4, flexDirection: "row", alignItems: "flex-start" },
+  roomColorBar: { width: 4, borderRadius: 2, alignSelf: "stretch", marginRight: 10, minHeight: 40 },
   roomName: { fontSize: 14, fontWeight: "600" },
   roomFloor: { fontSize: 12, marginTop: 2 },
   roomFeatures: { fontSize: 11, marginTop: 2 },
+  roomLegend: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  legendChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
+  legendLabel: { fontSize: 11, fontWeight: "600" },
   floorPlanHint: { fontSize: 12, marginTop: -4 },
   floorPlanCard: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   floorPlanThumb: { height: 200, backgroundColor: "#f5f5f5" },

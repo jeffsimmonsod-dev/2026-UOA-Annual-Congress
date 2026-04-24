@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useNote } from "@/hooks/useNotes";
 import { useColors } from "@/hooks/useColors";
+import { getRoomColor } from "@/constants/roomColors";
 import { getSessionById, getSpeakersForSession } from "@/services/data";
 
 const TRACK_COLORS: Record<string, string> = {
@@ -105,7 +106,7 @@ export default function SessionDetailScreen() {
       {/* Meta card */}
       <View style={[styles.metaCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <MetaRow icon="time-outline" label="Time" value={`${session.startTime} – ${session.endTime}`} colors={colors} />
-        <MetaRow icon="location-outline" label="Room" value={session.room} colors={colors} />
+        <MetaRow icon="location-outline" label="Room" value={session.room} colors={colors} valueColor={getRoomColor(session.room)} />
         <MetaRow icon="calendar-outline" label="Day" value={session.day} colors={colors} />
         {session.copeId && (
           <MetaRow icon="school-outline" label="COPE" value={session.copeId} colors={colors} />
@@ -272,17 +273,26 @@ function MetaRow({
   label,
   value,
   colors,
+  valueColor,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   colors: any;
+  valueColor?: string;
 }) {
   return (
     <View style={styles.metaRow}>
-      <Ionicons name={icon} size={16} color={colors.primary} />
+      <Ionicons name={icon} size={16} color={valueColor ?? colors.primary} />
       <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.metaValue, { color: colors.foreground }]}>{value}</Text>
+      {valueColor ? (
+        <View style={styles.metaValueRow}>
+          <View style={[styles.metaRoomDot, { backgroundColor: valueColor }]} />
+          <Text style={[styles.metaValue, { color: valueColor, fontWeight: "700" }]}>{value}</Text>
+        </View>
+      ) : (
+        <Text style={[styles.metaValue, { color: colors.foreground }]}>{value}</Text>
+      )}
     </View>
   );
 }
@@ -308,6 +318,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   metaLabel: { fontSize: 13, width: 48 },
   metaValue: { fontSize: 14, fontWeight: "500", flex: 1 },
+  metaValueRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  metaRoomDot: { width: 9, height: 9, borderRadius: 5 },
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   tagText: { fontSize: 12, fontWeight: "500" },

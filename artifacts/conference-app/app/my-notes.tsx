@@ -60,7 +60,11 @@ export default function MyNotesScreen() {
     setLoading(false);
   }, []);
 
-  useFocusEffect(loadNotes);
+  useFocusEffect(
+    useCallback(() => {
+      loadNotes();
+    }, [loadNotes])
+  );
 
   const handleDelete = (entry: NoteEntry) => {
     Alert.alert(
