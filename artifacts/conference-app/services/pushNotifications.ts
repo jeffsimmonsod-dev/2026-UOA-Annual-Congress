@@ -3,15 +3,23 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Expo Go on Android SDK 53+ removed push notification native support.
+// Any expo-notifications API call throws in that environment.
+// The published EAS build works correctly — this guard is Expo Go only.
+const isExpoGo = Constants.appOwnership === "expo";
+const isExpoGoAndroid = isExpoGo && Platform.OS === "android";
+
+if (!isExpoGoAndroid) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 function getApiBase(): string | null {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
@@ -19,14 +27,10 @@ function getApiBase(): string | null {
   return `https://${domain}`;
 }
 
-// Expo Go on Android does not support remote push notifications (SDK 53+).
-// The real EAS build works fine — this guard is for dev-only Expo Go testing.
-const isExpoGo = Constants.appOwnership === "expo";
-
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (Platform.OS === "web") return null;
   if (!Device.isDevice) return null;
-  if (isExpoGo && Platform.OS === "android") return null;
+  if (isExpoGoAndroid) return null;
 
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
