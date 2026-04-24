@@ -65,6 +65,18 @@ const MID_OVERLAYS: RoomOverlay[] = [
   },
 ];
 
+// Main Level: native 1163 × 767 px
+const MAIN_OVERLAYS: RoomOverlay[] = [
+  {
+    room: "Hailstone Terrace",
+    rects: [{ x: 120, y: 75, w: 255, h: 245 }],
+  },
+  {
+    room: "Remington Hall Restaurant",
+    rects: [{ x: 440, y: 10, w: 178, h: 310 }],
+  },
+];
+
 // ── Floor plan data ───────────────────────────────────────────────────────────
 const FLOOR_PLANS = [
   {
@@ -84,6 +96,15 @@ const FLOOR_PLANS = [
     nativeH: 589,
     overlays: MID_OVERLAYS,
     rooms: ["Empire Conference Room", "Dutch Conference Room"],
+  },
+  {
+    id: "main",
+    label: "Main Level",
+    source: require("@/assets/images/floorplan-main-level.png"),
+    nativeW: 1163,
+    nativeH: 767,
+    overlays: MAIN_OVERLAYS,
+    rooms: ["Hailstone Terrace", "Remington Hall Restaurant"],
   },
 ];
 

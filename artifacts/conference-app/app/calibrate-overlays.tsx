@@ -57,11 +57,20 @@ const INITIAL_OVERLAYS: Record<string, { nativeW: number; nativeH: number; overl
       { room: "Dutch Conference Room",  rects: [{ x: 370, y: 413, w: 128, h: 115 }] },
     ],
   },
+  main: {
+    nativeW: 1163,
+    nativeH: 767,
+    overlays: [
+      { room: "Hailstone Terrace",        rects: [{ x: 120, y: 75, w: 255, h: 245 }] },
+      { room: "Remington Hall Restaurant", rects: [{ x: 440, y: 10, w: 178, h: 310 }] },
+    ],
+  },
 };
 
 const SOURCES: Record<string, ReturnType<typeof require>> = {
   lake: require("@/assets/images/floorplan-lake-level.png"),
   mid:  require("@/assets/images/floorplan-mid-mountain.png"),
+  main: require("@/assets/images/floorplan-main-level.png"),
 };
 
 // ─── Flat list item for editing ──────────────────────────────────────────────
@@ -212,7 +221,8 @@ export default function CalibrateOverlaysScreen() {
         .join(",\n        ");
       return `  {\n    room: "${o.room}",\n    rects: [\n        ${rectsStr},\n    ],\n  }`;
     });
-    return `// ${id === "lake" ? "LAKE" : "MID"}_OVERLAYS\n[\n${lines.join(",\n")}\n]`;
+    const label = id === "lake" ? "LAKE" : id === "mid" ? "MID" : "MAIN";
+    return `// ${label}_OVERLAYS\n[\n${lines.join(",\n")}\n]`;
   }, [rects, id]);
 
   const copyOutput = async () => {
@@ -236,7 +246,7 @@ export default function CalibrateOverlaysScreen() {
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </Pressable>
           <Text style={styles.headerTitle}>
-            Overlay Calibrator — {id === "lake" ? "Lake Level" : "Mid Mountain"}
+            Overlay Calibrator — {id === "lake" ? "Lake Level" : id === "mid" ? "Mid Mountain" : "Main Level"}
           </Text>
         </View>
 
