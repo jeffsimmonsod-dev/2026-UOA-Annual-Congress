@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import { Rect, Svg } from "react-native-svg";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -27,34 +28,166 @@ import { VENUE } from "@/services/data";
 
 const SCREEN = Dimensions.get("window");
 
+// ── Room overlay rectangles in native image pixel coords ─────────────────────
+interface RoomOverlay {
+  room: string;
+  rects: Array<{ x: number; y: number; w: number; h: number }>;
+}
+
+// Lake Level: native 1000 × 880 px
+const LAKE_OVERLAYS: RoomOverlay[] = [
+  {
+    room: "Deer Creek Ballroom",
+    rects: [
+      { x: 70, y: 235, w: 232, h: 190 }, // upper section A
+      { x: 70, y: 425, w: 232, h: 275 }, // lower section B
+    ],
+  },
+  {
+    room: "Jordanelle Ballroom",
+    rects: [{ x: 370, y: 360, w: 310, h: 475 }],
+  },
+  {
+    room: "Strawberry Conference Room",
+    rects: [{ x: 718, y: 235, w: 252, h: 140 }],
+  },
+];
+
+// Mid Mountain Level: native 530 × 589 px
+const MID_OVERLAYS: RoomOverlay[] = [
+  {
+    room: "Empire Conference Room",
+    rects: [{ x: 78, y: 28, w: 192, h: 150 }],
+  },
+  {
+    room: "Dutch Conference Room",
+    rects: [{ x: 370, y: 413, w: 128, h: 115 }], // "Big Dutch"
+  },
+];
+
+// ── Floor plan data ───────────────────────────────────────────────────────────
 const FLOOR_PLANS = [
   {
     id: "lake",
     label: "Lake Level",
-    subtitle: "Deer Creek Ballroom · Jordanelle Ballroom · Strawberry Conference Room",
     source: require("@/assets/images/floorplan-lake-level.png"),
-    rooms: [
-      "Deer Creek Ballroom",
-      "Jordanelle Ballroom",
-      "Strawberry Conference Room",
-    ],
+    nativeW: 1000,
+    nativeH: 880,
+    overlays: LAKE_OVERLAYS,
+    rooms: ["Deer Creek Ballroom", "Jordanelle Ballroom", "Strawberry Conference Room"],
   },
   {
     id: "mid",
     label: "Mid Mountain Level",
-    subtitle: "Empire Conference Room · Dutch Conference Room",
     source: require("@/assets/images/floorplan-mid-mountain.png"),
-    rooms: [
-      "Empire Conference Room",
-      "Dutch Conference Room",
-    ],
+    nativeW: 530,
+    nativeH: 589,
+    overlays: MID_OVERLAYS,
+    rooms: ["Empire Conference Room", "Dutch Conference Room"],
   },
 ];
 
-// ─── Zoomable image — same pattern as photos.tsx ────────────────────────────
-function ZoomableImage({ source }: { source: ReturnType<typeof require> }) {
+// ── SVG overlay layer ─────────────────────────────────────────────────────────
+function RoomOverlaysSvg({
+  overlays,
+  viewW,
+  viewH,
+  nativeW,
+  nativeH,
+  offsetX = 0,
+  offsetY = 0,
+}: {
+  overlays: RoomOverlay[];
+  viewW: number;
+  viewH: number;
+  nativeW: number;
+  nativeH: number;
+  offsetX?: number;
+  offsetY?: number;
+}) {
+  return (
+    <Svg
+      style={{ position: "absolute", left: offsetX, top: offsetY }}
+      width={viewW}
+      height={viewH}
+      viewBox={`0 0 ${nativeW} ${nativeH}`}
+      pointerEvents="none"
+    >
+      {overlays.flatMap((overlay) =>
+        overlay.rects.map((r, i) => (
+          <Rect
+            key={`${overlay.room}-${i}`}
+            x={r.x}
+            y={r.y}
+            width={r.w}
+            height={r.h}
+            fill={getRoomColor(overlay.room)}
+            opacity={0.38}
+            rx={6}
+          />
+        ))
+      )}
+    </Svg>
+  );
+}
+
+// ── Thumbnail with overlay ────────────────────────────────────────────────────
+function FloorPlanThumb({
+  plan,
+  displayWidth,
+}: {
+  plan: (typeof FLOOR_PLANS)[0];
+  displayWidth: number;
+}) {
+  const aspectH = (plan.nativeH / plan.nativeW) * displayWidth;
+  return (
+    <View style={{ width: displayWidth, height: aspectH, backgroundColor: "#f5f5f5" }}>
+      <Image
+        source={plan.source}
+        style={{ width: displayWidth, height: aspectH }}
+        resizeMode="stretch"
+      />
+      <RoomOverlaysSvg
+        overlays={plan.overlays}
+        viewW={displayWidth}
+        viewH={aspectH}
+        nativeW={plan.nativeW}
+        nativeH={plan.nativeH}
+      />
+    </View>
+  );
+}
+
+// ── Zoomable lightbox with overlay ───────────────────────────────────────────
+function ZoomableImageWithOverlays({
+  source,
+  overlays,
+  nativeW,
+  nativeH,
+}: {
+  source: ReturnType<typeof require>;
+  overlays: RoomOverlay[];
+  nativeW: number;
+  nativeH: number;
+}) {
   const W = SCREEN.width;
   const H = SCREEN.height * 0.78;
+
+  // Calculate where the image lands inside the contain box
+  const imgAspect = nativeW / nativeH;
+  const screenAspect = W / H;
+  let imgW: number, imgH: number, offX: number, offY: number;
+  if (imgAspect > screenAspect) {
+    imgW = W;
+    imgH = W / imgAspect;
+    offX = 0;
+    offY = (H - imgH) / 2;
+  } else {
+    imgH = H;
+    imgW = H * imgAspect;
+    offX = (W - imgW) / 2;
+    offY = 0;
+  }
 
   const scale = useSharedValue(1);
   const offsetX = useSharedValue(0);
@@ -172,21 +305,31 @@ function ZoomableImage({ source }: { source: ReturnType<typeof require> }) {
 
   return (
     <GestureDetector gesture={gesture}>
-      <Animated.Image
-        source={source}
-        style={[{ width: W, height: H }, animStyle]}
-        resizeMode="contain"
-      />
+      {/* Animated.View wraps both the image AND the SVG so they pan/zoom together */}
+      <Animated.View style={[{ width: W, height: H, alignItems: "center", justifyContent: "center" }, animStyle]}>
+        <Image source={source} style={{ width: W, height: H }} resizeMode="contain" />
+        <RoomOverlaysSvg
+          overlays={overlays}
+          viewW={imgW}
+          viewH={imgH}
+          nativeW={nativeW}
+          nativeH={nativeH}
+          offsetX={offX}
+          offsetY={offY}
+        />
+      </Animated.View>
     </GestureDetector>
   );
 }
-// ────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function VenueScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width } = Dimensions.get("window");
   const [lightbox, setLightbox] = useState<null | (typeof FLOOR_PLANS)[0]>(null);
+  const thumbWidth = width - 64; // padding 16 + card padding 16 each side
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -303,7 +446,6 @@ export default function VenueScreen() {
                   },
                 ]}
               >
-                {/* Color bar */}
                 <View style={[styles.roomColorBar, { backgroundColor: roomColor }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.roomName, { color: roomColor, fontWeight: "700" }]}>
@@ -336,16 +478,12 @@ export default function VenueScreen() {
                 { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
               ]}
             >
-              <Image
-                source={plan.source}
-                style={[styles.floorPlanThumb, { width: width - 64 }]}
-                resizeMode="contain"
-              />
+              <FloorPlanThumb plan={plan} displayWidth={thumbWidth} />
               <View style={[styles.floorPlanLabel, { backgroundColor: colors.background }]}>
                 <Text style={[styles.floorPlanTitle, { color: colors.foreground }]}>
                   {plan.label}
                 </Text>
-                {/* Room color legend */}
+                {/* Color legend chips */}
                 <View style={styles.roomLegend}>
                   {plan.rooms.map((roomName) => {
                     const rc = getRoomColor(roomName);
@@ -356,7 +494,10 @@ export default function VenueScreen() {
                       >
                         <View style={[styles.legendDot, { backgroundColor: rc }]} />
                         <Text style={[styles.legendLabel, { color: rc }]} numberOfLines={1}>
-                          {roomName.replace(" Conference Room", "").replace(" Ballroom", "").replace(" Restaurant", "")}
+                          {roomName
+                            .replace(" Conference Room", "")
+                            .replace(" Ballroom", "")
+                            .replace(" Restaurant", "")}
                         </Text>
                       </View>
                     );
@@ -375,9 +516,15 @@ export default function VenueScreen() {
         statusBarTranslucent
         onRequestClose={() => setLightbox(null)}
       >
-        {/* GestureHandlerRootView is REQUIRED inside Modal for gestures to work */}
         <GestureHandlerRootView style={styles.lightboxRoot}>
-          {lightbox && <ZoomableImage source={lightbox.source} />}
+          {lightbox && (
+            <ZoomableImageWithOverlays
+              source={lightbox.source}
+              overlays={lightbox.overlays}
+              nativeW={lightbox.nativeW}
+              nativeH={lightbox.nativeH}
+            />
+          )}
 
           {/* Overlay controls */}
           <View style={[styles.lightboxHeader, { paddingTop: insets.top + 8 }]}>
@@ -393,6 +540,28 @@ export default function VenueScreen() {
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
           </View>
+
+          {/* Legend in lightbox */}
+          {lightbox && (
+            <View style={[styles.lightboxLegend, { bottom: insets.bottom + 16 }]}>
+              {lightbox.rooms.map((roomName) => {
+                const rc = getRoomColor(roomName);
+                return (
+                  <View
+                    key={roomName}
+                    style={[styles.lightboxChip, { backgroundColor: rc + "CC" }]}
+                  >
+                    <Text style={styles.lightboxChipText} numberOfLines={1}>
+                      {roomName
+                        .replace(" Conference Room", "")
+                        .replace(" Ballroom", "")
+                        .replace(" Restaurant", "")}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </GestureHandlerRootView>
       </Modal>
     </View>
@@ -459,9 +628,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   wifiValue: { fontSize: 15, fontWeight: "600" },
-  roomRow: { paddingVertical: 12, gap: 4, flexDirection: "row", alignItems: "flex-start" },
+  roomRow: { paddingVertical: 12, flexDirection: "row", alignItems: "flex-start" },
   roomColorBar: { width: 4, borderRadius: 2, alignSelf: "stretch", marginRight: 10, minHeight: 40 },
-  roomName: { fontSize: 14, fontWeight: "600" },
+  roomName: { fontSize: 14 },
   roomFloor: { fontSize: 12, marginTop: 2 },
   roomFeatures: { fontSize: 11, marginTop: 2 },
   roomLegend: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
@@ -478,10 +647,8 @@ const styles = StyleSheet.create({
   legendLabel: { fontSize: 11, fontWeight: "600" },
   floorPlanHint: { fontSize: 12, marginTop: -4 },
   floorPlanCard: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
-  floorPlanThumb: { height: 200, backgroundColor: "#f5f5f5" },
   floorPlanLabel: { paddingHorizontal: 12, paddingVertical: 10, gap: 2 },
   floorPlanTitle: { fontSize: 14, fontWeight: "700" },
-  floorPlanSub: { fontSize: 11, lineHeight: 16 },
   // Lightbox
   lightboxRoot: {
     flex: 1,
@@ -512,4 +679,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 2,
   },
+  lightboxLegend: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+  },
+  lightboxChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  lightboxChipText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 });
