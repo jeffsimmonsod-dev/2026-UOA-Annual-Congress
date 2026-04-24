@@ -5,6 +5,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
+import { Ionicons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -45,6 +46,7 @@ function RootLayoutNav() {
       <Stack.Screen name="updates" options={{ title: "Updates" }} />
       <Stack.Screen name="faq" options={{ title: "FAQ" }} />
       <Stack.Screen name="admin" options={{ title: "Send Announcement" }} />
+      <Stack.Screen name="calibrate-overlays" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -55,6 +57,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    ...Ionicons.font,
   });
   useEffect(() => {
     if (fontsLoaded || fontError) {
