@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +31,7 @@ interface BoothVisitor {
   attendee_name: string | null;
   attendee_email: string | null;
   visited_at: string;
-  device_id: string;
+  attendee_id: number;
 }
 
 interface BoothAnalytics {
@@ -54,7 +54,6 @@ interface Booth {
   company: string;
   booth_number: string | null;
   description: string | null;
-  secret_token: string;
   visit_count: number;
 }
 
@@ -64,14 +63,6 @@ interface ScheduledAnnouncement {
   body: string;
   scheduled_for: string;
   sent_at: string | null;
-}
-
-function qrUrl(data: string) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`;
-}
-
-function boothQrData(booth: Booth) {
-  return `uoa2026:booth:${booth.id}:${booth.secret_token}`;
 }
 
 function formatScheduledDate(iso: string) {
@@ -116,6 +107,8 @@ export default function AdminScreen() {
   const [newBoothNumber, setNewBoothNumber] = useState("");
   const [addingBooth, setAddingBooth] = useState(false);
   const [expandedBoothId, setExpandedBoothId] = useState<number | null>(null);
+  const [liveQrState, setLiveQrState] = useState<Record<number, { dataUrl: string | null; expiresAt: Date | null; loading: boolean; countdown: number }>>({});
+  const liveQrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -399,10 +392,62 @@ export default function AdminScreen() {
     ]);
   };
 
-  const handlePrintQR = (booth: Booth) => {
-    const data = boothQrData(booth);
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}&margin=20`;
-    Linking.openURL(url);
+  const fetchLiveQr = useCallback(async (boothId: number) => {
+    setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], dataUrl: prev[boothId]?.dataUrl ?? null, expiresAt: prev[boothId]?.expiresAt ?? null, loading: true, countdown: 0 } }));
+    try {
+      const codeRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/scan-code`, {
+        method: "POST",
+        headers: { "x-admin-pin": verifiedPin },
+      });
+      if (!codeRes.ok) {
+        setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
+        return;
+      }
+      const { code, expiresAt, ttlSeconds = 30 } = await codeRes.json();
+
+      const qrRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/qr?scanCode=${encodeURIComponent(code)}`, {
+        headers: { "x-admin-pin": verifiedPin },
+      });
+      if (!qrRes.ok) {
+        setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
+        return;
+      }
+      const { dataUrl } = await qrRes.json();
+
+      setLiveQrState((prev) => ({
+        ...prev,
+        [boothId]: { dataUrl, expiresAt: new Date(expiresAt), loading: false, countdown: ttlSeconds ?? 90 },
+      }));
+    } catch {
+      setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
+    }
+  }, [verifiedPin]);
+
+  useEffect(() => {
+    if (liveQrTimerRef.current) clearInterval(liveQrTimerRef.current);
+    if (expandedBoothId === null) return;
+
+    fetchLiveQr(expandedBoothId);
+
+    liveQrTimerRef.current = setInterval(() => {
+      setLiveQrState((prev) => {
+        const cur = prev[expandedBoothId];
+        if (!cur) return prev;
+        if (cur.countdown <= 1) {
+          fetchLiveQr(expandedBoothId);
+          return { ...prev, [expandedBoothId]: { ...cur, countdown: 0 } };
+        }
+        return { ...prev, [expandedBoothId]: { ...cur, countdown: cur.countdown - 1 } };
+      });
+    }, 1000);
+
+    return () => {
+      if (liveQrTimerRef.current) clearInterval(liveQrTimerRef.current);
+    };
+  }, [expandedBoothId, fetchLiveQr]);
+
+  const handlePrintQR = (_booth: Booth) => {
+    Linking.openURL(`${API_BASE}/admin/qr-codes`);
   };
 
   const pending = scheduledList.filter((a) => !a.sent_at);
@@ -729,7 +774,7 @@ export default function AdminScreen() {
                 <>
                   <Text style={[styles.raffleCount, { color: "#10b981" }]}>{raffleEntries.length} completed passport{raffleEntries.length !== 1 ? "s" : ""}</Text>
                   {raffleEntries.map((entry, i) => (
-                    <View key={entry.device_id} style={[styles.raffleEntry, { borderTopColor: colors.border }]}>
+                    <View key={String(entry.attendee_id)} style={[styles.raffleEntry, { borderTopColor: colors.border }]}>
                       <Text style={[styles.raffleEntryName, { color: colors.foreground }]}>
                         {i + 1}. {entry.attendee_name || "(no name)"}
                       </Text>
@@ -796,9 +841,15 @@ export default function AdminScreen() {
               ) : (
                 booths.map((booth) => {
                   const isExpanded = expandedBoothId === booth.id;
+                  const qr = liveQrState[booth.id];
                   return (
                     <View key={booth.id} style={[styles.boothItem, { borderColor: colors.border }]}>
-                      <Pressable onPress={() => setExpandedBoothId(isExpanded ? null : booth.id)} style={styles.boothItemHeader}>
+                      <Pressable
+                        onPress={() => {
+                          setExpandedBoothId(isExpanded ? null : booth.id);
+                        }}
+                        style={styles.boothItemHeader}
+                      >
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.boothItemName, { color: colors.foreground }]}>
                             {booth.booth_number ? `#${booth.booth_number} · ` : ""}{booth.company}
@@ -812,19 +863,26 @@ export default function AdminScreen() {
 
                       {isExpanded && (
                         <View style={[styles.boothExpanded, { borderTopColor: colors.border }]}>
-                          <Image
-                            source={{ uri: qrUrl(boothQrData(booth)) }}
-                            style={styles.qrImage}
-                            resizeMode="contain"
-                          />
-                          <Text style={[styles.qrLabel, { color: colors.mutedForeground }]}>
-                            Scan this QR code at the booth
-                          </Text>
+                          <View style={[styles.liveQrBadge, { backgroundColor: "#10b98118", borderColor: "#10b98140" }]}>
+                            <Ionicons name="timer-outline" size={13} color="#10b981" />
+                            <Text style={[styles.liveQrBadgeText, { color: "#10b981" }]}>Live QR — one attendee per code · renews every 30s</Text>
+                          </View>
+                          {qr?.loading || !qr ? (
+                            <ActivityIndicator color={colors.primary} style={styles.qrImage} />
+                          ) : qr.dataUrl ? (
+                            <Image source={{ uri: qr.dataUrl }} style={styles.qrImage} resizeMode="contain" />
+                          ) : (
+                            <Text style={[styles.hint, { color: "#ef4444", marginVertical: 16 }]}>Failed to load QR code</Text>
+                          )}
+                          {qr && !qr.loading && qr.countdown > 0 && (
+                            <Text style={[styles.qrLabel, { color: colors.mutedForeground }]}>
+                              Show to one attendee · refreshes in {qr.countdown}s
+                            </Text>
+                          )}
+                          {qr && !qr.loading && qr.countdown === 0 && (
+                            <Text style={[styles.qrLabel, { color: colors.mutedForeground }]}>Refreshing…</Text>
+                          )}
                           <View style={styles.boothActions}>
-                            <Pressable onPress={() => handlePrintQR(booth)} style={[styles.actionBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
-                              <Ionicons name="open-outline" size={16} color={colors.primary} />
-                              <Text style={[styles.actionBtnText, { color: colors.primary }]}>Open Full-Size QR</Text>
-                            </Pressable>
                             <Pressable onPress={() => handleDeleteBooth(booth)} style={[styles.actionBtn, { backgroundColor: "#ef444415", borderColor: "#ef444440" }]}>
                               <Ionicons name="trash-outline" size={16} color="#ef4444" />
                               <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Delete</Text>
@@ -1153,6 +1211,8 @@ const styles = StyleSheet.create({
   boothExpanded: { borderTopWidth: StyleSheet.hairlineWidth, padding: 14, alignItems: "center", gap: 10 },
   qrImage: { width: 160, height: 160, borderRadius: 8 },
   qrLabel: { fontSize: 12 },
+  liveQrBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  liveQrBadgeText: { fontSize: 11, fontWeight: "600" },
   boothActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", justifyContent: "center" },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   actionBtnText: { fontSize: 13, fontWeight: "600" },

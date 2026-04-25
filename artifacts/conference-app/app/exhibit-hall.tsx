@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
@@ -337,11 +338,23 @@ const SORTED_EXHIBITORS = [...EXHIBITOR_DIRECTORY].sort((a, b) =>
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
-function getDeviceId(): string {
-  if (typeof globalThis.__deviceId === "string") return globalThis.__deviceId;
-  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  globalThis.__deviceId = id;
-  return id;
+const ATTENDEE_TOKEN_KEY = "@uoa2026/attendeeToken";
+
+async function getOrCreateAttendeeToken(): Promise<string> {
+  try {
+    const stored = await AsyncStorage.getItem(ATTENDEE_TOKEN_KEY);
+    if (stored) return stored;
+  } catch {}
+  try {
+    const res = await fetch(`${API_BASE}/api/attendees/register`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      const token: string = data.attendeeToken;
+      await AsyncStorage.setItem(ATTENDEE_TOKEN_KEY, token);
+      return token;
+    }
+  } catch {}
+  return "";
 }
 
 interface Booth {
@@ -365,7 +378,8 @@ export default function ExhibitHallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile } = useProfile();
-  const deviceId = useRef(getDeviceId()).current;
+  const [attendeeToken, setAttendeeToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState(false);
   const params = useLocalSearchParams<{ scan?: string }>();
 
   const [passport, setPassport] = useState<PassportData | null>(null);
@@ -391,15 +405,32 @@ export default function ExhibitHallScreen() {
       .map(([letter, data]) => ({ title: letter, data }));
   }, []);
 
+  useEffect(() => {
+    getOrCreateAttendeeToken().then((t) => {
+      if (t) {
+        setAttendeeToken(t);
+      } else {
+        setTokenError(true);
+        setLoading(false);
+      }
+    });
+  }, []);
+
   const fetchPassport = useCallback(async () => {
+    if (!attendeeToken) {
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch(`${API_BASE}/api/booths?deviceId=${encodeURIComponent(deviceId)}`);
+      const res = await fetch(`${API_BASE}/api/booths?attendeeToken=${encodeURIComponent(attendeeToken)}`);
       if (res.ok) setPassport(await res.json());
     } catch {}
     setLoading(false);
-  }, [deviceId]);
+  }, [attendeeToken]);
 
-  useEffect(() => { fetchPassport(); }, [fetchPassport]);
+  useEffect(() => {
+    if (attendeeToken) fetchPassport();
+  }, [attendeeToken, fetchPassport]);
 
   const handleOpenScanner = async () => {
     if (!permission?.granted) {
@@ -422,7 +453,7 @@ export default function ExhibitHallScreen() {
   }, [params.scan, loading]);
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
-    if (scanned) return;
+    if (scanned || !attendeeToken) return;
     const prefix = "uoa2026:booth:";
     if (!data.startsWith(prefix)) {
       Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
@@ -435,18 +466,32 @@ export default function ExhibitHallScreen() {
       return;
     }
     const boothId = parseInt(parts[0], 10);
-    const secretToken = parts[1];
+    const scanCode = parts[1];
     setScannerVisible(false);
-    doCheckin(boothId, secretToken, profile?.name ?? "", profile?.email ?? "");
+    doCheckin(boothId, scanCode, profile?.name ?? "", profile?.email ?? "");
   };
 
-  const doCheckin = async (boothId: number, secretToken: string, name: string, email: string = "") => {
+  const doCheckin = async (boothId: number, scanCode: string, name: string, email: string = "") => {
+    if (!attendeeToken) return;
     setCheckingIn(true);
     try {
+      const nonceRes = await fetch(`${API_BASE}/api/booths/checkin-nonce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attendeeToken, boothId }),
+      });
+      if (!nonceRes.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Check-in failed", "Could not start check-in. Please try again.");
+        setCheckingIn(false);
+        return;
+      }
+      const { nonce } = await nonceRes.json();
+
       const res = await fetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boothId, secretToken, deviceId, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
+        body: JSON.stringify({ boothId, scanCode, attendeeToken, nonce, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -495,6 +540,27 @@ export default function ExhibitHallScreen() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : tokenError ? (
+        <View style={styles.center}>
+          <Ionicons name="wifi-outline" size={48} color={colors.mutedForeground} />
+          <Text style={[styles.emptyText, { color: colors.foreground, marginTop: 16 }]}>Could not connect</Text>
+          <Text style={[styles.emptySubtext, { color: colors.mutedForeground, textAlign: "center", marginTop: 6 }]}>
+            Unable to register your device. Please check your connection and try again.
+          </Text>
+          <Pressable
+            onPress={() => {
+              setTokenError(false);
+              setLoading(true);
+              getOrCreateAttendeeToken().then((t) => {
+                if (t) { setAttendeeToken(t); }
+                else { setTokenError(true); setLoading(false); }
+              });
+            }}
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
@@ -764,6 +830,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  emptySubtext: { fontSize: 13, lineHeight: 19, paddingHorizontal: 32 },
+  retryBtn: { marginTop: 20, paddingHorizontal: 28, paddingVertical: 10, borderRadius: 8 },
+  retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
   boothList: {
     borderRadius: 16,
     borderWidth: 1,
