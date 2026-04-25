@@ -41,6 +41,7 @@ function RootLayoutNav() {
       <Stack.Screen name="exhibit-hall" options={{ headerShown: false }} />
       <Stack.Screen name="session/[id]" options={{ title: "Session" }} />
       <Stack.Screen name="speaker/[id]" options={{ title: "Speaker" }} />
+      <Stack.Screen name="my-notes" options={{ headerShown: false }} />
       <Stack.Screen name="my-schedule" options={{ title: "My Schedule" }} />
       <Stack.Screen name="sponsors" options={{ title: "Sponsors" }} />
       <Stack.Screen name="updates" options={{ title: "Updates" }} />
