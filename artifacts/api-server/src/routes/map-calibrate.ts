@@ -21,7 +21,39 @@ router.get("/admin/floorplan-mid",  (_req, res) => serveAsset(res, "floorplan-mi
 router.get("/admin/floorplan-main", (_req, res) => serveAsset(res, "floorplan-main-level.png"));
 
 // ── Venue Overlay Calibration ─────────────────────────────────────────────────
+const VENUE_PLANS_DEFAULT = {
+  lake: {
+    nativeW: 1000, nativeH: 880,
+    imgSrc: "/api/admin/floorplan-lake",
+    label: "Lake Level",
+    overlays: [
+      { room: "Deer Creek Ballroom",       rects: [{x:70,y:235,w:232,h:190},{x:70,y:425,w:232,h:275}] },
+      { room: "Jordanelle Ballroom",        rects: [{x:370,y:360,w:310,h:475}] },
+      { room: "Strawberry Conference Room", rects: [{x:718,y:235,w:252,h:140}] },
+    ],
+  },
+  mid: {
+    nativeW: 530, nativeH: 589,
+    imgSrc: "/api/admin/floorplan-mid",
+    label: "Mid Mountain Level",
+    overlays: [
+      { room: "Empire Conference Room", rects: [{x:78,y:28,w:192,h:150}] },
+      { room: "Dutch Conference Room",  rects: [{x:370,y:413,w:128,h:115}] },
+    ],
+  },
+  main: {
+    nativeW: 1163, nativeH: 767,
+    imgSrc: "/api/admin/floorplan-main",
+    label: "Main Level",
+    overlays: [
+      { room: "Hailstone Terrace",         rects: [{x:120,y:75,w:255,h:245}] },
+      { room: "Remington Hall Restaurant", rects: [{x:440,y:10,w:178,h:310}] },
+    ],
+  },
+};
+
 router.get("/admin/venue-calibrate", (_req: Request, res: Response) => {
+  const plansJson = JSON.stringify(VENUE_PLANS_DEFAULT);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,36 +150,7 @@ const ROOM_COLORS = {
   "Remington Hall Restaurant":  "#f97316",
 };
 
-const PLANS_DEFAULT = {
-  lake: {
-    nativeW: 1000, nativeH: 880,
-    imgSrc: '/api/admin/floorplan-lake',
-    label: 'Lake Level',
-    overlays: [
-      { room: "Deer Creek Ballroom",       rects: [{x:70,y:235,w:232,h:190},{x:70,y:425,w:232,h:275}] },
-      { room: "Jordanelle Ballroom",        rects: [{x:370,y:360,w:310,h:475}] },
-      { room: "Strawberry Conference Room", rects: [{x:718,y:235,w:252,h:140}] },
-    ]
-  },
-  mid: {
-    nativeW: 530, nativeH: 589,
-    imgSrc: '/api/admin/floorplan-mid',
-    label: 'Mid Mountain Level',
-    overlays: [
-      { room: "Empire Conference Room", rects: [{x:78,y:28,w:192,h:150}] },
-      { room: "Dutch Conference Room",  rects: [{x:370,y:413,w:128,h:115}] },
-    ]
-  },
-  main: {
-    nativeW: 1163, nativeH: 767,
-    imgSrc: '/api/admin/floorplan-main',
-    label: 'Main Level',
-    overlays: [
-      { room: "Hailstone Terrace",         rects: [{x:120,y:75,w:255,h:245}] },
-      { room: "Remington Hall Restaurant", rects: [{x:440,y:10,w:178,h:310}] },
-    ]
-  }
-};
+const PLANS_DEFAULT = ${plansJson};
 
 // Deep-copy so resets work
 const PLANS = JSON.parse(JSON.stringify(PLANS_DEFAULT));
@@ -401,7 +404,7 @@ canvas.addEventListener('touchend',   e=>touchToMouse(e,'mouseup'),   {passive:f
 
 // ── Reset ──────────────────────────────────────────────────────────────────────
 function resetPlan() {
-  const defaults = ${JSON.stringify(PLANS_DEFAULT)};
+  const defaults = ${plansJson};
   PLANS[currentPlanKey] = JSON.parse(JSON.stringify(defaults[currentPlanKey]));
   selOvIdx=-1; selRectIdx=-1; focusedOvIdx=-1;
   renderSidebar(); updateButtons(); draw();
