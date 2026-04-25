@@ -1,11 +1,31 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import pg from "pg";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
 
-const ADMIN_PIN = process.env.ADMIN_PIN ?? "Chanae2026!";
+function getAdminPin(): string {
+  const pin = process.env.ADMIN_PIN;
+  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
+  return pin;
+}
+
+function isAuthorizedHeader(req: Request): boolean {
+  try {
+    return req.headers["x-admin-pin"] === getAdminPin();
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorizedBody(adminPin: string | undefined): boolean {
+  try {
+    return adminPin === getAdminPin();
+  } catch {
+    return false;
+  }
+}
 
 async function ensureTables() {
   await pool.query(`
@@ -104,7 +124,7 @@ router.post("/push/send", async (req, res) => {
     adminPin?: string;
   };
 
-  if (adminPin !== ADMIN_PIN) {
+  if (!isAuthorizedBody(adminPin)) {
     res.status(401).json({ error: "Invalid admin PIN" });
     return;
   }
@@ -129,7 +149,7 @@ router.post("/push/schedule", async (req, res) => {
     scheduledFor?: string;
   };
 
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorizedHeader(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -160,7 +180,7 @@ router.post("/push/schedule", async (req, res) => {
 });
 
 router.get("/push/scheduled", async (req, res) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorizedHeader(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -174,7 +194,7 @@ router.get("/push/scheduled", async (req, res) => {
 });
 
 router.delete("/push/scheduled/:id", async (req, res) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorizedHeader(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

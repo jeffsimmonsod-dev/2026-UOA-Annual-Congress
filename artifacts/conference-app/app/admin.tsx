@@ -22,7 +22,6 @@ import { useColors } from "@/hooks/useColors";
 import { sendPushNotification } from "@/services/pushNotifications";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-const CORRECT_PIN = "Chanae2026!";
 
 type Step = "pin" | "dashboard";
 type AdminTab = "notifications" | "booths" | "analytics";
@@ -90,7 +89,9 @@ export default function AdminScreen() {
 
   const [step, setStep] = useState<Step>("pin");
   const [pin, setPin] = useState("");
+  const [verifiedPin, setVerifiedPin] = useState("");
   const [pinError, setPinError] = useState("");
+  const [pinVerifying, setPinVerifying] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("notifications");
 
   const [title, setTitle] = useState("");
@@ -120,14 +121,36 @@ export default function AdminScreen() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [expandedAnalyticsId, setExpandedAnalyticsId] = useState<number | null>(null);
 
-  const handlePinSubmit = () => {
-    if (pin === CORRECT_PIN) {
-      setPinError("");
-      setStep("dashboard");
-    } else {
-      setPinError("Incorrect PIN. Try again.");
-      setPin("");
+  const handlePinSubmit = async () => {
+    if (!pin.trim()) return;
+    setPinVerifying(true);
+    setPinError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.valid) {
+          setVerifiedPin(pin);
+          setPin("");
+          setStep("dashboard");
+        } else {
+          setPinError("Incorrect PIN. Try again.");
+          setPin("");
+        }
+      } else if (res.status === 401) {
+        setPinError("Incorrect PIN. Try again.");
+        setPin("");
+      } else {
+        setPinError("Could not verify PIN. Please try again.");
+      }
+    } catch {
+      setPinError("Could not reach the server. Check your connection.");
     }
+    setPinVerifying(false);
   };
 
   const handleSend = async () => {
@@ -136,7 +159,7 @@ export default function AdminScreen() {
       return;
     }
     setSending(true);
-    const result = await sendPushNotification(title.trim(), body.trim(), CORRECT_PIN);
+    const result = await sendPushNotification(title.trim(), body.trim(), verifiedPin);
     setSending(false);
     if (result.success) {
       Alert.alert("Sent!", result.message, [{ text: "OK", onPress: () => { setTitle(""); setBody(""); } }]);
@@ -165,7 +188,7 @@ export default function AdminScreen() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-pin": CORRECT_PIN,
+          "x-admin-pin": verifiedPin,
         },
         body: JSON.stringify({
           title: title.trim(),
@@ -225,7 +248,7 @@ export default function AdminScreen() {
     setScheduledLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/push/scheduled`, {
-        headers: { "x-admin-pin": CORRECT_PIN },
+        headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
         const data = await res.json();
@@ -233,7 +256,7 @@ export default function AdminScreen() {
       }
     } catch {}
     setScheduledLoading(false);
-  }, []);
+  }, [verifiedPin]);
 
   const handleCancelScheduled = (item: ScheduledAnnouncement) => {
     Alert.alert("Cancel Announcement", `Remove "${item.title}" scheduled for ${formatScheduledDate(item.scheduled_for)}?`, [
@@ -244,7 +267,7 @@ export default function AdminScreen() {
         onPress: async () => {
           await fetch(`${API_BASE}/api/push/scheduled/${item.id}`, {
             method: "DELETE",
-            headers: { "x-admin-pin": CORRECT_PIN },
+            headers: { "x-admin-pin": verifiedPin },
           });
           fetchScheduled();
         },
@@ -256,7 +279,7 @@ export default function AdminScreen() {
     setBoothsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/booths/admin`, {
-        headers: { "x-admin-pin": CORRECT_PIN },
+        headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
         const data = await res.json();
@@ -264,13 +287,13 @@ export default function AdminScreen() {
       }
     } catch {}
     setBoothsLoading(false);
-  }, []);
+  }, [verifiedPin]);
 
   const fetchRaffle = useCallback(async () => {
     setRaffleLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/booths/admin/entries`, {
-        headers: { "x-admin-pin": CORRECT_PIN },
+        headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
         const data = await res.json();
@@ -278,20 +301,20 @@ export default function AdminScreen() {
       }
     } catch {}
     setRaffleLoading(false);
-  }, []);
+  }, [verifiedPin]);
 
   const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/booths/admin/analytics`, {
-        headers: { "x-admin-pin": CORRECT_PIN },
+        headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
         setAnalyticsData(await res.json());
       }
     } catch {}
     setAnalyticsLoading(false);
-  }, []);
+  }, [verifiedPin]);
 
   const handleExportCSV = async () => {
     if (!analyticsData) return;
@@ -342,7 +365,7 @@ export default function AdminScreen() {
     try {
       const res = await fetch(`${API_BASE}/api/booths`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-pin": CORRECT_PIN },
+        headers: { "Content-Type": "application/json", "x-admin-pin": verifiedPin },
         body: JSON.stringify({ name: newBoothName.trim(), company: newBoothCompany.trim(), boothNumber: newBoothNumber.trim() }),
       });
       if (res.ok) {
@@ -367,7 +390,7 @@ export default function AdminScreen() {
         onPress: async () => {
           await fetch(`${API_BASE}/api/booths/${booth.id}`, {
             method: "DELETE",
-            headers: { "x-admin-pin": CORRECT_PIN },
+            headers: { "x-admin-pin": verifiedPin },
           });
           fetchBooths();
           fetchRaffle();
@@ -411,9 +434,18 @@ export default function AdminScreen() {
               autoFocus
             />
             {pinError ? <Text style={styles.errorText}>{pinError}</Text> : null}
-            <Pressable onPress={handlePinSubmit} style={[styles.button, { backgroundColor: colors.primary }]}>
-              <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={16} color="#fff" />
+            <Pressable
+              onPress={handlePinSubmit}
+              disabled={pinVerifying}
+              style={[styles.button, { backgroundColor: colors.primary, opacity: pinVerifying ? 0.6 : 1 }]}
+            >
+              {pinVerifying
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Text style={styles.buttonText}>Continue</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                  </>
+              }
             </Pressable>
           </View>
         </ScrollView>

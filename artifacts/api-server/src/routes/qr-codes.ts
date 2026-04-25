@@ -7,17 +7,98 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const router = Router();
 
-const ADMIN_PIN = process.env.ADMIN_PIN ?? "Chanae2026!";
+function getAdminPin(): string {
+  const pin = process.env.ADMIN_PIN;
+  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
+  return pin;
+}
 
-// GET /admin/qr-codes?pin=... — printable QR code sheet for all booths
-router.get("/admin/qr-codes", async (req: Request, res: Response) => {
-  if (req.query.pin !== ADMIN_PIN) {
-    return res.status(403).send(`
-      <html><body style="font-family:sans-serif;padding:40px;text-align:center">
-        <h2>Access Denied</h2>
-        <p>Add <code>?pin=YOUR_ADMIN_PIN</code> to the URL.</p>
-      </body></html>
-    `);
+function isAuthorized(req: Request): boolean {
+  try {
+    return req.headers["x-admin-pin"] === getAdminPin();
+  } catch {
+    return false;
+  }
+}
+
+// GET /admin/qr-codes — show PIN login form
+router.get("/admin/qr-codes", (_req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Login — UOA Congress 2026</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 36px 32px; max-width: 380px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    h1 { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+    p  { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    label { font-size: 13px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px; }
+    input[type=password] { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; transition: border-color .15s; }
+    input[type=password]:focus { border-color: #4f46e5; }
+    button { width: 100%; margin-top: 16px; padding: 13px; background: #4f46e5; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:hover { background: #4338ca; }
+    .err { color: #ef4444; font-size: 13px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin Access</h1>
+    <p>Enter the UOA admin PIN to view and print exhibitor QR codes.</p>
+    <form method="POST" action="">
+      <label for="pin">Admin PIN</label>
+      <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" required />
+      <button type="submit">View QR Codes</button>
+    </form>
+  </div>
+</body>
+</html>`);
+});
+
+// POST /admin/qr-codes — verify PIN in request body then render QR sheet
+router.post("/admin/qr-codes", async (req: Request, res: Response) => {
+  const submittedPin: string = (req.body?.pin as string) ?? "";
+
+  try {
+    if (submittedPin !== getAdminPin()) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.status(403).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Login — UOA Congress 2026</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 36px 32px; max-width: 380px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    h1 { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+    p  { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    label { font-size: 13px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px; }
+    input[type=password] { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; transition: border-color .15s; }
+    input[type=password]:focus { border-color: #4f46e5; }
+    button { width: 100%; margin-top: 16px; padding: 13px; background: #4f46e5; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:hover { background: #4338ca; }
+    .err { color: #ef4444; font-size: 13px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin Access</h1>
+    <p>Enter the UOA admin PIN to view and print exhibitor QR codes.</p>
+    <form method="POST" action="">
+      <label for="pin">Admin PIN</label>
+      <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" required />
+      <button type="submit">View QR Codes</button>
+      <p class="err">Incorrect PIN. Please try again.</p>
+    </form>
+  </div>
+</body>
+</html>`);
+    }
+  } catch {
+    return res.status(503).json({ error: "Server configuration error" });
   }
 
   const { rows } = await pool.query(
@@ -27,6 +108,7 @@ router.get("/admin/qr-codes", async (req: Request, res: Response) => {
   );
 
   if (rows.length === 0) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(`
       <html><body style="font-family:sans-serif;padding:40px;text-align:center">
         <h2>No Booths Found</h2>
@@ -35,7 +117,6 @@ router.get("/admin/qr-codes", async (req: Request, res: Response) => {
     `);
   }
 
-  // Generate SVG QR codes for all booths in parallel
   const qrItems = await Promise.all(
     rows.map(async (booth) => {
       const payload = `uoa2026:booth:${booth.id}:${booth.secret_token}`;
@@ -160,7 +241,7 @@ router.get("/admin/qr-codes", async (req: Request, res: Response) => {
   </style>
 </head>
 <body>
-  <button class="print-btn" onclick="window.print()">🖨 Print All QR Codes</button>
+  <button class="print-btn" onclick="window.print()">Print All QR Codes</button>
 
   <header>
     <h1>2026 UOA Annual Congress</h1>
@@ -169,18 +250,26 @@ router.get("/admin/qr-codes", async (req: Request, res: Response) => {
   </header>
 
   <div class="grid">${cards}</div>
-
-  <script>
-    // Auto-print on load if ?print=1 is set
-    if (new URLSearchParams(location.search).get("print") === "1") {
-      window.addEventListener("load", () => setTimeout(() => window.print(), 500));
-    }
-  </script>
 </body>
 </html>`;
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(html);
+});
+
+// GET /api/booths/admin/qr-codes — API endpoint for admin mobile app (uses x-admin-pin header)
+router.get("/booths/admin/qr-codes", async (req: Request, res: Response) => {
+  if (!isAuthorized(req)) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, name, company, booth_number, secret_token
+     FROM congress_booths
+     ORDER BY booth_number ASC, name ASC`
+  );
+
+  res.json({ booths: rows });
 });
 
 function escHtml(s: string): string {

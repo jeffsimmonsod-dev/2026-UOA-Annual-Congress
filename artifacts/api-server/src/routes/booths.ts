@@ -6,7 +6,19 @@ const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
 
-const ADMIN_PIN = "Chanae2026!";
+function getAdminPin(): string {
+  const pin = process.env.ADMIN_PIN;
+  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
+  return pin;
+}
+
+function isAuthorized(req: Request): boolean {
+  try {
+    return req.headers["x-admin-pin"] === getAdminPin();
+  } catch {
+    return false;
+  }
+}
 
 async function ensureTables() {
   await pool.query(`
@@ -109,7 +121,7 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin — admin view with tokens and visit counts
 router.get("/booths/admin", async (req: Request, res: Response) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
   const { rows } = await pool.query(
@@ -123,7 +135,7 @@ router.get("/booths/admin", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/analytics — per-booth visitor details for sponsor reporting
 router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
   const { rows: booths } = await pool.query(
@@ -155,7 +167,7 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/entries — raffle entries (devices that visited all booths)
 router.get("/booths/admin/entries", async (req: Request, res: Response) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
   const totalRes = await pool.query("SELECT COUNT(*) as count FROM congress_booths");
@@ -178,7 +190,7 @@ router.get("/booths/admin/entries", async (req: Request, res: Response) => {
 
 // POST /api/booths — create booth (admin)
 router.post("/booths", async (req: Request, res: Response) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
   const { name, company, boothNumber, description } = req.body as {
@@ -201,7 +213,7 @@ router.post("/booths", async (req: Request, res: Response) => {
 
 // DELETE /api/booths/:id — delete booth (admin)
 router.delete("/booths/:id", async (req: Request, res: Response) => {
-  if (req.headers["x-admin-pin"] !== ADMIN_PIN) {
+  if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
   await pool.query("DELETE FROM congress_booths WHERE id = $1", [req.params.id]);

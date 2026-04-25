@@ -5,6 +5,7 @@ import photosRouter from "./photos";
 import boothsRouter from "./booths";
 import qrCodesRouter from "./qr-codes";
 import mapCalibrateRouter from "./map-calibrate";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(photosRouter);
 router.use(boothsRouter);
 router.use(qrCodesRouter);
 router.use(mapCalibrateRouter);
+router.use(adminRouter);
 
 export default router;
