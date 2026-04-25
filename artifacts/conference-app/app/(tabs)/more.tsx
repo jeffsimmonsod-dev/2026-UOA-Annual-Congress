@@ -75,11 +75,11 @@ const useMenuItems = (): MenuItem[] => {
       description: "Frequently asked questions",
     },
     {
-      label: "Register Online",
-      icon: "open-outline",
+      label: "UOA Conference Website",
+      icon: "globe-outline",
       color: "#8b5cf6",
       action: () => Linking.openURL("https://www.utaheyedoc.org/2026_uoa_annual_congress.php"),
-      description: "Open UOA registration website",
+      description: "utaheyedoc.org · 2026 Annual Congress",
     },
   ];
 };

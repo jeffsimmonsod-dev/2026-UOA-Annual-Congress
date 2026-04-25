@@ -357,7 +357,7 @@ export default function VenueScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.navigate("/(tabs)/more")} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.navTitle, { color: colors.foreground }]}>

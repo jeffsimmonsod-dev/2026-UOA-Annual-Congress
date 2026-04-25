@@ -33,7 +33,7 @@ export default function ParaScreen() {
         ]}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable onPress={() => router.navigate("/(tabs)/more")} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>
