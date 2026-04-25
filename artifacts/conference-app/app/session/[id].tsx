@@ -106,7 +106,14 @@ export default function SessionDetailScreen() {
       {/* Meta card */}
       <View style={[styles.metaCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <MetaRow icon="time-outline" label="Time" value={`${session.startTime} – ${session.endTime}`} colors={colors} />
-        <MetaRow icon="location-outline" label="Room" value={session.room} colors={colors} valueColor={getRoomColor(session.room)} />
+        <MetaRow
+          icon="location-outline"
+          label="Room"
+          value={session.room}
+          colors={colors}
+          valueColor={getRoomColor(session.room)}
+          onPress={() => router.navigate({ pathname: "/(tabs)/venue", params: { room: session.room } })}
+        />
         <MetaRow icon="calendar-outline" label="Day" value={session.day} colors={colors} />
         {session.copeId && (
           <MetaRow icon="school-outline" label="COPE" value={session.copeId} colors={colors} />
@@ -274,27 +281,39 @@ function MetaRow({
   value,
   colors,
   valueColor,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   colors: any;
   valueColor?: string;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={styles.metaRow}>
+  const inner = (
+    <View style={[styles.metaRow, onPress && styles.metaRowTappable]}>
       <Ionicons name={icon} size={16} color={valueColor ?? colors.primary} />
       <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>{label}</Text>
       {valueColor ? (
         <View style={styles.metaValueRow}>
           <View style={[styles.metaRoomDot, { backgroundColor: valueColor }]} />
           <Text style={[styles.metaValue, { color: valueColor, fontWeight: "700" }]}>{value}</Text>
+          {onPress && <Ionicons name="map-outline" size={13} color={valueColor} style={{ marginLeft: 4 }} />}
         </View>
       ) : (
         <Text style={[styles.metaValue, { color: colors.foreground }]}>{value}</Text>
       )}
+      {onPress && !valueColor && <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />}
     </View>
   );
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        {inner}
+      </Pressable>
+    );
+  }
+  return inner;
 }
 
 const styles = StyleSheet.create({
@@ -316,6 +335,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.3, lineHeight: 34 },
   metaCard: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 12 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  metaRowTappable: { paddingVertical: 2 },
   metaLabel: { fontSize: 13, width: 48 },
   metaValue: { fontSize: 14, fontWeight: "500", flex: 1 },
   metaValueRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },

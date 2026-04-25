@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
-import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -67,6 +67,7 @@ function RoomOverlaysSvg({
   nativeH,
   offsetX = 0,
   offsetY = 0,
+  highlightRoom,
 }: {
   overlays: RoomOverlay[];
   viewW: number;
@@ -75,7 +76,9 @@ function RoomOverlaysSvg({
   nativeH: number;
   offsetX?: number;
   offsetY?: number;
+  highlightRoom?: string;
 }) {
+  const hasHighlight = !!highlightRoom;
   return (
     <Svg
       style={{ position: "absolute", left: offsetX, top: offsetY }}
@@ -84,20 +87,24 @@ function RoomOverlaysSvg({
       viewBox={`0 0 ${nativeW} ${nativeH}`}
       pointerEvents="none"
     >
-      {overlays.flatMap((overlay) =>
-        overlay.rects.map((r, i) => (
+      {overlays.flatMap((overlay) => {
+        const isHighlighted = hasHighlight && overlay.room === highlightRoom;
+        const color = getRoomColor(overlay.room);
+        return overlay.rects.map((r, i) => (
           <Rect
             key={`${overlay.room}-${i}`}
             x={r.x}
             y={r.y}
             width={r.w}
             height={r.h}
-            fill={getRoomColor(overlay.room)}
-            opacity={0.38}
+            fill={color}
+            opacity={hasHighlight ? (isHighlighted ? 0.65 : 0.15) : 0.38}
+            stroke={isHighlighted ? color : "none"}
+            strokeWidth={isHighlighted ? 3 : 0}
             rx={6}
           />
-        ))
-      )}
+        ));
+      })}
     </Svg>
   );
 }
@@ -135,11 +142,13 @@ function ZoomableImageWithOverlays({
   overlays,
   nativeW,
   nativeH,
+  highlightRoom,
 }: {
   source: ReturnType<typeof require>;
   overlays: RoomOverlay[];
   nativeW: number;
   nativeH: number;
+  highlightRoom?: string;
 }) {
   const W = SCREEN.width;
   const H = SCREEN.height * 0.78;
@@ -287,6 +296,7 @@ function ZoomableImageWithOverlays({
           nativeH={nativeH}
           offsetX={offX}
           offsetY={offY}
+          highlightRoom={highlightRoom}
         />
       </Animated.View>
     </GestureDetector>
@@ -316,7 +326,23 @@ export default function VenueScreen() {
     overlays: allOverlays[p.id]?.overlays ?? DEFAULT_OVERLAYS[p.id].overlays,
   }));
 
-  const [lightbox, setLightbox] = useState<null | PlanEntry>(null);
+  const { room: roomParam } = useLocalSearchParams<{ room?: string }>();
+
+  const [lightbox, setLightbox] = useState<null | { plan: PlanEntry; highlightRoom?: string }>(null);
+  const autoOpenedRef = useRef<string | null>(null);
+
+  // Auto-open the correct floor plan when navigated here from a session.
+  // Re-runs when plans update (overlays load) but only opens once per roomParam.
+  useEffect(() => {
+    if (!roomParam || autoOpenedRef.current === roomParam) return;
+    const base = FLOOR_PLANS_BASE.find((p) => p.rooms.includes(roomParam));
+    if (!base) return;
+    const plan = plans.find((p) => p.id === base.id);
+    if (plan) {
+      autoOpenedRef.current = roomParam;
+      setLightbox({ plan, highlightRoom: roomParam });
+    }
+  }, [roomParam, plans]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -459,7 +485,7 @@ export default function VenueScreen() {
           {plans.map((plan) => (
             <Pressable
               key={plan.id}
-              onPress={() => setLightbox(plan)}
+              onPress={() => setLightbox({ plan })}
               style={({ pressed }) => [
                 styles.floorPlanCard,
                 { borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
@@ -506,17 +532,18 @@ export default function VenueScreen() {
         <GestureHandlerRootView style={styles.lightboxRoot}>
           {lightbox && (
             <ZoomableImageWithOverlays
-              source={lightbox.source}
-              overlays={lightbox.overlays}
-              nativeW={lightbox.nativeW}
-              nativeH={lightbox.nativeH}
+              source={lightbox.plan.source}
+              overlays={lightbox.plan.overlays}
+              nativeW={lightbox.plan.nativeW}
+              nativeH={lightbox.plan.nativeH}
+              highlightRoom={lightbox.highlightRoom}
             />
           )}
 
           {/* Overlay controls */}
           <View style={[styles.lightboxHeader, { paddingTop: insets.top + 8 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.lightboxTitle}>{lightbox?.label}</Text>
+              <Text style={styles.lightboxTitle}>{lightbox?.plan.label}</Text>
               <Text style={styles.lightboxHint}>Pinch to zoom · Double-tap to reset</Text>
             </View>
             <Pressable
@@ -531,14 +558,19 @@ export default function VenueScreen() {
           {/* Legend in lightbox */}
           {lightbox && (
             <View style={[styles.lightboxLegend, { bottom: insets.bottom + 16 }]}>
-              {lightbox.rooms.map((roomName) => {
+              {lightbox.plan.rooms.map((roomName) => {
                 const rc = getRoomColor(roomName);
+                const isHighlighted = roomName === lightbox.highlightRoom;
                 return (
                   <View
                     key={roomName}
-                    style={[styles.lightboxChip, { backgroundColor: rc + "CC" }]}
+                    style={[
+                      styles.lightboxChip,
+                      { backgroundColor: rc + "CC" },
+                      isHighlighted && { borderWidth: 2, borderColor: "#fff" },
+                    ]}
                   >
-                    <Text style={styles.lightboxChipText} numberOfLines={1}>
+                    <Text style={[styles.lightboxChipText, isHighlighted && { fontWeight: "800" }]} numberOfLines={1}>
                       {roomName
                         .replace(" Conference Room", "")
                         .replace(" Ballroom", "")
