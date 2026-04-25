@@ -11,25 +11,25 @@ export const DEFAULT_OVERLAYS: Record<string, PlanData> = {
     nativeW: 1000,
     nativeH: 880,
     overlays: [
-      { room: "Deer Creek Ballroom",       rects: [{ x: 70,  y: 235, w: 232, h: 190 }, { x: 70, y: 425, w: 232, h: 275 }] },
-      { room: "Jordanelle Ballroom",        rects: [{ x: 370, y: 360, w: 310, h: 475 }] },
-      { room: "Strawberry Conference Room", rects: [{ x: 718, y: 235, w: 252, h: 140 }] },
+      { room: "Deer Creek Ballroom",        rects: [{ x: 103, y: 239, w: 213, h: 257 }] },
+      { room: "Jordanelle Ballroom",         rects: [{ x: 385, y: 354, w: 320, h: 404 }] },
+      { room: "Strawberry Conference Room",  rects: [{ x: 777, y: 239, w: 191, h: 129 }] },
     ],
   },
   mid: {
     nativeW: 530,
     nativeH: 589,
     overlays: [
-      { room: "Empire Conference Room", rects: [{ x: 78,  y: 28,  w: 192, h: 150 }] },
-      { room: "Dutch Conference Room",  rects: [{ x: 370, y: 413, w: 128, h: 115 }] },
+      { room: "Empire Conference Room", rects: [{ x: 91,  y: 48,  w: 176, h: 93  }] },
+      { room: "Dutch Conference Room",  rects: [{ x: 322, y: 399, w: 120, h: 80  }] },
     ],
   },
   main: {
     nativeW: 1163,
     nativeH: 767,
     overlays: [
-      { room: "Hailstone Terrace",         rects: [{ x: 120, y: 75,  w: 255, h: 245 }] },
-      { room: "Remington Hall Restaurant", rects: [{ x: 440, y: 10,  w: 178, h: 310 }] },
+      { room: "Hailstone Terrace",         rects: [{ x: 237, y: 58,  w: 341, h: 379 }] },
+      { room: "Remington Hall Restaurant", rects: [{ x: 579, y: 152, w: 107, h: 231 }] },
     ],
   },
 };
