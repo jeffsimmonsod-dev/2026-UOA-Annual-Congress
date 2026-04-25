@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -19,6 +19,7 @@ import { useNote } from "@/hooks/useNotes";
 import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
 import { getSessionById, getSpeakersForSession } from "@/services/data";
+import RoomMapModal from "@/components/RoomMapModal";
 
 const TRACK_COLORS: Record<string, string> = {
   "Retinal Disease": "#ef4444",
@@ -50,6 +51,7 @@ export default function SessionDetailScreen() {
   const isWeb = Platform.OS === "web";
   const { note, saveNote, loaded } = useNote(id ?? "");
   const noteRef = useRef<TextInput>(null);
+  const [showMap, setShowMap] = useState(false);
 
   if (!session) {
     return (
@@ -77,6 +79,7 @@ export default function SessionDetailScreen() {
   };
 
   return (
+    <>
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
@@ -112,7 +115,7 @@ export default function SessionDetailScreen() {
           value={session.room}
           colors={colors}
           valueColor={getRoomColor(session.room)}
-          onPress={() => router.navigate({ pathname: "/(tabs)/venue", params: { room: session.room } })}
+          onPress={() => setShowMap(true)}
         />
         <MetaRow icon="calendar-outline" label="Day" value={session.day} colors={colors} />
         {session.copeId && (
@@ -272,6 +275,12 @@ export default function SessionDetailScreen() {
         </Text>
       </Pressable>
     </ScrollView>
+    <RoomMapModal
+      room={session.room}
+      visible={showMap}
+      onClose={() => setShowMap(false)}
+    />
+    </>
   );
 }
 
