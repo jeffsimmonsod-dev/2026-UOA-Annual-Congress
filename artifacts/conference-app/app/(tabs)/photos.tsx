@@ -28,6 +28,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
+import { useProfile } from "@/context/ProfileContext";
 
 const SCREEN = Dimensions.get("window");
 
@@ -208,6 +209,7 @@ export default function PhotosScreen() {
   const { contentStyle, numPhotoColumns } = useTabletLayout();
   const isWeb = Platform.OS === "web";
   const deviceId = useRef(getDeviceId()).current;
+  const { profile } = useProfile();
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,7 +218,6 @@ export default function PhotosScreen() {
 
   const [uploadModal, setUploadModal] = useState(false);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
-  const [uploaderName, setUploaderName] = useState("");
   const [caption, setCaption] = useState("");
 
   const [fullscreenPhoto, setFullscreenPhoto] = useState<PhotoItem | null>(null);
@@ -310,8 +311,9 @@ export default function PhotosScreen() {
   };
 
   const handleUpload = async () => {
-    if (!pickedUri || !uploaderName.trim()) {
-      Alert.alert("Name required", "Please enter your name before uploading.");
+    const uploaderName = profile?.name?.trim() ?? "";
+    if (!pickedUri || !uploaderName) {
+      Alert.alert("Profile required", "Please complete your profile setup before uploading.");
       return;
     }
     setUploading(true);
@@ -322,7 +324,7 @@ export default function PhotosScreen() {
         name: "photo.jpg",
         type: "image/jpeg",
       } as any);
-      form.append("uploaderName", uploaderName.trim());
+      form.append("uploaderName", uploaderName);
       form.append("caption", caption.trim());
       form.append("deviceId", deviceId);
 
@@ -338,7 +340,6 @@ export default function PhotosScreen() {
 
       setUploadModal(false);
       setPickedUri(null);
-      setUploaderName("");
       setCaption("");
       fetchPhotos();
     } catch (err) {
@@ -463,15 +464,13 @@ export default function PhotosScreen() {
               <Image source={{ uri: pickedUri }} style={styles.preview} resizeMode="cover" />
             )}
 
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
-              placeholder="Your name *"
-              placeholderTextColor={colors.mutedForeground}
-              value={uploaderName}
-              onChangeText={setUploaderName}
-              maxLength={50}
-              returnKeyType="next"
-            />
+            <View style={[styles.nameTag, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Ionicons name="person-circle-outline" size={16} color={colors.mutedForeground} />
+              <Text style={[styles.nameTagText, { color: colors.foreground }]}>
+                Uploading as <Text style={{ fontWeight: "700" }}>{profile?.name ?? "—"}</Text>
+              </Text>
+            </View>
+
             <TextInput
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: colors.border }]}
               placeholder="Add a caption (optional)"
@@ -638,6 +637,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     borderRadius: 12,
+  },
+  nameTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  nameTagText: {
+    fontSize: 14,
   },
   input: {
     borderRadius: 10,
