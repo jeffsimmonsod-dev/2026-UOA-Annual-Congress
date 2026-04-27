@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 16.0.0",
-    "requireCommit": false
+    "requireCommit": false,
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -10,7 +11,9 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "simulator": false }
+      "ios": {
+        "simulator": false
+      }
     },
     "production": {
       "autoIncrement": true,

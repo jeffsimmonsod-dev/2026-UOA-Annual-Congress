@@ -8,16 +8,16 @@ const PROJECT_ID = "78c58011-2ce2-4113-80cc-da38f4de6e59";
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
-  name: "UOA Annual Congress 2026",
+  name: "UOA Congress 2026",
   slug: "conference-app",
   version: "1.1.0",
   orientation: "portrait",
-  icon: "./assets/images/uoa-logo.png",
+  icon: "./assets/images/app-icon.png",
   scheme: "conference-app",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   splash: {
-    image: "./assets/images/uoa-logo.png",
+    image: "./assets/images/app-icon.png",
     resizeMode: "contain",
     backgroundColor: "#ffffff",
   },
@@ -25,14 +25,14 @@ module.exports = {
     supportsTablet: false,
     bundleIdentifier: "org.utaheyedoc.congress2026",
     infoPlist: {
-      NSCameraUsageDescription: "Used to scan booth QR codes in the exhibit hall",
+      NSCameraUsageDescription: "Used to scan booth QR codes in the exhibit hall", ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
     package: "org.utaheyedoc.congress2026",
     versionCode: 2,
     adaptiveIcon: {
-      foregroundImage: "./assets/images/uoa-logo.png",
+      foregroundImage: "./assets/images/app-icon-adaptive.png",
       backgroundColor: "#ffffff",
     },
     permissions: [
@@ -44,7 +44,7 @@ module.exports = {
     ],
   },
   web: {
-    favicon: "./assets/images/uoa-logo.png",
+    favicon: "./assets/images/app-icon.png",
   },
   plugins: [
     ["expo-router", { origin: "https://replit.com/" }],

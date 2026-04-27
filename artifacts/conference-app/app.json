@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "UOA Annual Congress 2026",
+    "name": "UOA Congress 2026",
     "slug": "conference-app",
     "version": "2.0.0",
     "orientation": "portrait",
@@ -18,7 +18,8 @@
       "bundleIdentifier": "org.utaheyedoc.congress2026",
       "buildNumber": "3",
       "infoPlist": {
-        "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall"
+        "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
