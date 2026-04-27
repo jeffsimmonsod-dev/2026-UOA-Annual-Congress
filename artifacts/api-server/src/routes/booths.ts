@@ -122,6 +122,24 @@ async function ensureTables() {
     ALTER TABLE congress_booth_visits
     ADD COLUMN IF NOT EXISTS email_consent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
+
+  // Fix corrupted production records for Blue River Medical and Optos
+  await pool.query(`
+    UPDATE congress_booths
+    SET name = 'Blue River Medical, Inc',
+        company = 'Blue River Medical, Inc',
+        booth_number = '400'
+    WHERE id = 36
+      AND (booth_number IS NULL OR booth_number != '400');
+  `);
+  await pool.query(`
+    UPDATE congress_booths
+    SET name = 'Optos, Inc',
+        company = 'Optos, Inc',
+        booth_number = '415'
+    WHERE id = 46
+      AND (booth_number IS NULL OR booth_number != '415');
+  `);
 }
 
 ensureTables().catch(console.error);
