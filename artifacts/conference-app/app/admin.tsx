@@ -24,7 +24,7 @@ import { sendPushNotification } from "@/services/pushNotifications";
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type Step = "pin" | "dashboard";
-type AdminTab = "notifications" | "booths" | "analytics";
+type AdminTab = "notifications" | "booths" | "analytics" | "photos";
 type SendMode = "now" | "schedule";
 
 interface BoothVisitor {
@@ -113,6 +113,10 @@ export default function AdminScreen() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [expandedAnalyticsId, setExpandedAnalyticsId] = useState<number | null>(null);
+
+  const [adminPhotos, setAdminPhotos] = useState<{ id: string; objectPath: string; uploaderName: string; caption: string; likes: number; createdAt: string }[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
 
   const handlePinSubmit = async () => {
     if (!pin.trim()) return;
@@ -309,6 +313,51 @@ export default function AdminScreen() {
     setAnalyticsLoading(false);
   }, [verifiedPin]);
 
+  const fetchAdminPhotos = useCallback(async () => {
+    setPhotosLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/photos/admin`, {
+        headers: { "x-admin-pin": verifiedPin },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminPhotos(data.photos);
+      }
+    } catch {}
+    setPhotosLoading(false);
+  }, [verifiedPin]);
+
+  const handleAdminDeletePhoto = (photoId: string, uploaderName: string) => {
+    Alert.alert(
+      "Remove Photo",
+      `Remove this photo by ${uploaderName}? It will be deleted for everyone immediately.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingPhotoId(photoId);
+            try {
+              const res = await fetch(`${API_BASE}/api/photos/${photoId}`, {
+                method: "DELETE",
+                headers: { "x-admin-pin": verifiedPin },
+              });
+              if (res.ok) {
+                setAdminPhotos((prev) => prev.filter((p) => p.id !== photoId));
+              } else {
+                Alert.alert("Error", "Could not delete the photo.");
+              }
+            } catch {
+              Alert.alert("Error", "Could not reach the server.");
+            }
+            setDeletingPhotoId(null);
+          },
+        },
+      ]
+    );
+  };
+
   const handleExportCSV = async () => {
     if (!analyticsData) return;
     const lines: string[] = ["Company,Booth #,Attendee Name,Attendee Email,Visit Time"];
@@ -347,7 +396,10 @@ export default function AdminScreen() {
     if (step === "dashboard" && activeTab === "analytics") {
       fetchAnalytics();
     }
-  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled, fetchAnalytics]);
+    if (step === "dashboard" && activeTab === "photos") {
+      fetchAdminPhotos();
+    }
+  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled, fetchAnalytics, fetchAdminPhotos]);
 
   const handleAddBooth = async () => {
     if (!newBoothName.trim() || !newBoothCompany.trim()) {
@@ -505,6 +557,7 @@ export default function AdminScreen() {
           { key: "notifications", label: "Alerts", icon: "megaphone-outline" },
           { key: "booths", label: "Booths", icon: "storefront-outline" },
           { key: "analytics", label: "Analytics", icon: "bar-chart-outline" },
+          { key: "photos", label: "Photos", icon: "images-outline" },
         ] as const).map((tab) => (
           <Pressable
             key={tab.key}
@@ -1026,6 +1079,74 @@ export default function AdminScreen() {
                 </View>
               </>
             )}
+
+            <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
+              <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>
+            </Pressable>
+          </>
+        )}
+
+        {activeTab === "photos" && (
+          <>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.boothsHeader}>
+                <View>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Photo Moderation</Text>
+                  <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                    {adminPhotos.length} photo{adminPhotos.length !== 1 ? "s" : ""} uploaded
+                  </Text>
+                </View>
+                <Pressable onPress={fetchAdminPhotos} style={styles.refreshBtn}>
+                  <Ionicons name="refresh" size={16} color={colors.primary} />
+                </Pressable>
+              </View>
+
+              {photosLoading ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+              ) : adminPhotos.length === 0 ? (
+                <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 24 }]}>
+                  No photos have been uploaded yet.
+                </Text>
+              ) : (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                  {adminPhotos.map((photo) => {
+                    const uri = `${API_BASE}/api/storage/objects${photo.objectPath}`;
+                    const isDeleting = deletingPhotoId === photo.id;
+                    return (
+                      <View key={photo.id} style={{ width: "47%", position: "relative" }}>
+                        <Image
+                          source={{ uri }}
+                          style={{ width: "100%", aspectRatio: 1, borderRadius: 8, backgroundColor: colors.muted }}
+                          resizeMode="cover"
+                        />
+                        {photo.caption ? (
+                          <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                            {photo.caption}
+                          </Text>
+                        ) : null}
+                        <Text style={{ color: colors.mutedForeground, fontSize: 10 }} numberOfLines={1}>
+                          {photo.uploaderName}
+                        </Text>
+                        <Pressable
+                          onPress={() => handleAdminDeletePhoto(photo.id, photo.uploaderName)}
+                          disabled={isDeleting}
+                          style={{
+                            position: "absolute", top: 4, right: 4,
+                            backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 14,
+                            padding: 5,
+                          }}
+                        >
+                          {isDeleting
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Ionicons name="trash-outline" size={16} color="#ff4444" />
+                          }
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
 
             <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
               <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>

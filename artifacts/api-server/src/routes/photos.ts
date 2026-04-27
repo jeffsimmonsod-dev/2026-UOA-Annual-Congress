@@ -182,6 +182,25 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
 });
 
 router.delete("/photos/:id", async (req: Request, res: Response) => {
+  const adminPin = req.headers["x-admin-pin"] as string | undefined;
+  const isAdmin = adminPin && adminPin === process.env.ADMIN_PIN;
+
+  if (isAdmin) {
+    try {
+      const result = await pool.query(
+        `DELETE FROM congress_photos WHERE id = $1 RETURNING id`,
+        [req.params.id]
+      );
+      if (result.rows.length === 0) {
+        res.status(404).json({ error: "Photo not found" }); return;
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to delete photo", details: String(err) });
+    }
+    return;
+  }
+
   const { deviceId } = req.body as { deviceId?: string };
   if (!deviceId) { res.status(400).json({ error: "deviceId required" }); return; }
   try {
@@ -195,6 +214,26 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete photo", details: String(err) });
+  }
+});
+
+router.get("/photos/admin", async (req: Request, res: Response) => {
+  const adminPin = req.headers["x-admin-pin"] as string | undefined;
+  if (!adminPin || adminPin !== process.env.ADMIN_PIN) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.object_path, p.uploader_name, p.caption, p.created_at,
+              COUNT(l.photo_id)::int AS likes
+       FROM congress_photos p
+       LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
+       GROUP BY p.id
+       ORDER BY p.created_at DESC`
+    );
+    res.json({ photos: result.rows.map((r) => photoToJSON(r)) });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch photos", details: String(err) });
   }
 });
 
