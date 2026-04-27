@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "org.utaheyedoc.congress2026",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-adaptive.png",
         "backgroundColor": "#ffffff"
