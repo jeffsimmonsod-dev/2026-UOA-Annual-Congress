@@ -33,6 +33,19 @@ import { useProfile } from "@/context/ProfileContext";
 const SCREEN = Dimensions.get("window");
 
 function ZoomableImage({ uri }: { uri: string }) {
+  if (Platform.OS === "web") {
+    return (
+      <Image
+        source={{ uri }}
+        style={styles.fsImage}
+        resizeMode="contain"
+      />
+    );
+  }
+  return <ZoomableImageNative uri={uri} />;
+}
+
+function ZoomableImageNative({ uri }: { uri: string }) {
   // Current animated values
   const scale = useSharedValue(1);
   const offsetX = useSharedValue(0);
