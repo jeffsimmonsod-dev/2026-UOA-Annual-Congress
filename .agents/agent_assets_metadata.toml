@@ -1,3 +1,8 @@
 uploads = []
 generated = []
-outputs = []
+
+[[outputs]]
+id = "B2fdSB2XaaO9dvY4dVdqT"
+uri = "file://screenshots/ipad-screenshot-2048x2732.png"
+type = "image"
+title = "iPad Screenshot — 2048×2732px (App Store compliant)"
