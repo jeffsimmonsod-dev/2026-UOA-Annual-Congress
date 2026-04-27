@@ -59,7 +59,5 @@ module.exports = {
     typedRoutes: true,
     reactCompiler: true,
   },
-  extra: IS_PRODUCTION
-    ? { eas: { projectId: PROJECT_ID } }
-    : {},
+  extra: { eas: { projectId: PROJECT_ID } },
 };
