@@ -8,17 +8,22 @@ import { Platform } from "react-native";
 // The published EAS build works correctly — this guard is Expo Go only.
 const isExpoGo = Constants.appOwnership === "expo";
 const isExpoGoAndroid = isExpoGo && Platform.OS === "android";
+const isWeb = Platform.OS === "web";
 
-if (!isExpoGoAndroid) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+if (!isExpoGoAndroid && !isWeb) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {
+    // silently skip in unsupported environments
+  }
 }
 
 function getApiBase(): string | null {

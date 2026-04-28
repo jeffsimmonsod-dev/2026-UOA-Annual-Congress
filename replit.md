@@ -54,6 +54,13 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - `expo-notifications` + `expo-device` for push notification support
 - iPad support: `supportsTablet: true` in `app.json`; `hooks/useTabletLayout.ts` constrains content to max 720px wide, uses 4-column photo grid on tablet (2 on phone)
 
+**Web Preview Compatibility:**
+- `metro.config.js` — custom resolver stubs out `react-native-worklets` on web platform via `shims/react-native-worklets-web.js` (fixes worklets init error in dev mode)
+- `components/ZoomableImage.native.tsx` — gesture/pinch/zoom for iOS/Android (react-native-reanimated + gesture-handler)
+- `components/ZoomableImage.web.tsx` — plain Image for web (no reanimated imports)
+- `babel.config.js` — includes `react-native-worklets/plugin` for worklet transformation
+- Push notifications suppressed on web via `!isWeb` guards in `pushNotifications.ts` and `_layout.tsx`
+
 **File structure:**
 ```
 artifacts/conference-app/
@@ -71,18 +78,22 @@ artifacts/conference-app/
     sponsors.tsx          # Sponsors by tier
     updates.tsx           # Announcement feed
     faq.tsx               # FAQ accordion
-    admin.tsx             # PIN-protected admin → send push notifications
+    admin.tsx             # PIN-protected admin → send push notifications + photo moderation
   components/
     SessionCard.tsx
     SpeakerCard.tsx
     QuickActionButton.tsx
     ErrorBoundary.tsx
+    ZoomableImage.native.tsx  # Pinch/pan/double-tap zoom (native only)
+    ZoomableImage.web.tsx     # Plain image (web only)
   context/
     ScheduleContext.tsx   # Saved sessions via AsyncStorage
   services/
     data.ts               # Real UOA 2026 conference data (27 sessions, 9 speakers)
     speakerImages.ts      # Speaker photo mapping (s1–s9)
     pushNotifications.ts  # Push notification utilities
+  shims/
+    react-native-worklets-web.js  # No-op web stub for worklets package
   assets/speakers/        # Real speaker photos (s1.jpg–s9.jpg)
   types/
     index.ts
