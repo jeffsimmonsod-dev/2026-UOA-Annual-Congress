@@ -281,7 +281,7 @@ function ZoomableImageWithOverlays({
       { translateY: offsetY.value },
       { scale: scale.value },
     ],
-  }));
+  }), [offsetX, offsetY, scale]);
 
   return (
     <GestureDetector gesture={gesture}>

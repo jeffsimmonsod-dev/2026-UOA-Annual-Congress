@@ -24,7 +24,7 @@ function FaqItem({ item, colors }: { item: (typeof FAQ)[0]; colors: any }) {
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  }), [rotation]);
 
   const toggleOpen = () => {
     const next = !open;

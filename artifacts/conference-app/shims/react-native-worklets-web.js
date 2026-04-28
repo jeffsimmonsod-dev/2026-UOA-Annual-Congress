@@ -14,8 +14,8 @@ export function getRuntimeKind() {
   return RuntimeKind.ReactNative;
 }
 
-export function isWorkletFunction() {
-  return false;
+export function isWorkletFunction(value) {
+  return typeof value === 'function' && !!value.__workletHash;
 }
 
 export function runOnUI(fn) {

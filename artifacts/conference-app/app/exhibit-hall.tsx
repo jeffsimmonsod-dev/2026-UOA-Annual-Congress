@@ -195,7 +195,7 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }, { scale: scale.value }],
-  }));
+  }), [offsetX, offsetY, scale]);
 
   const visited = new Set(visitedBooths.filter(Boolean));
   const selectedName = selectedBooth ? (BOOTH_NAMES[selectedBooth] ?? "") : "";
