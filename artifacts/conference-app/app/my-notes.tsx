@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
 import { router, useFocusEffect } from "expo-router";
-import * as Sharing from "expo-sharing";
 import React, { useCallback, useState } from "react";
 import {
   ActionSheetIOS,
@@ -10,6 +8,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -79,7 +78,7 @@ function buildNotesText(notes: NoteEntry[]): string {
   return lines.join("\n");
 }
 
-async function saveAndShareNotes(notes: NoteEntry[]) {
+async function shareNotes(notes: NoteEntry[]) {
   const text = buildNotesText(notes);
   const filename = "UOA-Congress-2026-Notes.txt";
 
@@ -94,29 +93,21 @@ async function saveAndShareNotes(notes: NoteEntry[]) {
     return;
   }
 
-  const cacheDir = FileSystem.cacheDirectory;
-  if (!cacheDir) throw new Error("File system not available");
-  const path = `${cacheDir}${filename}`;
-  await FileSystem.writeAsStringAsync(path, text, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  const available = await Sharing.isAvailableAsync();
-  if (!available) throw new Error("Sharing not available on this device");
-  await Sharing.shareAsync(path, {
-    mimeType: "text/plain",
-    dialogTitle: "Save your notes",
-    UTI: "public.plain-text",
-  });
+  await Share.share(
+    { message: text, title: "2026 UOA Annual Congress — My Notes" },
+    { dialogTitle: "Export notes" }
+  );
 }
 
 async function emailNotes(notes: NoteEntry[]) {
   const text = buildNotesText(notes);
+  // Trim to stay under mailto URI limits on most mail clients (~8 KB)
+  const trimmed = text.length > 7000 ? text.slice(0, 7000) + "\n\n[truncated — use Share to get full notes]" : text;
   const subject = encodeURIComponent("2026 UOA Annual Congress — My Notes");
-  const body = encodeURIComponent(text);
+  const body = encodeURIComponent(trimmed);
   const url = `mailto:?subject=${subject}&body=${body}`;
   const canOpen = await Linking.canOpenURL(url);
-  if (!canOpen) throw new Error("No email app available");
+  if (!canOpen) throw new Error("No email app found on this device");
   await Linking.openURL(url);
 }
 
@@ -182,7 +173,7 @@ export default function MyNotesScreen() {
       setDownloading(true);
       try {
         if (action === "save") {
-          await saveAndShareNotes(notes);
+          await shareNotes(notes);
         } else {
           await emailNotes(notes);
         }
@@ -197,7 +188,7 @@ export default function MyNotesScreen() {
       ActionSheetIOS.showActionSheetWithOptions(
         {
           title: "Export Notes",
-          options: ["Cancel", "Save / Share File", "Send via Email"],
+          options: ["Cancel", "Share / Copy Text", "Send via Email"],
           cancelButtonIndex: 0,
         },
         (idx) => {
@@ -208,7 +199,7 @@ export default function MyNotesScreen() {
     } else {
       Alert.alert("Export Notes", "How would you like to export your notes?", [
         { text: "Cancel", style: "cancel" },
-        { text: "Save / Share File", onPress: () => runAction("save") },
+        { text: "Share / Copy Text", onPress: () => runAction("save") },
         { text: "Send via Email", onPress: () => runAction("email") },
       ]);
     }
