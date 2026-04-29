@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { Readable } from "stream";
+import { randomUUID } from "crypto";
 import multer from "multer";
 import pg from "pg";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage";
@@ -72,12 +73,23 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (photo_id, device_id)
     );
+    CREATE TABLE IF NOT EXISTS congress_sessions (
+      session_token TEXT PRIMARY KEY,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
     DROP INDEX IF EXISTS idx_congress_photos_created;
     CREATE INDEX idx_congress_photos_created ON congress_photos(created_at);
     CREATE INDEX IF NOT EXISTS idx_congress_photo_likes_photo ON congress_photo_likes(photo_id);
   `);
   await pool.query(`
     ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS drive_file_id TEXT;
+  `);
+  await pool.query(`
+    ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS delete_token TEXT;
+  `);
+  // Backfill any existing photos that were uploaded before delete_token was introduced
+  await pool.query(`
+    UPDATE congress_photos SET delete_token = gen_random_uuid()::text WHERE delete_token IS NULL;
   `);
 }
 
@@ -88,11 +100,9 @@ function photoToJSON(row: any, deviceId?: string) {
     id: row.id,
     objectPath: row.object_path,
     uploaderName: row.uploader_name,
-    uploaderDeviceId: row.uploader_device_id,
     caption: row.caption,
     likes: parseInt(row.likes ?? "0", 10),
-    likedByMe: row.liked_by_me === true || row.liked_by_me === "true",
-    isMyPhoto: deviceId ? row.uploader_device_id === deviceId : false,
+    likedByMe: deviceId ? (row.liked_by_me === true || row.liked_by_me === "true") : false,
     createdAt: row.created_at,
   };
 }
@@ -104,16 +114,71 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   ]);
 }
 
+// Simple in-memory sliding-window rate limiter
+const rateLimitWindows = new Map<string, number[]>();
+
+function isRateLimited(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimitWindows.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (timestamps.length >= maxRequests) return true;
+  timestamps.push(now);
+  rateLimitWindows.set(key, timestamps);
+  return false;
+}
+
+// Periodically clean up stale rate-limit entries to avoid unbounded memory growth
+setInterval(() => {
+  const cutoff = Date.now() - 3_600_000; // 1 hour
+  for (const [key, timestamps] of rateLimitWindows.entries()) {
+    const fresh = timestamps.filter((t) => t > cutoff);
+    if (fresh.length === 0) rateLimitWindows.delete(key);
+    else rateLimitWindows.set(key, fresh);
+  }
+}, 300_000); // every 5 minutes
+
+// Issue a new server-generated session token
+// Rate-limited: max 30 sessions per IP per hour to prevent Sybil identity farming
+// while allowing conference NAT environments where many users share an IP
+router.post("/photos/session", async (req: Request, res: Response) => {
+  const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0].trim()
+    ?? req.socket.remoteAddress
+    ?? "unknown";
+  if (isRateLimited(`session:${ip}`, 30, 3_600_000)) {
+    res.status(429).json({ error: "Too many session requests. Please try again later." });
+    return;
+  }
+  try {
+    const sessionToken = randomUUID();
+    await pool.query(
+      `INSERT INTO congress_sessions (session_token) VALUES ($1)`,
+      [sessionToken]
+    );
+    res.status(201).json({ sessionToken });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create session", details: String(err) });
+  }
+});
+
 // Upload image through server → GCS, register in DB, return photo
 router.post("/photos/upload", upload.single("photo"), async (req: Request, res: Response) => {
-  const { uploaderName, caption, deviceId } = req.body as {
+  const { uploaderName, caption, sessionToken } = req.body as {
     uploaderName?: string;
     caption?: string;
-    deviceId?: string;
+    sessionToken?: string;
   };
 
-  if (!req.file || !uploaderName || !deviceId) {
-    res.status(400).json({ error: "photo file, uploaderName, and deviceId are required" });
+  if (!req.file || !uploaderName || !sessionToken) {
+    res.status(400).json({ error: "photo file, uploaderName, and sessionToken are required" });
+    return;
+  }
+
+  // Verify the session token was issued by this server
+  const sessionCheck = await pool.query(
+    `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
+    [sessionToken]
+  );
+  if (sessionCheck.rows.length === 0) {
+    res.status(403).json({ error: "Invalid session token" });
     return;
   }
 
@@ -149,7 +214,8 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     }
 
     const id = Date.now().toString() + Math.random().toString(36).slice(2, 7);
-    const cleanName = uploaderName.trim().slice(0, 50);
+    const deleteToken = randomUUID();
+    const cleanName = (uploaderName as string).trim().slice(0, 50);
     const cleanCaption = (caption ?? "").trim().slice(0, 200);
 
     const extMap: Record<string, string> = {
@@ -174,23 +240,23 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     }
 
     await pool.query(
-      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption, drive_file_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, objectPath, cleanName, deviceId, cleanCaption, driveFileId]
+      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption, drive_file_id, delete_token)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, objectPath, cleanName, sessionToken, cleanCaption, driveFileId, deleteToken]
     );
 
     const row = {
       id,
       object_path: objectPath,
       uploader_name: cleanName,
-      uploader_device_id: deviceId,
+      uploader_device_id: sessionToken,
       caption: cleanCaption,
       likes: "0",
       liked_by_me: false,
       created_at: new Date().toISOString(),
     };
 
-    res.status(201).json(photoToJSON(row, deviceId));
+    res.status(201).json({ ...photoToJSON(row), deleteToken });
   } catch (err) {
     console.error("[photos/upload] error:", err);
     res.status(500).json({ error: "Upload failed", details: String(err) });
@@ -198,8 +264,17 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
 });
 
 router.get("/photos", async (req: Request, res: Response) => {
-  const deviceId = req.query.deviceId as string | undefined;
+  const sessionToken = req.query.sessionToken as string | undefined;
   try {
+    // Validate the session token if provided (unknown tokens get no likedByMe data)
+    let validatedToken: string | undefined;
+    if (sessionToken) {
+      const check = await pool.query(
+        `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
+        [sessionToken]
+      );
+      if (check.rows.length > 0) validatedToken = sessionToken;
+    }
     const result = await pool.query(
       `SELECT
          p.*,
@@ -212,34 +287,51 @@ router.get("/photos", async (req: Request, res: Response) => {
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
        GROUP BY p.id
        ORDER BY p.created_at DESC`,
-      [deviceId ?? ""]
+      [validatedToken ?? ""]
     );
-    res.json({ photos: result.rows.map((r) => photoToJSON(r, deviceId)) });
+    res.json({ photos: result.rows.map((r) => photoToJSON(r, validatedToken)) });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch photos", details: String(err) });
   }
 });
 
 router.post("/photos/:id/like", async (req: Request, res: Response) => {
-  const { deviceId } = req.body as { deviceId?: string };
-  if (!deviceId) {
-    res.status(400).json({ error: "deviceId required" });
+  const { sessionToken } = req.body as { sessionToken?: string };
+  if (!sessionToken) {
+    res.status(400).json({ error: "sessionToken required" });
+    return;
+  }
+  // Rate-limit like operations: max 60 per IP per 10 minutes
+  const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0].trim()
+    ?? req.socket.remoteAddress
+    ?? "unknown";
+  if (isRateLimited(`like:${ip}`, 60, 600_000)) {
+    res.status(429).json({ error: "Too many like requests. Please slow down." });
     return;
   }
   try {
+    // Validate the session token was issued by this server
+    const sessionCheck = await pool.query(
+      `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
+      [sessionToken]
+    );
+    if (sessionCheck.rows.length === 0) {
+      res.status(403).json({ error: "Invalid session token" });
+      return;
+    }
     const existing = await pool.query(
       `SELECT 1 FROM congress_photo_likes WHERE photo_id = $1 AND device_id = $2`,
-      [req.params.id, deviceId]
+      [req.params.id, sessionToken]
     );
     if (existing.rows.length > 0) {
       await pool.query(
         `DELETE FROM congress_photo_likes WHERE photo_id = $1 AND device_id = $2`,
-        [req.params.id, deviceId]
+        [req.params.id, sessionToken]
       );
     } else {
       await pool.query(
         `INSERT INTO congress_photo_likes (photo_id, device_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [req.params.id, deviceId]
+        [req.params.id, sessionToken]
       );
     }
     const result = await pool.query(
@@ -248,10 +340,10 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
        WHERE p.id = $2 GROUP BY p.id`,
-      [deviceId, req.params.id]
+      [sessionToken, req.params.id]
     );
     if (result.rows.length === 0) { res.status(404).json({ error: "Photo not found" }); return; }
-    res.json(photoToJSON(result.rows[0], deviceId));
+    res.json(photoToJSON(result.rows[0], sessionToken));
   } catch (err) {
     res.status(500).json({ error: "Failed to toggle like", details: String(err) });
   }
@@ -277,13 +369,13 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const { deviceId } = req.body as { deviceId?: string };
-  if (!deviceId) { res.status(400).json({ error: "deviceId required" }); return; }
+  const { deleteToken } = req.body as { deleteToken?: string };
+  if (!deleteToken) { res.status(400).json({ error: "deleteToken required" }); return; }
   try {
     const result = await pool.query(
-      `DELETE FROM congress_photos WHERE id = $1 AND uploader_device_id = $2
+      `DELETE FROM congress_photos WHERE id = $1 AND delete_token = $2
        RETURNING id, object_path, drive_file_id`,
-      [req.params.id, deviceId]
+      [req.params.id, deleteToken]
     );
     if (result.rows.length === 0) {
       res.status(403).json({ error: "Photo not found or no permission" }); return;

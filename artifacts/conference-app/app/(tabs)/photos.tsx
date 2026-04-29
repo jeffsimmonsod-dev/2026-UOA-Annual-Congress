@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,23 +25,29 @@ import { useProfile } from "@/context/ProfileContext";
 import ZoomableImage from "@/components/ZoomableImage";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+const PHOTO_TOKENS_KEY = "@photo_delete_tokens";
+const SESSION_TOKEN_KEY = "@photo_session_token";
 
-function getDeviceId(): string {
-  if (typeof globalThis.__deviceId === "string") return globalThis.__deviceId;
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  globalThis.__deviceId = id;
-  return id;
+async function getOrCreateSessionToken(): Promise<string> {
+  const stored = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
+  if (stored) return stored;
+  const res = await fetch(`${API_BASE}/api/photos/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Failed to create session");
+  const { sessionToken } = await res.json();
+  await AsyncStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
+  return sessionToken;
 }
 
 interface PhotoItem {
   id: string;
   objectPath: string;
   uploaderName: string;
-  uploaderDeviceId: string;
   caption: string;
   likes: number;
   likedByMe: boolean;
-  isMyPhoto: boolean;
   createdAt: string;
 }
 
@@ -59,13 +66,26 @@ export default function PhotosScreen() {
   const insets = useSafeAreaInsets();
   const { contentStyle, numPhotoColumns } = useTabletLayout();
   const isWeb = Platform.OS === "web";
-  const deviceId = useRef(getDeviceId()).current;
   const { profile } = useProfile();
 
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [myPhotoTokens, setMyPhotoTokens] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    Promise.all([
+      getOrCreateSessionToken().catch(() => null),
+      AsyncStorage.getItem(PHOTO_TOKENS_KEY),
+    ]).then(([token, tokensVal]) => {
+      if (token) setSessionToken(token);
+      if (tokensVal) {
+        try { setMyPhotoTokens(JSON.parse(tokensVal)); } catch { /* ignore */ }
+      }
+    });
+  }, []);
 
   const [uploadModal, setUploadModal] = useState(false);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
@@ -75,7 +95,8 @@ export default function PhotosScreen() {
 
   const fetchPhotos = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/photos?deviceId=${encodeURIComponent(deviceId)}`);
+      const tokenParam = sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : "";
+      const res = await fetch(`${API_BASE}/api/photos${tokenParam}`);
       const data = await res.json();
       setPhotos(data.photos ?? []);
     } catch {
@@ -84,7 +105,7 @@ export default function PhotosScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [deviceId]);
+  }, [sessionToken]);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
 
@@ -94,6 +115,8 @@ export default function PhotosScreen() {
   };
 
   const handleDelete = async (photo: PhotoItem) => {
+    const deleteToken = myPhotoTokens[photo.id];
+    if (!deleteToken) return;
     Alert.alert(
       "Remove Photo",
       "Are you sure you want to remove this photo? This cannot be undone.",
@@ -109,7 +132,7 @@ export default function PhotosScreen() {
               await fetch(`${API_BASE}/api/photos/${photo.id}`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deviceId }),
+                body: JSON.stringify({ deleteToken }),
               });
             } catch {
               fetchPhotos();
@@ -121,6 +144,7 @@ export default function PhotosScreen() {
   };
 
   const handleLike = async (photo: PhotoItem) => {
+    if (!sessionToken) return;
     setPhotos((prev) =>
       prev.map((p) =>
         p.id === photo.id
@@ -132,7 +156,7 @@ export default function PhotosScreen() {
       const res = await fetch(`${API_BASE}/api/photos/${photo.id}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId }),
+        body: JSON.stringify({ sessionToken }),
       });
       const data = await res.json();
       setPhotos((prev) => prev.map((p) => (p.id === data.id ? data : p)));
@@ -167,6 +191,10 @@ export default function PhotosScreen() {
       Alert.alert("Profile required", "Please complete your profile setup before uploading.");
       return;
     }
+    if (!sessionToken) {
+      Alert.alert("Not ready", "Please wait a moment and try again.");
+      return;
+    }
     setUploading(true);
     try {
       const form = new FormData();
@@ -177,7 +205,7 @@ export default function PhotosScreen() {
       } as any);
       form.append("uploaderName", uploaderName);
       form.append("caption", caption.trim());
-      form.append("deviceId", deviceId);
+      form.append("sessionToken", sessionToken);
 
       const res = await fetch(`${API_BASE}/api/photos/upload`, {
         method: "POST",
@@ -187,6 +215,13 @@ export default function PhotosScreen() {
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(`Upload failed (${res.status}): ${JSON.stringify(errBody)}`);
+      }
+
+      const uploadedPhoto = await res.json().catch(() => null);
+      if (uploadedPhoto?.id && uploadedPhoto?.deleteToken) {
+        const newTokens = { ...myPhotoTokens, [uploadedPhoto.id]: uploadedPhoto.deleteToken };
+        setMyPhotoTokens(newTokens);
+        await AsyncStorage.setItem(PHOTO_TOKENS_KEY, JSON.stringify(newTokens));
       }
 
       setUploadModal(false);
@@ -203,7 +238,9 @@ export default function PhotosScreen() {
   const getImageUrl = (objectPath: string) =>
     `${API_BASE}/api/storage${objectPath}`;
 
-  const renderPhoto = ({ item }: { item: PhotoItem }) => (
+  const renderPhoto = ({ item }: { item: PhotoItem }) => {
+    const isMyPhoto = item.id in myPhotoTokens;
+    return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Pressable onPress={() => setFullscreenPhoto(item)}>
         <Image
@@ -223,7 +260,7 @@ export default function PhotosScreen() {
           <Text style={[styles.cardTime, { color: colors.mutedForeground }]}>{timeAgo(item.createdAt)}</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {item.isMyPhoto && (
+          {isMyPhoto && (
             <Pressable
               onPress={() => handleDelete(item)}
               style={[styles.likeButton, { backgroundColor: colors.muted }]}
@@ -252,6 +289,7 @@ export default function PhotosScreen() {
       </View>
     </View>
   );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
