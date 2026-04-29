@@ -28,7 +28,8 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (photo_id, device_id)
     );
-    CREATE INDEX IF NOT EXISTS idx_congress_photos_created ON congress_photos(created_at DESC);
+    DROP INDEX IF EXISTS idx_congress_photos_created;
+    CREATE INDEX idx_congress_photos_created ON congress_photos(created_at);
     CREATE INDEX IF NOT EXISTS idx_congress_photo_likes_photo ON congress_photo_likes(photo_id);
   `);
 }
