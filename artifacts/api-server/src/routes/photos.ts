@@ -3,14 +3,57 @@ import { Readable } from "stream";
 import multer from "multer";
 import pg from "pg";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage";
-import { uploadPhotoToDrive } from "../lib/googleDrive";
+import { uploadPhotoToDrive, deleteDriveFile } from "../lib/googleDrive";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+
+const HEIC_BRANDS = new Set(["heic", "heix", "hevc", "hevx", "mif1", "msf1"]);
+
+function detectMimeFromMagicBytes(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  // GIF: 47 49 46 38
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "image/gif";
+  // WebP: RIFF....WEBP
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) return "image/webp";
+  // HEIC/HEIF: ISO BMFF — "ftyp" box at offset 4, then major brand
+  if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) {
+    const brand = buf.slice(8, 12).toString("ascii").replace(/\0/g, "").toLowerCase();
+    if (HEIC_BRANDS.has(brand)) return "image/heic";
+  }
+  return null;
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
 
 async function ensureTables() {
   await pool.query(`
@@ -20,6 +63,7 @@ async function ensureTables() {
       uploader_name      TEXT NOT NULL,
       uploader_device_id TEXT NOT NULL,
       caption            TEXT NOT NULL DEFAULT '',
+      drive_file_id      TEXT,
       created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS congress_photo_likes (
@@ -31,6 +75,9 @@ async function ensureTables() {
     DROP INDEX IF EXISTS idx_congress_photos_created;
     CREATE INDEX idx_congress_photos_created ON congress_photos(created_at);
     CREATE INDEX IF NOT EXISTS idx_congress_photo_likes_photo ON congress_photo_likes(photo_id);
+  `);
+  await pool.query(`
+    ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS drive_file_id TEXT;
   `);
 }
 
@@ -50,6 +97,13 @@ function photoToJSON(row: any, deviceId?: string) {
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 // Upload image through server → GCS, register in DB, return photo
 router.post("/photos/upload", upload.single("photo"), async (req: Request, res: Response) => {
   const { uploaderName, caption, deviceId } = req.body as {
@@ -63,16 +117,22 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     return;
   }
 
+  const detectedMime = detectMimeFromMagicBytes(req.file.buffer);
+  if (!detectedMime) {
+    res.status(400).json({ error: "File content does not match a supported image format" });
+    return;
+  }
+
   try {
     // Get a private upload path
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const u = new URL(uploadURL);
     const rawGcsUrl = `${u.protocol}//${u.host}${u.pathname}`;
 
-    // Upload the image buffer to GCS using the signed URL
+    // Upload the image buffer to GCS using the signed URL; use server-detected MIME type
     const putResp = await fetch(uploadURL, {
       method: "PUT",
-      headers: { "Content-Type": req.file.mimetype || "image/jpeg" },
+      headers: { "Content-Type": detectedMime },
       body: req.file.buffer,
     });
 
@@ -92,24 +152,39 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     const cleanName = uploaderName.trim().slice(0, 50);
     const cleanCaption = (caption ?? "").trim().slice(0, 200);
 
-    await pool.query(
-      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, objectPath, cleanName, deviceId, cleanCaption]
-    );
-
-    // Mirror to Google Drive (non-blocking — failure does not affect the response)
-    const ext = req.file.mimetype?.includes("png") ? "png" : "jpg";
+    const extMap: Record<string, string> = {
+      "image/png": "png", "image/gif": "gif", "image/webp": "webp",
+      "image/heic": "heic", "image/heif": "heif",
+    };
+    const ext = extMap[detectedMime] ?? "jpg";
     const driveFileName = `${new Date().toISOString().replace(/[:.]/g, "-")}_${cleanName.replace(/\s+/g, "_")}.${ext}`;
-    uploadPhotoToDrive(req.file.buffer, req.file.mimetype || "image/jpeg", driveFileName, cleanName, cleanCaption)
-      .catch((err) => console.error("[photos] Drive mirror failed:", err));
+
+    // Mirror to Google Drive before storing the record so drive_file_id is
+    // captured in the INSERT and is available immediately if the user deletes.
+    // Capped at 5 s so a slow Drive response does not block the upload.
+    let driveFileId: string | null = null;
+    try {
+      const driveResult = await withTimeout(
+        uploadPhotoToDrive(req.file.buffer, detectedMime, driveFileName, cleanName, cleanCaption),
+        5000
+      );
+      driveFileId = driveResult?.fileId ?? null;
+    } catch (err) {
+      console.error("[photos] Drive mirror failed:", err);
+    }
+
+    await pool.query(
+      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption, drive_file_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, objectPath, cleanName, deviceId, cleanCaption, driveFileId]
+    );
 
     const row = {
       id,
       object_path: objectPath,
-      uploader_name: uploaderName.trim().slice(0, 50),
+      uploader_name: cleanName,
       uploader_device_id: deviceId,
-      caption: (caption ?? "").trim().slice(0, 200),
+      caption: cleanCaption,
       likes: "0",
       liked_by_me: false,
       created_at: new Date().toISOString(),
@@ -206,12 +281,30 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
   if (!deviceId) { res.status(400).json({ error: "deviceId required" }); return; }
   try {
     const result = await pool.query(
-      `DELETE FROM congress_photos WHERE id = $1 AND uploader_device_id = $2 RETURNING id`,
+      `DELETE FROM congress_photos WHERE id = $1 AND uploader_device_id = $2
+       RETURNING id, object_path, drive_file_id`,
       [req.params.id, deviceId]
     );
     if (result.rows.length === 0) {
       res.status(403).json({ error: "Photo not found or no permission" }); return;
     }
+
+    const { object_path, drive_file_id } = result.rows[0];
+
+    // Delete the GCS object synchronously (bounded timeout) so the file is
+    // revoked as close to the DB delete as possible.
+    try {
+      await withTimeout(objectStorageService.deleteObjectEntity(object_path), 8000);
+    } catch (err) {
+      console.error("[photos/delete] GCS object delete failed:", err);
+    }
+
+    // Delete the Google Drive mirror if we have its ID (non-blocking)
+    if (drive_file_id) {
+      deleteDriveFile(drive_file_id)
+        .catch((err) => console.error("[photos/delete] Drive delete failed:", err));
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete photo", details: String(err) });
@@ -243,10 +336,33 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
+
+    // Verify that this object path belongs to an existing (non-deleted) photo
+    const dbCheck = await pool.query(
+      `SELECT id FROM congress_photos WHERE object_path = $1 LIMIT 1`,
+      [objectPath]
+    );
+    if (dbCheck.rows.length === 0) {
+      res.status(404).json({ error: "Object not found" });
+      return;
+    }
+
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
     const response = await objectStorageService.downloadObject(objectFile);
     res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "content-type") {
+        const ct = value.toLowerCase().split(";")[0].trim();
+        const safeType = ALLOWED_MIME_TYPES.has(ct) ? ct : "application/octet-stream";
+        res.setHeader("Content-Type", safeType);
+        if (!ALLOWED_MIME_TYPES.has(ct)) {
+          res.setHeader("Content-Disposition", "attachment");
+        }
+      } else {
+        res.setHeader(key, value);
+      }
+    });
+    res.setHeader("X-Content-Type-Options", "nosniff");
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
       nodeStream.pipe(res);

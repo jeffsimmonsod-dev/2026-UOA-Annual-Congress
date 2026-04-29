@@ -53,7 +53,7 @@ export async function uploadPhotoToDrive(
   fileName: string,
   uploaderName: string,
   caption: string
-): Promise<string | null> {
+): Promise<{ fileId: string | null; webViewLink: string | null }> {
   try {
     const folderId = await ensureDriveFolder();
 
@@ -84,10 +84,18 @@ export async function uploadPhotoToDrive(
     );
 
     const uploadData = await uploadResp.json() as { id?: string; webViewLink?: string };
-    return uploadData.webViewLink ?? null;
+    return { fileId: uploadData.id ?? null, webViewLink: uploadData.webViewLink ?? null };
   } catch (err) {
     // Non-fatal: log but don't break the photo upload flow
     console.error("[googleDrive] upload failed:", err);
-    return null;
+    return { fileId: null, webViewLink: null };
+  }
+}
+
+export async function deleteDriveFile(fileId: string): Promise<void> {
+  try {
+    await driveRequest(`/drive/v3/files/${encodeURIComponent(fileId)}`, { method: "DELETE" });
+  } catch (err) {
+    console.error("[googleDrive] delete failed:", err);
   }
 }
