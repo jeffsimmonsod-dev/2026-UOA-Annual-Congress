@@ -59,6 +59,8 @@
     "@react-native-community/datetimepicker": "^8.4.4",
     "expo-camera": "^17.0.10",
     "expo-device": "^8.0.10",
-    "expo-notifications": "^0.32.16"
+    "expo-file-system": "^55.0.17",
+    "expo-notifications": "^0.32.16",
+    "expo-sharing": "^55.0.18"
   }
 }

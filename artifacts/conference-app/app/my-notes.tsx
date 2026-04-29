@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system";
 import { router, useFocusEffect } from "expo-router";
+import * as Sharing from "expo-sharing";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,12 +35,87 @@ function dayRank(day: string) {
   return i === -1 ? 999 : i;
 }
 
+function buildNotesText(notes: NoteEntry[]): string {
+  const days = [...new Set(notes.map((n) => n.day))].sort(
+    (a, b) => dayRank(a) - dayRank(b)
+  );
+  const date = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const lines: string[] = [
+    "2026 UOA Annual Congress — My Notes",
+    `Downloaded: ${date}`,
+    "",
+  ];
+
+  for (const day of days) {
+    lines.push(`${"═".repeat(40)}`);
+    lines.push(day.toUpperCase());
+    lines.push(`${"═".repeat(40)}`);
+    lines.push("");
+
+    for (const entry of notes.filter((n) => n.day === day)) {
+      lines.push(entry.title);
+      const meta = [
+        entry.startTime && entry.endTime
+          ? `${entry.startTime} – ${entry.endTime}`
+          : entry.startTime,
+        entry.room,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      if (meta) lines.push(meta);
+      lines.push("-".repeat(32));
+      lines.push(entry.note);
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+async function downloadNotes(notes: NoteEntry[]) {
+  const text = buildNotesText(notes);
+  const filename = "UOA-Congress-2026-Notes.txt";
+
+  if (Platform.OS === "web") {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const path = `${FileSystem.cacheDirectory}${filename}`;
+  await FileSystem.writeAsStringAsync(path, text, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+
+  const available = await Sharing.isAvailableAsync();
+  if (available) {
+    await Sharing.shareAsync(path, {
+      mimeType: "text/plain",
+      dialogTitle: "Save your notes",
+      UTI: "public.plain-text",
+    });
+  } else {
+    Alert.alert("Sharing not available", "Unable to share files on this device.");
+  }
+}
+
 export default function MyNotesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   const loadNotes = useCallback(async () => {
     setLoading(true);
@@ -86,7 +164,18 @@ export default function MyNotesScreen() {
     );
   };
 
-  // Build ordered unique day list from whatever days actually exist in notes
+  const handleDownload = async () => {
+    if (notes.length === 0) return;
+    setDownloading(true);
+    try {
+      await downloadNotes(notes);
+    } catch {
+      Alert.alert("Error", "Could not export notes. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const days = [...new Set(notes.map((n) => n.day))].sort(
     (a, b) => dayRank(a) - dayRank(b)
   );
@@ -108,7 +197,22 @@ export default function MyNotesScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.navTitle, { color: colors.foreground }]}>My Notes</Text>
-        <View style={{ width: 40 }} />
+        {notes.length > 0 ? (
+          <Pressable
+            onPress={handleDownload}
+            disabled={downloading}
+            style={styles.downloadBtn}
+            hitSlop={8}
+          >
+            <Ionicons
+              name={downloading ? "hourglass-outline" : "download-outline"}
+              size={22}
+              color={downloading ? colors.mutedForeground : colors.primary}
+            />
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <ScrollView
@@ -145,13 +249,11 @@ export default function MyNotesScreen() {
 
             {days.map((day) => (
               <View key={day} style={styles.daySection}>
-                {/* Day header */}
                 <View style={styles.dayHeader}>
                   <View style={[styles.dayDot, { backgroundColor: colors.primary }]} />
                   <Text style={[styles.dayLabel, { color: colors.primary }]}>{day}</Text>
                 </View>
 
-                {/* Notes for this day */}
                 {notes
                   .filter((n) => n.day === day)
                   .map((entry) => (
@@ -172,7 +274,6 @@ export default function MyNotesScreen() {
                         },
                       ]}
                     >
-                      {/* Session info row */}
                       <View style={styles.noteCardHeader}>
                         <View style={{ flex: 1 }}>
                           <Text
@@ -202,12 +303,10 @@ export default function MyNotesScreen() {
                         </Pressable>
                       </View>
 
-                      {/* Divider */}
                       <View
                         style={[styles.noteDivider, { backgroundColor: colors.border }]}
                       />
 
-                      {/* Note text preview */}
                       <Text
                         style={[styles.noteText, { color: colors.foreground }]}
                         numberOfLines={6}
@@ -242,6 +341,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40, alignItems: "flex-start" },
   navTitle: { flex: 1, fontSize: 18, fontWeight: "700", textAlign: "center" },
+  downloadBtn: { width: 40, alignItems: "flex-end" },
   container: { paddingHorizontal: 16 },
   emptyState: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyTitle: { fontSize: 20, fontWeight: "700", marginTop: 8 },
