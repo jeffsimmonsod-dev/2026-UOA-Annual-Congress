@@ -370,6 +370,13 @@ export default function PhotosScreen() {
               returnKeyType="done"
             />
 
+            <View style={[styles.disclaimer, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Ionicons name="information-circle-outline" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
+                By sharing this photo you consent to it being used by the Utah Optometric Association for marketing and promotional purposes.
+              </Text>
+            </View>
+
             <Pressable
               onPress={handleUpload}
               disabled={uploading}
@@ -545,6 +552,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+  },
+  disclaimer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
   },
   uploadBtn: {
     flexDirection: "row",

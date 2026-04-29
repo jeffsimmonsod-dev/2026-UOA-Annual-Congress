@@ -4,7 +4,9 @@ import { router, useFocusEffect } from "expo-router";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useState } from "react";
 import {
+  ActionSheetIOS,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -77,7 +79,7 @@ function buildNotesText(notes: NoteEntry[]): string {
   return lines.join("\n");
 }
 
-async function downloadNotes(notes: NoteEntry[]) {
+async function saveAndShareNotes(notes: NoteEntry[]) {
   const text = buildNotesText(notes);
   const filename = "UOA-Congress-2026-Notes.txt";
 
@@ -92,21 +94,30 @@ async function downloadNotes(notes: NoteEntry[]) {
     return;
   }
 
-  const path = `${FileSystem.cacheDirectory}${filename}`;
+  const cacheDir = FileSystem.cacheDirectory;
+  if (!cacheDir) throw new Error("File system not available");
+  const path = `${cacheDir}${filename}`;
   await FileSystem.writeAsStringAsync(path, text, {
     encoding: FileSystem.EncodingType.UTF8,
   });
 
   const available = await Sharing.isAvailableAsync();
-  if (available) {
-    await Sharing.shareAsync(path, {
-      mimeType: "text/plain",
-      dialogTitle: "Save your notes",
-      UTI: "public.plain-text",
-    });
-  } else {
-    Alert.alert("Sharing not available", "Unable to share files on this device.");
-  }
+  if (!available) throw new Error("Sharing not available on this device");
+  await Sharing.shareAsync(path, {
+    mimeType: "text/plain",
+    dialogTitle: "Save your notes",
+    UTI: "public.plain-text",
+  });
+}
+
+async function emailNotes(notes: NoteEntry[]) {
+  const text = buildNotesText(notes);
+  const subject = encodeURIComponent("2026 UOA Annual Congress — My Notes");
+  const body = encodeURIComponent(text);
+  const url = `mailto:?subject=${subject}&body=${body}`;
+  const canOpen = await Linking.canOpenURL(url);
+  if (!canOpen) throw new Error("No email app available");
+  await Linking.openURL(url);
 }
 
 export default function MyNotesScreen() {
@@ -164,15 +175,42 @@ export default function MyNotesScreen() {
     );
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (notes.length === 0) return;
-    setDownloading(true);
-    try {
-      await downloadNotes(notes);
-    } catch {
-      Alert.alert("Error", "Could not export notes. Please try again.");
-    } finally {
-      setDownloading(false);
+
+    const runAction = async (action: "save" | "email") => {
+      setDownloading(true);
+      try {
+        if (action === "save") {
+          await saveAndShareNotes(notes);
+        } else {
+          await emailNotes(notes);
+        }
+      } catch (err) {
+        Alert.alert("Error", String(err) || "Could not export notes. Please try again.");
+      } finally {
+        setDownloading(false);
+      }
+    };
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: "Export Notes",
+          options: ["Cancel", "Save / Share File", "Send via Email"],
+          cancelButtonIndex: 0,
+        },
+        (idx) => {
+          if (idx === 1) runAction("save");
+          else if (idx === 2) runAction("email");
+        }
+      );
+    } else {
+      Alert.alert("Export Notes", "How would you like to export your notes?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Save / Share File", onPress: () => runAction("save") },
+        { text: "Send via Email", onPress: () => runAction("email") },
+      ]);
     }
   };
 
@@ -205,7 +243,7 @@ export default function MyNotesScreen() {
             hitSlop={8}
           >
             <Ionicons
-              name={downloading ? "hourglass-outline" : "download-outline"}
+              name={downloading ? "hourglass-outline" : "share-outline"}
               size={22}
               color={downloading ? colors.mutedForeground : colors.primary}
             />
