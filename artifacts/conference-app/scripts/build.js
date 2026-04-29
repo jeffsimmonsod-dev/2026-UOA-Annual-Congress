@@ -100,9 +100,11 @@ function prepareDirectories(timestamp) {
 function clearMetroCache() {
   console.log("Clearing Metro cache...");
 
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "/root";
   const cacheDirs = [
     path.join(projectRoot, ".metro-cache"),
     path.join(projectRoot, "node_modules/.cache/metro"),
+    path.join(homeDir, ".expo", "metro-cache"),
   ];
 
   for (const dir of cacheDirs) {
