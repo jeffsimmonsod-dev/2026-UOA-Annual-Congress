@@ -38,7 +38,7 @@ const IMG_H = 2362;
 // Each entry defines a tappable region over the corresponding booth
 const BOOTH_ZONES: { id: string; x: number; y: number; w: number; h: number }[] = [
   // ── Foyer top row (98–112) ──────────────────────────────────────────────────
-  { id:"98",  x:367, y:-3,  w:132, h:143 }, { id:"098", x:503, y:-5,  w:132, h:145 },
+  { id:"099", x:367, y:-3,  w:132, h:143 }, { id:"098", x:503, y:-5,  w:132, h:145 },
   { id:"100", x:645, y:1,   w:132, h:139 }, { id:"102", x:783, y:-1,  w:132, h:143 },
   { id:"104", x:917, y:1,   w:132, h:141 }, { id:"106", x:1053,y:1,   w:132, h:141 },
   { id:"108", x:1187,y:3,   w:132, h:141 }, { id:"110", x:1323,y:1,   w:132, h:141 },
@@ -299,7 +299,7 @@ const EXHIBITOR_DIRECTORY: { booth: string; company: string }[] = [
   { booth: "312", company: "iOR Partners" },
   { booth: "314", company: "IT4Eyes" },
   { booth: "211", company: "Johnson & Johnson" },
-  { booth: "98",  company: "Kering Eyewear" },
+  { booth: "099", company: "Kering Eyewear" },
   { booth: "409", company: "L'Amy America" },
   { booth: "101", company: "Lenz Therapeutics" },
   { booth: "203", company: "LKC Technologies" },
