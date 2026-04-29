@@ -3,7 +3,7 @@ import { Image, View, Text, StyleSheet } from "react-native";
 
 // ─── Booth name lookup (used by directory & passport) ─────────────────────────
 export const BOOTH_NAMES: Record<string, string> = {
-  "98":  "Kering Eyewear",    "99":  "Edward Jones",       "100": "",
+  "098": "Edward Jones",      "98":  "Kering Eyewear",     "100": "",
   "101": "Lenz Therapeutics", "102": "",
   "103": "Visionix",          "104": "",                    "105": "",
   "106": "Restoration Ophth.","107": "",
