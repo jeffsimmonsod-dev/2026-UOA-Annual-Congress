@@ -339,6 +339,15 @@ const SORTED_EXHIBITORS = [...EXHIBITOR_DIRECTORY].sort((a, b) =>
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 const ATTENDEE_TOKEN_KEY = "@uoa2026/attendeeToken";
+const PASSPORT_CACHE_KEY  = "@uoa2026/passportCache";
+const PENDING_CHECKINS_KEY = "@uoa2026/pendingCheckins";
+
+interface PendingCheckin {
+  boothId: number;
+  scanCode: string;
+  name: string;
+  email: string;
+}
 
 async function getOrCreateAttendeeToken(): Promise<string> {
   try {
@@ -374,6 +383,16 @@ interface PassportData {
   complete: boolean;
 }
 
+function formatRelativeTime(ts: number): string {
+  const diffMs = Date.now() - ts;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return `${Math.floor(diffHrs / 24)}d ago`;
+}
+
 export default function ExhibitHallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -387,6 +406,10 @@ export default function ExhibitHallScreen() {
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [cacheTimestamp, setCacheTimestamp] = useState<number | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [mapVisible, setMapVisible] = useState(false);
@@ -416,17 +439,91 @@ export default function ExhibitHallScreen() {
     });
   }, []);
 
+  // Flush any queued offline check-ins. Returns how many remain after flushing.
+  const flushPendingQueue = useCallback(async (token: string, emailConsent: boolean): Promise<number> => {
+    try {
+      const stored = await AsyncStorage.getItem(PENDING_CHECKINS_KEY);
+      if (!stored) return 0;
+      const pending: PendingCheckin[] = JSON.parse(stored);
+      if (pending.length === 0) return 0;
+
+      setSyncing(true);
+      const remaining: PendingCheckin[] = [];
+
+      for (const checkin of pending) {
+        try {
+          const nonceRes = await fetch(`${API_BASE}/api/booths/checkin-nonce`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ attendeeToken: token, boothId: checkin.boothId }),
+          });
+          if (!nonceRes.ok) { remaining.push(checkin); continue; }
+          const { nonce } = await nonceRes.json();
+
+          const res = await fetch(`${API_BASE}/api/booths/checkin`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              boothId: checkin.boothId,
+              scanCode: checkin.scanCode,
+              attendeeToken: token,
+              nonce,
+              attendeeName: checkin.name,
+              attendeeEmail: checkin.email || undefined,
+              emailConsent,
+            }),
+          });
+          // If already visited that's fine — don't re-queue it
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            if (!body.alreadyVisited) remaining.push(checkin);
+          }
+        } catch {
+          remaining.push(checkin);
+        }
+      }
+
+      await AsyncStorage.setItem(PENDING_CHECKINS_KEY, JSON.stringify(remaining));
+      setSyncing(false);
+      return remaining.length;
+    } catch {
+      setSyncing(false);
+      return 0;
+    }
+  }, []);
+
   const fetchPassport = useCallback(async () => {
     if (!attendeeToken) {
       setLoading(false);
       return;
     }
+    // Flush any offline-queued check-ins before fetching so the server state is current
+    const remainingPending = await flushPendingQueue(attendeeToken, profile?.emailConsent ?? false);
+    setPendingCount(remainingPending);
     try {
       const res = await fetch(`${API_BASE}/api/booths?attendeeToken=${encodeURIComponent(attendeeToken)}`);
-      if (res.ok) setPassport(await res.json());
-    } catch {}
+      if (res.ok) {
+        const data: PassportData = await res.json();
+        setPassport(data);
+        setIsOffline(false);
+        setCacheTimestamp(null);
+        // Cache the fresh result for offline use
+        await AsyncStorage.setItem(PASSPORT_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+      }
+    } catch {
+      // Network failed — try the local cache
+      try {
+        const cached = await AsyncStorage.getItem(PASSPORT_CACHE_KEY);
+        if (cached) {
+          const { data, ts }: { data: PassportData; ts: number } = JSON.parse(cached);
+          setPassport(data);
+          setCacheTimestamp(ts);
+          setIsOffline(true);
+        }
+      } catch {}
+    }
     setLoading(false);
-  }, [attendeeToken]);
+  }, [attendeeToken, flushPendingQueue, profile?.emailConsent]);
 
   useEffect(() => {
     if (attendeeToken) fetchPassport();
@@ -443,6 +540,18 @@ export default function ExhibitHallScreen() {
     setScanned(false);
     setScannerVisible(true);
   };
+
+  // Load initial pending check-in count from storage
+  useEffect(() => {
+    AsyncStorage.getItem(PENDING_CHECKINS_KEY).then((stored) => {
+      if (stored) {
+        try {
+          const pending: PendingCheckin[] = JSON.parse(stored);
+          setPendingCount(pending.length);
+        } catch {}
+      }
+    }).catch(() => {});
+  }, []);
 
   // Auto-open scanner when navigated from home screen with ?scan=true
   useEffect(() => {
@@ -512,7 +621,46 @@ export default function ExhibitHallScreen() {
         }
       }
     } catch {
-      Alert.alert("Error", "Could not connect to server. Please try again.");
+      // Network unavailable — queue the check-in and apply an optimistic update
+      try {
+        const stored = await AsyncStorage.getItem(PENDING_CHECKINS_KEY);
+        const pending: PendingCheckin[] = stored ? JSON.parse(stored) : [];
+        // Only queue if not already in the queue
+        const alreadyQueued = pending.some((p) => p.boothId === boothId);
+        if (!alreadyQueued) {
+          pending.push({ boothId, scanCode, name, email });
+          await AsyncStorage.setItem(PENDING_CHECKINS_KEY, JSON.stringify(pending));
+          setPendingCount(pending.length);
+
+          // Optimistically mark the booth as visited in local state
+          setPassport((prev) => {
+            if (!prev) return prev;
+            const alreadyVisited = prev.booths.find((b) => b.id === boothId)?.visited;
+            if (alreadyVisited) return prev;
+            const booths = prev.booths.map((b) =>
+              b.id === boothId ? { ...b, visited: true } : b
+            );
+            const newVisitedCount = prev.visitedCount + 1;
+            const updated: PassportData = {
+              ...prev,
+              booths,
+              visitedCount: newVisitedCount,
+              complete: newVisitedCount >= prev.total,
+            };
+            // Also update the on-disk cache so it reflects this change
+            AsyncStorage.setItem(PASSPORT_CACHE_KEY, JSON.stringify({ data: updated, ts: cacheTimestamp ?? Date.now() })).catch(() => {});
+            return updated;
+          });
+
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert("Saved offline", "No connection right now — your check-in has been saved and will sync automatically when you're back online.");
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          Alert.alert("Already saved", "This booth is already saved and waiting to sync.");
+        }
+      } catch {
+        Alert.alert("Error", "Could not save check-in. Please try again.");
+      }
     }
     setCheckingIn(false);
   };
@@ -564,6 +712,39 @@ export default function ExhibitHallScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
+
+          {/* Offline / syncing banners */}
+          {syncing && (
+            <View style={[styles.offlineBanner, { backgroundColor: "#3b82f620", borderColor: "#3b82f6" }]}>
+              <ActivityIndicator size="small" color="#3b82f6" />
+              <Text style={[styles.offlineBannerText, { color: "#3b82f6" }]}>
+                Syncing saved check-ins…
+              </Text>
+            </View>
+          )}
+          {!syncing && isOffline && (
+            <Pressable
+              onPress={() => fetchPassport()}
+              style={[styles.offlineBanner, { backgroundColor: "#f59e0b20", borderColor: "#f59e0b" }]}
+            >
+              <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+              <Text style={[styles.offlineBannerText, { color: "#f59e0b" }]}>
+                {"Offline — showing cached data"}
+                {cacheTimestamp ? ` · Last synced ${formatRelativeTime(cacheTimestamp)}` : ""}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#f59e0b", fontWeight: "600" }}>Retry</Text>
+            </Pressable>
+          )}
+          {!syncing && isOffline && pendingCount > 0 && (
+            <View style={[styles.offlineBanner, { backgroundColor: "#f59e0b20", borderColor: "#f59e0b" }]}>
+              <Ionicons name="time-outline" size={16} color="#f59e0b" />
+              <Text style={[styles.offlineBannerText, { color: "#f59e0b" }]}>
+                {pendingCount === 1
+                  ? "1 check-in saved — will sync when you're back online"
+                  : `${pendingCount} check-ins saved — will sync when you're back online`}
+              </Text>
+            </View>
+          )}
 
           {complete && (
             <View style={[styles.completeBanner, { backgroundColor: "#10b98120", borderColor: "#10b981" }]}>
@@ -786,6 +967,16 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: 18, fontWeight: "700", textAlign: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 12 },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  offlineBannerText: { fontSize: 13, fontWeight: "500", flex: 1 },
   completeBanner: {
     flexDirection: "row",
     alignItems: "center",
