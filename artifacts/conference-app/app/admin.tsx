@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -107,8 +107,7 @@ export default function AdminScreen() {
   const [newBoothNumber, setNewBoothNumber] = useState("");
   const [addingBooth, setAddingBooth] = useState(false);
   const [expandedBoothId, setExpandedBoothId] = useState<number | null>(null);
-  const [liveQrState, setLiveQrState] = useState<Record<number, { dataUrl: string | null; expiresAt: Date | null; loading: boolean; countdown: number }>>({});
-  const liveQrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [liveQrState, setLiveQrState] = useState<Record<number, { dataUrl: string | null; loading: boolean }>>({});
 
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -444,59 +443,28 @@ export default function AdminScreen() {
     ]);
   };
 
-  const fetchLiveQr = useCallback(async (boothId: number) => {
-    setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], dataUrl: prev[boothId]?.dataUrl ?? null, expiresAt: prev[boothId]?.expiresAt ?? null, loading: true, countdown: 0 } }));
+  const fetchStaticQr = useCallback(async (boothId: number) => {
+    if (liveQrState[boothId]?.dataUrl) return;
+    setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: true } }));
     try {
-      const codeRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/scan-code`, {
-        method: "POST",
-        headers: { "x-admin-pin": verifiedPin },
-      });
-      if (!codeRes.ok) {
-        setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
-        return;
-      }
-      const { code, expiresAt, ttlSeconds = 30 } = await codeRes.json();
-
-      const qrRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/qr?scanCode=${encodeURIComponent(code)}`, {
+      const qrRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/qr`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (!qrRes.ok) {
-        setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
+        setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: false } }));
         return;
       }
       const { dataUrl } = await qrRes.json();
-
-      setLiveQrState((prev) => ({
-        ...prev,
-        [boothId]: { dataUrl, expiresAt: new Date(expiresAt), loading: false, countdown: ttlSeconds ?? 90 },
-      }));
+      setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl, loading: false } }));
     } catch {
-      setLiveQrState((prev) => ({ ...prev, [boothId]: { ...prev[boothId], loading: false, countdown: 0 } }));
+      setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: false } }));
     }
-  }, [verifiedPin]);
+  }, [verifiedPin, liveQrState]);
 
   useEffect(() => {
-    if (liveQrTimerRef.current) clearInterval(liveQrTimerRef.current);
     if (expandedBoothId === null) return;
-
-    fetchLiveQr(expandedBoothId);
-
-    liveQrTimerRef.current = setInterval(() => {
-      setLiveQrState((prev) => {
-        const cur = prev[expandedBoothId];
-        if (!cur) return prev;
-        if (cur.countdown <= 1) {
-          fetchLiveQr(expandedBoothId);
-          return { ...prev, [expandedBoothId]: { ...cur, countdown: 0 } };
-        }
-        return { ...prev, [expandedBoothId]: { ...cur, countdown: cur.countdown - 1 } };
-      });
-    }, 1000);
-
-    return () => {
-      if (liveQrTimerRef.current) clearInterval(liveQrTimerRef.current);
-    };
-  }, [expandedBoothId, fetchLiveQr]);
+    fetchStaticQr(expandedBoothId);
+  }, [expandedBoothId, fetchStaticQr]);
 
   const handlePrintQR = (_booth: Booth) => {
     Linking.openURL(`${API_BASE}/admin/qr-codes`);
@@ -916,9 +884,9 @@ export default function AdminScreen() {
 
                       {isExpanded && (
                         <View style={[styles.boothExpanded, { borderTopColor: colors.border }]}>
-                          <View style={[styles.liveQrBadge, { backgroundColor: "#10b98118", borderColor: "#10b98140" }]}>
-                            <Ionicons name="timer-outline" size={13} color="#10b981" />
-                            <Text style={[styles.liveQrBadgeText, { color: "#10b981" }]}>Live QR — one attendee per code · renews every 30s</Text>
+                          <View style={[styles.liveQrBadge, { backgroundColor: "#4f46e518", borderColor: "#4f46e540" }]}>
+                            <Ionicons name="qr-code-outline" size={13} color={colors.primary} />
+                            <Text style={[styles.liveQrBadgeText, { color: colors.primary }]}>Static QR — print and place at booth for attendees to scan</Text>
                           </View>
                           {qr?.loading || !qr ? (
                             <ActivityIndicator color={colors.primary} style={styles.qrImage} />
@@ -926,14 +894,6 @@ export default function AdminScreen() {
                             <Image source={{ uri: qr.dataUrl }} style={styles.qrImage} resizeMode="contain" />
                           ) : (
                             <Text style={[styles.hint, { color: "#ef4444", marginVertical: 16 }]}>Failed to load QR code</Text>
-                          )}
-                          {qr && !qr.loading && qr.countdown > 0 && (
-                            <Text style={[styles.qrLabel, { color: colors.mutedForeground }]}>
-                              Show to one attendee · refreshes in {qr.countdown}s
-                            </Text>
-                          )}
-                          {qr && !qr.loading && qr.countdown === 0 && (
-                            <Text style={[styles.qrLabel, { color: colors.mutedForeground }]}>Refreshing…</Text>
                           )}
                           <View style={styles.boothActions}>
                             <Pressable onPress={() => handleDeleteBooth(booth)} style={[styles.actionBtn, { backgroundColor: "#ef444415", borderColor: "#ef444440" }]}>

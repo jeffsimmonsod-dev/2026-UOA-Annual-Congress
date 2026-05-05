@@ -268,62 +268,36 @@ router.post("/booths/checkin-nonce", async (req: Request, res: Response) => {
   res.json({ nonce });
 });
 
-// POST /api/booths/checkin — record a booth visit using a short-lived server-issued scan code + attendee token + nonce
+// POST /api/booths/checkin — record a booth visit by verifying the booth's static secret token
 router.post("/booths/checkin", async (req: Request, res: Response) => {
-  const { boothId, scanCode, attendeeToken, nonce, attendeeName, attendeeEmail, emailConsent } = req.body as {
+  const { boothId, secretToken, attendeeToken, attendeeName, attendeeEmail, emailConsent } = req.body as {
     boothId: number;
-    scanCode: string;
+    secretToken: string;
     attendeeToken: string;
-    nonce: string;
     attendeeName?: string;
     attendeeEmail?: string;
     emailConsent?: boolean;
   };
 
-  if (!boothId || !scanCode || !attendeeToken || !nonce) {
+  if (!boothId || !secretToken || !attendeeToken) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   const attendee = await resolveAttendee(attendeeToken);
   if (!attendee) return res.status(403).json({ error: "Invalid attendee token" });
 
-  const nonceConsumed = await pool.query(
-    `UPDATE congress_checkin_nonces
-     SET used = TRUE
-     WHERE nonce = $1
-       AND attendee_id = $2
-       AND booth_id = $3
-       AND used = FALSE
-       AND expires_at > NOW()
-     RETURNING nonce`,
-    [nonce, attendee.id, boothId]
-  );
-  if (nonceConsumed.rows.length === 0) {
-    return res.status(403).json({ error: "Invalid, expired, or already-used check-in token" });
-  }
-
-  const scanConsumed = await pool.query(
-    `UPDATE congress_booth_scan_codes
-     SET used = TRUE
-     WHERE code = $1
-       AND booth_id = $2
-       AND used = FALSE
-       AND expires_at > NOW()
-     RETURNING code`,
-    [scanCode, boothId]
-  );
-  if (scanConsumed.rows.length === 0) {
-    return res.status(403).json({ error: "Booth QR code has already been used or has expired. Ask staff to show the refreshed QR code." });
-  }
-
   const boothRes = await pool.query(
-    "SELECT id, name, company, booth_number FROM congress_booths WHERE id = $1",
+    "SELECT id, name, company, booth_number, secret_token FROM congress_booths WHERE id = $1",
     [boothId]
   );
   if (boothRes.rows.length === 0) {
     return res.status(404).json({ error: "Booth not found" });
   }
   const booth = boothRes.rows[0];
+
+  if (booth.secret_token !== secretToken) {
+    return res.status(403).json({ error: "Invalid booth QR code" });
+  }
 
   const consent = emailConsent === true;
   const name = attendeeName || null;

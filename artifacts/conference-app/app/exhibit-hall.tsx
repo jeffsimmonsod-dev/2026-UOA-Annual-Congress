@@ -344,7 +344,7 @@ const PENDING_CHECKINS_KEY = "@uoa2026/pendingCheckins";
 
 interface PendingCheckin {
   boothId: number;
-  scanCode: string;
+  secretToken: string;
   name: string;
   email: string;
 }
@@ -452,22 +452,13 @@ export default function ExhibitHallScreen() {
 
       for (const checkin of pending) {
         try {
-          const nonceRes = await fetch(`${API_BASE}/api/booths/checkin-nonce`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ attendeeToken: token, boothId: checkin.boothId }),
-          });
-          if (!nonceRes.ok) { remaining.push(checkin); continue; }
-          const { nonce } = await nonceRes.json();
-
           const res = await fetch(`${API_BASE}/api/booths/checkin`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               boothId: checkin.boothId,
-              scanCode: checkin.scanCode,
+              secretToken: checkin.secretToken,
               attendeeToken: token,
-              nonce,
               attendeeName: checkin.name,
               attendeeEmail: checkin.email || undefined,
               emailConsent,
@@ -575,32 +566,19 @@ export default function ExhibitHallScreen() {
       return;
     }
     const boothId = parseInt(parts[0], 10);
-    const scanCode = parts[1];
+    const secretToken = parts[1];
     setScannerVisible(false);
-    doCheckin(boothId, scanCode, profile?.name ?? "", profile?.email ?? "");
+    doCheckin(boothId, secretToken, profile?.name ?? "", profile?.email ?? "");
   };
 
-  const doCheckin = async (boothId: number, scanCode: string, name: string, email: string = "") => {
+  const doCheckin = async (boothId: number, secretToken: string, name: string, email: string = "") => {
     if (!attendeeToken) return;
     setCheckingIn(true);
     try {
-      const nonceRes = await fetch(`${API_BASE}/api/booths/checkin-nonce`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attendeeToken, boothId }),
-      });
-      if (!nonceRes.ok) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Check-in failed", "Could not start check-in. Please try again.");
-        setCheckingIn(false);
-        return;
-      }
-      const { nonce } = await nonceRes.json();
-
       const res = await fetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boothId, scanCode, attendeeToken, nonce, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
+        body: JSON.stringify({ boothId, secretToken, attendeeToken, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -628,7 +606,7 @@ export default function ExhibitHallScreen() {
         // Only queue if not already in the queue
         const alreadyQueued = pending.some((p) => p.boothId === boothId);
         if (!alreadyQueued) {
-          pending.push({ boothId, scanCode, name, email });
+          pending.push({ boothId, secretToken, name, email });
           await AsyncStorage.setItem(PENDING_CHECKINS_KEY, JSON.stringify(pending));
           setPendingCount(pending.length);
 
