@@ -1,9 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import pg from "pg";
 import crypto from "crypto";
-
-const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from "../lib/db";
 const router = Router();
 
 const MAX_REGISTRATIONS_PER_IP_PER_HOUR = 500;

@@ -1,8 +1,5 @@
 import { Router, type Request } from "express";
-import pg from "pg";
-
-const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from "../lib/db";
 const router = Router();
 
 function getAdminPin(): string {
@@ -47,31 +44,51 @@ async function ensureTables() {
 
 ensureTables().catch(console.error);
 
+const EXPO_PUSH_BATCH_SIZE = 100;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function sendToAll(title: string, body: string) {
   const { rows } = await pool.query(`SELECT token FROM congress_push_tokens`);
   const tokens = rows.map((r: { token: string }) => r.token);
   if (tokens.length === 0) return { sent: 0 };
 
-  const messages = tokens.map((to) => ({
-    to,
-    title,
-    body,
-    sound: "default",
-    data: { type: "announcement", timestamp: new Date().toISOString() },
-  }));
+  const batches = chunkArray(tokens, EXPO_PUSH_BATCH_SIZE);
+  let totalSent = 0;
 
-  const response = await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip, deflate",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(messages),
-  });
+  for (const batch of batches) {
+    const messages = batch.map((to) => ({
+      to,
+      title,
+      body,
+      sound: "default",
+      data: { type: "announcement", timestamp: new Date().toISOString() },
+    }));
 
-  const result = await response.json();
-  return { sent: tokens.length, result };
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(messages),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Expo push API error: ${response.status}`);
+    }
+
+    totalSent += batch.length;
+  }
+
+  return { sent: totalSent };
 }
 
 async function processScheduled() {

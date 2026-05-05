@@ -1,9 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import QRCode from "qrcode";
-import pg from "pg";
-
-const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from "../lib/db";
 
 const router = Router();
 

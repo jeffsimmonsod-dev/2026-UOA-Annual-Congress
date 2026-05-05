@@ -2,12 +2,9 @@ import { Router, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
 import multer from "multer";
-import pg from "pg";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage";
 import { uploadPhotoToDrive, deleteDriveFile } from "../lib/googleDrive";
-
-const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from "../lib/db";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();

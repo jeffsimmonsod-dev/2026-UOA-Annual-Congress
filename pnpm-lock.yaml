@@ -175,6 +175,9 @@ importers:
       '@replit/connectors-sdk':
         specifier: ^0.4.0
         version: 0.4.0
+      '@types/compression':
+        specifier: ^1.8.1
+        version: 1.8.1
       '@types/multer':
         specifier: ^2.1.0
         version: 2.1.0
@@ -190,6 +193,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      compression:
+        specifier: ^1.8.1
+        version: 1.8.1
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -2627,6 +2633,9 @@ packages:
 
   '@types/cli-progress@3.11.6':
     resolution: {integrity: sha512-cE3+jb9WRlu+uOSAugewNpITJDt1VF8dHOopPO4IABFc3SXYL5WE/+PTz/FCdZRRfIujiWW3n3aMbv1eIGVRWA==}
+
+  '@types/compression@1.8.1':
+    resolution: {integrity: sha512-kCFuWS0ebDbmxs0AXYn6e2r2nrGAb5KwQhknjSPSPgJcGd8+HVSILlUyFhGqML2gk39HcG7D1ydW9/qpYkN00Q==}
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
@@ -10005,6 +10014,11 @@ snapshots:
 
   '@types/cli-progress@3.11.6':
     dependencies:
+      '@types/node': 25.3.5
+
+  '@types/compression@1.8.1':
+    dependencies:
+      '@types/express': 5.0.6
       '@types/node': 25.3.5
 
   '@types/connect@3.4.38':
