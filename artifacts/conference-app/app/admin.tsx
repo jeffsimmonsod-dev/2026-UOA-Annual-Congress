@@ -126,6 +126,7 @@ export default function AdminScreen() {
   const [votingResults, setVotingResults] = useState<VotingResults | null>(null);
   const [votingLoading, setVotingLoading] = useState(false);
   const [votingAction, setVotingAction] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handlePinSubmit = async () => {
     if (!pin.trim()) return;
@@ -351,30 +352,22 @@ export default function AdminScreen() {
 
   const handleVotingControl = async (action: "open" | "close" | "reset") => {
     if (action === "reset") {
-      Alert.alert(
-        "Reset All Votes",
-        "This will permanently delete all submitted ballots and close voting. This cannot be undone.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Reset",
-            style: "destructive",
-            onPress: async () => {
-              setVotingAction("reset");
-              await fetch(`${API_BASE}/api/voting/reset`, {
-                method: "POST",
-                headers: { "x-admin-pin": verifiedPin },
-              });
-              setVotingAction(null);
-              fetchVotingResults();
-            },
-          },
-        ]
-      );
+      setShowResetConfirm(true);
       return;
     }
     setVotingAction(action);
     await fetch(`${API_BASE}/api/voting/${action}`, {
+      method: "POST",
+      headers: { "x-admin-pin": verifiedPin },
+    });
+    setVotingAction(null);
+    fetchVotingResults();
+  };
+
+  const handleVotingReset = async () => {
+    setShowResetConfirm(false);
+    setVotingAction("reset");
+    await fetch(`${API_BASE}/api/voting/reset`, {
       method: "POST",
       headers: { "x-admin-pin": verifiedPin },
     });
@@ -1127,53 +1120,86 @@ export default function AdminScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Pressable onPress={fetchVotingResults} style={styles.refreshBtn}>
-                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                    <Pressable
+                      onPress={fetchVotingResults}
+                      disabled={votingLoading}
+                      style={[styles.refreshBtn, { opacity: votingLoading ? 0.4 : 1 }]}
+                    >
+                      {votingLoading
+                        ? <ActivityIndicator size="small" color={colors.primary} />
+                        : <Ionicons name="refresh" size={16} color={colors.primary} />
+                      }
                     </Pressable>
                   </View>
 
-                  <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-                    <Pressable
-                      onPress={() => handleVotingControl("open")}
-                      disabled={votingAction !== null || votingResults?.isOpen}
-                      style={[styles.actionBtn, {
-                        flex: 1,
-                        backgroundColor: "#10b981",
-                        borderColor: "#10b981",
-                        opacity: votingResults?.isOpen ? 0.4 : 1,
-                      }]}
-                    >
-                      {votingAction === "open"
-                        ? <ActivityIndicator color="#fff" size="small" />
-                        : <Text style={[styles.actionBtnText, { color: "#fff" }]}>Open Voting</Text>
-                      }
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleVotingControl("close")}
-                      disabled={votingAction !== null || !votingResults?.isOpen}
-                      style={[styles.actionBtn, {
-                        flex: 1,
-                        backgroundColor: colors.muted,
-                        borderColor: colors.border,
-                        opacity: !votingResults?.isOpen ? 0.4 : 1,
-                      }]}
-                    >
-                      {votingAction === "close"
-                        ? <ActivityIndicator color={colors.foreground} size="small" />
-                        : <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close Voting</Text>
-                      }
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleVotingControl("reset")}
-                      disabled={votingAction !== null}
-                      style={[styles.actionBtn, { borderColor: "#ef4444" }]}
-                    >
-                      {votingAction === "reset"
-                        ? <ActivityIndicator color="#ef4444" size="small" />
-                        : <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Reset</Text>
-                      }
-                    </Pressable>
-                  </View>
+                  {showResetConfirm ? (
+                    <View style={[{ borderRadius: 10, borderWidth: 1.5, borderColor: "#ef4444", padding: 12, gap: 10, backgroundColor: "#ef444410" }]}>
+                      <Text style={[styles.hint, { color: colors.foreground, fontWeight: "700" }]}>
+                        Delete all {votingResults?.totalVotes ?? 0} ballot{votingResults?.totalVotes !== 1 ? "s" : ""}? This cannot be undone.
+                      </Text>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <Pressable
+                          onPress={() => setShowResetConfirm(false)}
+                          style={[styles.actionBtn, { flex: 1, borderColor: colors.border }]}
+                        >
+                          <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleVotingReset}
+                          disabled={votingAction === "reset"}
+                          style={[styles.actionBtn, { flex: 1, backgroundColor: "#ef4444", borderColor: "#ef4444" }]}
+                        >
+                          {votingAction === "reset"
+                            ? <ActivityIndicator color="#fff" size="small" />
+                            : <Text style={[styles.actionBtnText, { color: "#fff" }]}>Yes, Reset</Text>
+                          }
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                      <Pressable
+                        onPress={() => handleVotingControl("open")}
+                        disabled={votingAction !== null || votingResults?.isOpen}
+                        style={[styles.actionBtn, {
+                          flex: 1,
+                          backgroundColor: "#10b981",
+                          borderColor: "#10b981",
+                          opacity: votingResults?.isOpen ? 0.4 : 1,
+                        }]}
+                      >
+                        {votingAction === "open"
+                          ? <ActivityIndicator color="#fff" size="small" />
+                          : <Text style={[styles.actionBtnText, { color: "#fff" }]}>Open Voting</Text>
+                        }
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleVotingControl("close")}
+                        disabled={votingAction !== null || !votingResults?.isOpen}
+                        style={[styles.actionBtn, {
+                          flex: 1,
+                          backgroundColor: colors.muted,
+                          borderColor: colors.border,
+                          opacity: !votingResults?.isOpen ? 0.4 : 1,
+                        }]}
+                      >
+                        {votingAction === "close"
+                          ? <ActivityIndicator color={colors.foreground} size="small" />
+                          : <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close Voting</Text>
+                        }
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleVotingControl("reset")}
+                        disabled={votingAction !== null}
+                        style={[styles.actionBtn, { borderColor: "#ef4444" }]}
+                      >
+                        {votingAction === "reset"
+                          ? <ActivityIndicator color="#ef4444" size="small" />
+                          : <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Reset</Text>
+                        }
+                      </Pressable>
+                    </View>
+                  )}
 
                   <View style={[styles.analyticsStatsRow, { marginTop: 4 }]}>
                     <View style={[styles.analyticsStatCard, { backgroundColor: colors.muted, borderColor: colors.border }]}>
