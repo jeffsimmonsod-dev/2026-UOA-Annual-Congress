@@ -26,13 +26,6 @@ interface MenuItem {
 const useMenuItems = (): MenuItem[] => {
   return [
     {
-      label: "Business Meeting Voting",
-      icon: "checkbox-outline" as keyof typeof Ionicons.glyphMap,
-      color: "#4f46e5",
-      route: "/voting",
-      description: "Officer slate & board trustee vote",
-    },
-    {
       label: "Exhibit Hall",
       icon: "storefront-outline" as keyof typeof Ionicons.glyphMap,
       color: "#f59e0b",
@@ -87,6 +80,13 @@ const useMenuItems = (): MenuItem[] => {
       color: "#8b5cf6",
       action: () => Linking.openURL("https://www.utaheyedoc.org/2026_uoa_annual_congress.php"),
       description: "utaheyedoc.org · 2026 Annual Congress",
+    },
+    {
+      label: "Business Meeting Voting",
+      icon: "checkbox-outline" as keyof typeof Ionicons.glyphMap,
+      color: "#4f46e5",
+      route: "/voting",
+      description: "Officer slate & board trustee vote",
     },
   ];
 };
