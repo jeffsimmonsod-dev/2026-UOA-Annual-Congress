@@ -159,6 +159,16 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     sessionToken?: string;
   };
 
+  req.log.info({
+    hasFile: !!req.file,
+    fileSize: req.file?.size,
+    fileMime: req.file?.mimetype,
+    bodyKeys: Object.keys(req.body ?? {}),
+    hasUploaderName: !!uploaderName,
+    hasSessionToken: !!sessionToken,
+    contentType: req.headers["content-type"]?.slice(0, 80),
+  }, "photos/upload debug");
+
   if (!req.file || !uploaderName || !sessionToken) {
     res.status(400).json({ error: "photo file, uploaderName, and sessionToken are required" });
     return;
