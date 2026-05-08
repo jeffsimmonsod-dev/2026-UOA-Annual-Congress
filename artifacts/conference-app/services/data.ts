@@ -687,7 +687,7 @@ export const SESSIONS: Session[] = [
 export const PARA_SESSIONS: Session[] = [
   // ── Thursday ──────────────────────────────────────────────
   {
-    id: "pm-thu-lunch",
+    id: "dm-thu-lunch",
     title: "Lunch sponsored by MacuHealth (RSVP only)",
     description: "Sponsored lunch for registered attendees. RSVP required. Hosted at the Remington Hall restaurant.",
     startTime: "11:30 AM",
@@ -699,7 +699,7 @@ export const PARA_SESSIONS: Session[] = [
     tags: ["lunch", "sponsored", "MacuHealth", "RSVP"],
   },
   {
-    id: "pm-thu-evening",
+    id: "dm-thu-evening",
     title: "Kickoff Reception sponsored by The Eye Institute",
     description: "Join us for the official congress kickoff reception, sponsored by The Eye Institute of Utah. Welcome drinks and appetizers to start the 2026 UOA Annual Congress.",
     startTime: "7:00 PM",
@@ -712,7 +712,7 @@ export const PARA_SESSIONS: Session[] = [
   },
   // ── Friday ────────────────────────────────────────────────
   {
-    id: "pm-fri-breakfast",
+    id: "dm-fri-breakfast",
     title: "Promotional Light Breakfast sponsored by Dompé",
     description: "Light breakfast for ODs and Paras, sponsored by Dompé.",
     startTime: "7:30 AM",
@@ -776,7 +776,7 @@ export const PARA_SESSIONS: Session[] = [
     tags: ["OCT", "retina", "ABO", "CPO"],
   },
   {
-    id: "pm-fri-lunch",
+    id: "dm-fri-lunch",
     title: "Installation Lunch sponsored by Hoopes Vision",
     description: "Annual installation lunch recognizing incoming UOA leadership, sponsored by Hoopes Vision.",
     startTime: "12:00 PM",
@@ -788,7 +788,7 @@ export const PARA_SESSIONS: Session[] = [
     tags: ["lunch", "installation", "sponsored", "Hoopes Vision"],
   },
   {
-    id: "pm-fri-exhibit",
+    id: "dm-fri-exhibit",
     title: "Exhibit Hall",
     description: "Open to optometrists, office staff, and optometry students only. Spouses and children are encouraged to attend the family social instead. Lanyards required for entry.",
     startTime: "1:30 PM",
@@ -852,7 +852,7 @@ export const PARA_SESSIONS: Session[] = [
   },
   // ── Saturday ──────────────────────────────────────────────
   {
-    id: "pm-sat-breakfast",
+    id: "dm-sat-breakfast",
     title: "Breakfast Challenge of the Clinics sponsored by Waite Vision",
     description: "Morning breakfast sponsored by Waite Vision. Features the 'Challenge of the Clinics' interactive format.",
     startTime: "7:00 AM",
@@ -955,7 +955,7 @@ export const PARA_SESSIONS: Session[] = [
   },
   // ── Saturday shared social events ────────────────────────
   {
-    id: "pm-sat-exhibit",
+    id: "dm-sat-exhibit",
     title: "Exhibit Hall with Raffle Drawing at 3:30 PM",
     description: "Exhibit Hall open to all attendees including paras. Visit sponsor booths, collect passport stamps, and enter the raffle drawing at 3:30 PM in the Deer Creek Ballroom.",
     startTime: "2:00 PM",
@@ -967,7 +967,7 @@ export const PARA_SESSIONS: Session[] = [
     tags: ["exhibit hall", "raffle", "sponsors", "networking"],
   },
   {
-    id: "pm-sat-family-social",
+    id: "dm-sat-family-social",
     title: "Family Social: Scales and Tails",
     description: "Family-friendly event featuring a live reptile show and prizes for the whole family.",
     startTime: "4:00 PM",
@@ -979,7 +979,7 @@ export const PARA_SESSIONS: Session[] = [
     tags: ["family", "social", "reptiles", "prizes"],
   },
   {
-    id: "pm-sat-carnival",
+    id: "dm-sat-carnival",
     title: "Family Carnival sponsored by Utah Eye Centers",
     description: "Evening family carnival sponsored by Utah Eye Centers. Games, activities, and entertainment for the whole family.",
     startTime: "6:30 PM",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -25,6 +25,11 @@ export default function ScheduleScreen() {
   const doctorSessionsByDay = getSessionsByDay();
   const paraSessionsByDay = getParaSessionsByDay();
   const isWeb = Platform.OS === "web";
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeTab]);
 
   const isPara = activeTab === "Para";
 
@@ -105,6 +110,7 @@ export default function ScheduleScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.list,
           { paddingBottom: isWeb ? insets.bottom + 100 : 100 },

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -23,6 +23,11 @@ export default function ParaScreen() {
   const [activeDay, setActiveDay] = useState("Thu, June 4");
   const sessionsByDay = getParaSessionsByDay();
   const sessions = sessionsByDay[activeDay] ?? [];
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [activeDay]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -102,6 +107,7 @@ export default function ParaScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.list,
           {
