@@ -32,6 +32,6 @@ jobs:
 
       - name: Build Android AAB
         working-directory: artifacts/conference-app
-        run: pnpm exec eas build --platform android --profile production --non-interactive
+        run: pnpm exec eas build --platform android --profile production --non-interactive --no-wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
