@@ -44,13 +44,8 @@ function detectMimeFromMagicBytes(buf: Buffer): string | null {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed"));
-    }
-  },
+  // Accept all MIME types here — Android often sends application/octet-stream.
+  // Real validation is done via magic bytes after multer parses the body.
 });
 
 async function ensureTables() {
