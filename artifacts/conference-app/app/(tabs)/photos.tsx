@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -197,27 +198,50 @@ export default function PhotosScreen() {
     }
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("photo", {
-        uri: pickedUri,
-        name: "photo.jpg",
-        type: "image/jpeg",
-      } as any);
-      form.append("uploaderName", uploaderName);
-      form.append("caption", caption.trim());
-      form.append("sessionToken", sessionToken);
+      let uploadedPhoto: any = null;
 
-      const res = await fetch(`${API_BASE}/api/photos/upload`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(`Upload failed (${res.status}): ${JSON.stringify(errBody)}`);
+      if (Platform.OS === "web") {
+        // Web: use standard FormData + fetch
+        const form = new FormData();
+        form.append("photo", {
+          uri: pickedUri,
+          name: "photo.jpg",
+          type: "image/jpeg",
+        } as any);
+        form.append("uploaderName", uploaderName);
+        form.append("caption", caption.trim());
+        form.append("sessionToken", sessionToken);
+        const res = await fetch(`${API_BASE}/api/photos/upload`, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(`Upload failed (${res.status}): ${JSON.stringify(errBody)}`);
+        }
+        uploadedPhoto = await res.json().catch(() => null);
+      } else {
+        // Native (iOS/Android): use FileSystem.uploadAsync for reliable multipart upload
+        const result = await FileSystem.uploadAsync(
+          `${API_BASE}/api/photos/upload`,
+          pickedUri,
+          {
+            fieldName: "photo",
+            httpMethod: "POST",
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            parameters: {
+              uploaderName,
+              caption: caption.trim(),
+              sessionToken,
+            },
+          }
+        );
+        if (result.status < 200 || result.status >= 300) {
+          const errBody = JSON.parse(result.body || "{}");
+          throw new Error(`Upload failed (${result.status}): ${JSON.stringify(errBody)}`);
+        }
+        uploadedPhoto = JSON.parse(result.body || "null");
       }
-
-      const uploadedPhoto = await res.json().catch(() => null);
       if (uploadedPhoto?.id && uploadedPhoto?.deleteToken) {
         const newTokens = { ...myPhotoTokens, [uploadedPhoto.id]: uploadedPhoto.deleteToken };
         setMyPhotoTokens(newTokens);

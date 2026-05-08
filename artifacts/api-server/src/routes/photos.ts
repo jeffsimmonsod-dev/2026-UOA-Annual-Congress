@@ -169,8 +169,12 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     contentType: req.headers["content-type"]?.slice(0, 80),
   }, "photos/upload debug");
 
+  if (!req.file && !uploaderName && !sessionToken) {
+    res.status(400).json({ error: "Request body was empty or not multipart — check Content-Type header", contentType: req.headers["content-type"]?.slice(0, 80) ?? "missing" });
+    return;
+  }
   if (!req.file || !uploaderName || !sessionToken) {
-    res.status(400).json({ error: "photo file, uploaderName, and sessionToken are required" });
+    res.status(400).json({ error: "photo file, uploaderName, and sessionToken are required", missing: { file: !req.file, uploaderName: !uploaderName, sessionToken: !sessionToken } });
     return;
   }
 
