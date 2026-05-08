@@ -24,7 +24,7 @@ import { sendPushNotification } from "@/services/pushNotifications";
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type Step = "pin" | "dashboard";
-type AdminTab = "notifications" | "booths" | "analytics" | "photos";
+type AdminTab = "notifications" | "booths" | "analytics" | "photos" | "voting";
 type SendMode = "now" | "schedule";
 
 interface BoothVisitor {
@@ -116,6 +116,16 @@ export default function AdminScreen() {
   const [adminPhotos, setAdminPhotos] = useState<{ id: string; objectPath: string; uploaderName: string; caption: string; likes: number; createdAt: string }[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+
+  interface VotingResults {
+    isOpen: boolean;
+    totalVotes: number;
+    slateResults: { approve: number; disapprove: number; abstain: number };
+    trusteeResults: Record<string, number>;
+  }
+  const [votingResults, setVotingResults] = useState<VotingResults | null>(null);
+  const [votingLoading, setVotingLoading] = useState(false);
+  const [votingAction, setVotingAction] = useState<string | null>(null);
 
   const handlePinSubmit = async () => {
     if (!pin.trim()) return;
@@ -326,6 +336,52 @@ export default function AdminScreen() {
     setPhotosLoading(false);
   }, [verifiedPin]);
 
+  const fetchVotingResults = useCallback(async () => {
+    setVotingLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/voting/results`, {
+        headers: { "x-admin-pin": verifiedPin },
+      });
+      if (res.ok) {
+        setVotingResults(await res.json());
+      }
+    } catch {}
+    setVotingLoading(false);
+  }, [verifiedPin]);
+
+  const handleVotingControl = async (action: "open" | "close" | "reset") => {
+    if (action === "reset") {
+      Alert.alert(
+        "Reset All Votes",
+        "This will permanently delete all submitted ballots and close voting. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Reset",
+            style: "destructive",
+            onPress: async () => {
+              setVotingAction("reset");
+              await fetch(`${API_BASE}/api/voting/reset`, {
+                method: "POST",
+                headers: { "x-admin-pin": verifiedPin },
+              });
+              setVotingAction(null);
+              fetchVotingResults();
+            },
+          },
+        ]
+      );
+      return;
+    }
+    setVotingAction(action);
+    await fetch(`${API_BASE}/api/voting/${action}`, {
+      method: "POST",
+      headers: { "x-admin-pin": verifiedPin },
+    });
+    setVotingAction(null);
+    fetchVotingResults();
+  };
+
   const handleAdminDeletePhoto = (photoId: string, uploaderName: string) => {
     Alert.alert(
       "Remove Photo",
@@ -398,7 +454,10 @@ export default function AdminScreen() {
     if (step === "dashboard" && activeTab === "photos") {
       fetchAdminPhotos();
     }
-  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled, fetchAnalytics, fetchAdminPhotos]);
+    if (step === "dashboard" && activeTab === "voting") {
+      fetchVotingResults();
+    }
+  }, [step, activeTab, fetchBooths, fetchRaffle, fetchScheduled, fetchAnalytics, fetchAdminPhotos, fetchVotingResults]);
 
   const handleAddBooth = async () => {
     if (!newBoothName.trim() || !newBoothCompany.trim()) {
@@ -526,6 +585,7 @@ export default function AdminScreen() {
           { key: "booths", label: "Booths", icon: "storefront-outline" },
           { key: "analytics", label: "Analytics", icon: "bar-chart-outline" },
           { key: "photos", label: "Photos", icon: "images-outline" },
+          { key: "voting", label: "Voting", icon: "checkbox-outline" },
         ] as const).map((tab) => (
           <Pressable
             key={tab.key}
@@ -1036,6 +1096,155 @@ export default function AdminScreen() {
                       </View>
                     );
                   })}
+                </View>
+              </>
+            )}
+
+            <Pressable onPress={() => { setStep("pin"); setPin(""); }}>
+              <Text style={[styles.backLink, { color: colors.mutedForeground }]}>← Lock admin panel</Text>
+            </Pressable>
+          </>
+        )}
+
+        {activeTab === "voting" && (
+          <>
+            {votingLoading && !votingResults ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 32 }} />
+            ) : (
+              <>
+                {/* Status + Controls */}
+                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.boothsHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.label, { color: colors.foreground }]}>Voting Status</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                        <View style={{
+                          width: 8, height: 8, borderRadius: 4,
+                          backgroundColor: votingResults?.isOpen ? "#10b981" : "#ef4444",
+                        }} />
+                        <Text style={[styles.hint, { color: votingResults?.isOpen ? "#10b981" : "#ef4444", fontWeight: "700" }]}>
+                          {votingResults?.isOpen ? "Voting is OPEN" : "Voting is CLOSED"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable onPress={fetchVotingResults} style={styles.refreshBtn}>
+                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                    </Pressable>
+                  </View>
+
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                    <Pressable
+                      onPress={() => handleVotingControl("open")}
+                      disabled={votingAction !== null || votingResults?.isOpen}
+                      style={[styles.actionBtn, {
+                        flex: 1,
+                        backgroundColor: "#10b981",
+                        borderColor: "#10b981",
+                        opacity: votingResults?.isOpen ? 0.4 : 1,
+                      }]}
+                    >
+                      {votingAction === "open"
+                        ? <ActivityIndicator color="#fff" size="small" />
+                        : <Text style={[styles.actionBtnText, { color: "#fff" }]}>Open Voting</Text>
+                      }
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleVotingControl("close")}
+                      disabled={votingAction !== null || !votingResults?.isOpen}
+                      style={[styles.actionBtn, {
+                        flex: 1,
+                        backgroundColor: colors.muted,
+                        borderColor: colors.border,
+                        opacity: !votingResults?.isOpen ? 0.4 : 1,
+                      }]}
+                    >
+                      {votingAction === "close"
+                        ? <ActivityIndicator color={colors.foreground} size="small" />
+                        : <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close Voting</Text>
+                      }
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleVotingControl("reset")}
+                      disabled={votingAction !== null}
+                      style={[styles.actionBtn, { borderColor: "#ef4444" }]}
+                    >
+                      {votingAction === "reset"
+                        ? <ActivityIndicator color="#ef4444" size="small" />
+                        : <Text style={[styles.actionBtnText, { color: "#ef4444" }]}>Reset</Text>
+                      }
+                    </Pressable>
+                  </View>
+
+                  <View style={[styles.analyticsStatsRow, { marginTop: 4 }]}>
+                    <View style={[styles.analyticsStatCard, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                      <Text style={[styles.analyticsStatNum, { color: colors.primary }]}>
+                        {votingResults?.totalVotes ?? 0}
+                      </Text>
+                      <Text style={[styles.analyticsStatLabel, { color: colors.mutedForeground }]}>
+                        Total Ballots
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Officer Slate Results */}
+                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Officer Slate Results</Text>
+                  {([
+                    { key: "approve", label: "Approve officer slate", color: "#10b981" },
+                    { key: "disapprove", label: "Do not approve officer slate", color: "#ef4444" },
+                    { key: "abstain", label: "Abstain", color: "#94a3b8" },
+                  ] as const).map((opt) => {
+                    const count = votingResults?.slateResults?.[opt.key] ?? 0;
+                    const total = votingResults?.totalVotes ?? 0;
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    return (
+                      <View key={opt.key} style={{ gap: 4 }}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <Text style={[styles.hint, { color: colors.foreground, fontWeight: "600" }]}>{opt.label}</Text>
+                          <Text style={[styles.hint, { color: colors.mutedForeground }]}>{count} ({pct}%)</Text>
+                        </View>
+                        <View style={{ height: 6, backgroundColor: colors.muted, borderRadius: 3, overflow: "hidden" }}>
+                          <View style={{ height: 6, width: `${pct}%`, backgroundColor: opt.color, borderRadius: 3 }} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Trustee Results */}
+                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Board Trustee Results</Text>
+                  <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                    Each ballot may include up to 3 trustee selections.
+                  </Text>
+                  {votingResults && Object.entries(votingResults.trusteeResults)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([candidate, count], idx) => {
+                      const totalBallots = votingResults.totalVotes;
+                      const pct = totalBallots > 0 ? Math.round((count / totalBallots) * 100) : 0;
+                      return (
+                        <View key={candidate} style={{ gap: 4 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                              <View style={{
+                                width: 22, height: 22, borderRadius: 11,
+                                backgroundColor: colors.primary + "18",
+                                alignItems: "center", justifyContent: "center",
+                              }}>
+                                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>{idx + 1}</Text>
+                              </View>
+                              <Text style={[styles.hint, { color: colors.foreground, fontWeight: "600" }]}>{candidate}</Text>
+                            </View>
+                            <Text style={[styles.hint, { color: colors.mutedForeground }]}>{count} votes ({pct}%)</Text>
+                          </View>
+                          <View style={{ height: 6, backgroundColor: colors.muted, borderRadius: 3, overflow: "hidden" }}>
+                            <View style={{ height: 6, width: `${pct}%`, backgroundColor: colors.primary, borderRadius: 3 }} />
+                          </View>
+                        </View>
+                      );
+                    })
+                  }
                 </View>
               </>
             )}

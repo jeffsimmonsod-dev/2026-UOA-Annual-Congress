@@ -6,6 +6,7 @@ import boothsRouter from "./booths";
 import qrCodesRouter from "./qr-codes";
 import mapCalibrateRouter from "./map-calibrate";
 import adminRouter from "./admin";
+import votingRouter from "./voting";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(boothsRouter);
 router.use(qrCodesRouter);
 router.use(mapCalibrateRouter);
 router.use(adminRouter);
+router.use(votingRouter);
 
 export default router;

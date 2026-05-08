@@ -38,6 +38,7 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - Dark/light mode support (automatic based on system preference)
 - Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN: UOA2026)
 - Admin screen (/admin) — PIN-protected, quick-fill templates, compose + send to all registered devices
+- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per device, gated by voting open/closed state
 
 **Push Notification Architecture:**
 - Mobile: `services/pushNotifications.ts` — Expo Push Token registration + send utility
@@ -60,6 +61,13 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - `components/ZoomableImage.web.tsx` — plain Image for web (no reanimated imports)
 - `babel.config.js` — includes `react-native-worklets/plugin` for worklet transformation
 - Push notifications suppressed on web via `!isWeb` guards in `pushNotifications.ts` and `_layout.tsx`
+
+**Business Meeting Voting Architecture:**
+- Mobile: `app/voting.tsx` — two-section ballot UI, deviceId-based one-vote limit, voting open/closed awareness
+- API: `POST /api/voting/submit` (cast ballot), `GET /api/voting/state` (open/closed), `GET /api/voting/status/:deviceId` (has voted?), `GET /api/voting/results` (admin only), `POST /api/voting/open|close|reset` (admin controls)
+- DB: `congress_votes` (device_id UNIQUE, slate_vote, trustee_votes TEXT[]), `congress_voting_state` (is_open flag)
+- Admin panel: "Voting" tab with open/close/reset controls + live bar charts for both Officer Slate and Trustee results
+- DeviceId: `services/deviceId.ts` — persisted via AsyncStorage (native) / localStorage (web), cached in memory
 
 **File structure:**
 ```

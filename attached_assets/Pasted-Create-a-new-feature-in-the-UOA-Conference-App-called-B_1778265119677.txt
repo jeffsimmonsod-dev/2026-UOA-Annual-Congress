@@ -1,0 +1,148 @@
+Create a new feature in the UOA Conference App called Business Meeting Voting.
+
+The goal is to allow eligible attendees to vote during the business meeting directly inside the app while allowing admins to monitor live results in real time.
+
+GENERAL REQUIREMENTS
+
+Add a new menu item called:
+
+“Business Meeting Voting”
+
+Place it inside the existing “More” menu.
+
+The feature should work on both web and mobile builds.
+
+The UI should match the current app styling and feel modern, clean, and simple.
+
+VOTING FLOW
+
+When a user opens the voting page:
+
+Display a title:
+“2026 UOA Board Trustee Voting”
+Display explanatory text:
+“Please select up to THREE candidates for Board Trustee positions.”
+Show the following candidates as selectable cards or checkboxes:
+Dr. Steven Blake
+Dr. Aaron King
+Dr. Jonathon King
+Dr. Taylor Linton
+Users may select a MAXIMUM of 3 candidates.
+Prevent selecting more than 3.
+Show a friendly error if they try.
+Include a large “Submit Vote” button.
+After submission:
+Show a confirmation screen:
+“Your vote has been submitted successfully.”
+Disable additional voting from that account/device.
+Store timestamp of vote.
+SECURITY / VOTE LIMITING
+
+Implement lightweight but effective vote protection.
+
+Requirements:
+
+Only logged-in conference attendees can vote.
+Each authenticated user account can vote only once.
+Store a “hasVoted” flag in the database.
+Prevent duplicate submissions.
+Also store device ID/session token as secondary protection.
+
+Admin accounts should NOT be prevented from viewing results.
+
+DATABASE STRUCTURE
+
+Create a database collection/table called:
+
+business_meeting_votes
+
+Fields:
+
+id
+userId
+selectedCandidates (array)
+timestamp
+deviceId
+
+Also create a lightweight aggregated results structure for fast admin viewing.
+
+ADMIN PANEL
+
+Inside the Admin Menu create a new page called:
+
+“Voting Results”
+
+This page should:
+
+LIVE RESULTS DASHBOARD
+
+Display:
+
+Total Votes Submitted
+Percentage turnout (if attendee count available)
+Real-time candidate vote totals
+
+Show results in:
+
+Ranked list
+Bar graph/chart
+
+Candidates:
+
+Dr. Steven Blake
+Dr. Aaron King
+Dr. Jonathon King
+Dr. Taylor Linton
+
+Since users can vote for up to 3 candidates, each selected candidate receives 1 vote.
+
+ADMIN CONTROLS
+
+Add controls for admins:
+
+Open Voting
+Close Voting
+Reset Voting (admin confirmation required)
+Export Results CSV
+
+When voting is closed:
+
+Users can still see the page
+But cannot submit votes
+Show:
+“Voting is currently closed.”
+OPTIONAL NICE-TO-HAVE FEATURES
+
+If feasible, also add:
+
+Live auto-refresh of results every 5 seconds
+Confetti/checkmark animation after successful vote submission
+Anonymous voting mode (results tied to account for duplicate prevention, but admin dashboard does not show who voted for whom)
+Ability to reuse this framework later for future elections/polls
+CURRENT ELECTION INFO
+
+Display this informational text somewhere on the voting screen:
+
+President: Dr. Jeff Simmons
+President-Elect: Dr. Collin Gray
+Past President: Dr. Kenyon Anderson
+VP Legislation: Dr. Court Wilkins
+VP Finance: Dr. Kyle Wilson
+
+Trustee Positions Not Up for Re-Vote:
+
+Dr. Dallin Boardman
+Dr. Ben Collins
+Dr. Mark Curtis
+
+Text at bottom:
+“No nominations will be accepted from the floor.”
+
+IMPORTANT IMPLEMENTATION NOTES
+Use existing authentication system already in the app.
+Reuse existing admin permission structure.
+Keep architecture modular so future polls can be added later.
+Make mobile-friendly responsive layouts.
+Use clean TypeScript types/interfaces.
+Add loading states and graceful error handling.
+Ensure vote submissions are atomic to prevent duplicate race-condition voting.
