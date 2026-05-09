@@ -773,6 +773,13 @@ export default function ExhibitHallScreen() {
             </Pressable>
           </View>
 
+          <View style={[styles.infoCard, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+            <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
+              Scan the QR code at each exhibitor booth to mark it visited. Complete all booths to enter the raffle!
+            </Text>
+          </View>
+
           {total === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="storefront-outline" size={40} color={colors.mutedForeground} />
@@ -813,13 +820,6 @@ export default function ExhibitHallScreen() {
               ))}
             </View>
           )}
-
-          <View style={[styles.infoCard, { backgroundColor: colors.accent, borderColor: colors.border }]}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-            <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-              Scan the QR code at each exhibitor booth to mark it visited. Complete all booths to enter the raffle!
-            </Text>
-          </View>
         </ScrollView>
       )}
 

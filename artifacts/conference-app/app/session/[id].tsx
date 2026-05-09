@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -80,13 +81,18 @@ export default function SessionDetailScreen() {
 
   return (
     <>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={insets.top}
+    >
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.container,
         {
           paddingTop: isWeb ? insets.top + 16 : 16,
-          paddingBottom: isWeb ? insets.bottom + 40 : 60,
+          paddingBottom: isWeb ? insets.bottom + 40 : 120,
         },
       ]}
       showsVerticalScrollIndicator={false}
@@ -275,6 +281,7 @@ export default function SessionDetailScreen() {
         </Text>
       </Pressable>
     </ScrollView>
+    </KeyboardAvoidingView>
     <RoomMapModal
       room={session.room}
       visible={showMap}
