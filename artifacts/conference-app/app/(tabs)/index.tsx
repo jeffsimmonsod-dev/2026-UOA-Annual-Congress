@@ -83,11 +83,11 @@ const QUICK_TILES = [
   },
   {
     label: "My Notes",
-    subtitle: "Saved sessions & notes",
-    icon: "bookmark-outline" as const,
+    subtitle: "Session notes organized by day",
+    icon: "create-outline" as const,
     color: "#10b981",
     bg: "rgba(16,185,129,0.10)",
-    route: "/(tabs)/my-schedule",
+    route: "/my-notes",
   },
   {
     label: "Venue & Hotel",
