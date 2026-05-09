@@ -464,9 +464,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   logoSmallWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -477,8 +477,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   logoSmall: {
-    width: 56,
-    height: 56,
+    width: 82,
+    height: 82,
   },
   heroText: {
     flex: 1,
