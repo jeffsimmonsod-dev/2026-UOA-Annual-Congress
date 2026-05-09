@@ -72,12 +72,46 @@ function sortSessions(sessions: Session[]): Session[] {
   });
 }
 
+const QUICK_TILES = [
+  {
+    label: "Exhibit Hall",
+    subtitle: "Booth passport & raffle",
+    icon: "storefront-outline" as const,
+    color: "#4f46e5",
+    bg: "rgba(79,70,229,0.10)",
+    route: "/exhibit-hall",
+  },
+  {
+    label: "My Notes",
+    subtitle: "Saved sessions & notes",
+    icon: "bookmark-outline" as const,
+    color: "#10b981",
+    bg: "rgba(16,185,129,0.10)",
+    route: "/(tabs)/my-schedule",
+  },
+  {
+    label: "Venue & Hotel",
+    subtitle: "Grand Hyatt Deer Valley",
+    icon: "business-outline" as const,
+    color: "#f59e0b",
+    bg: "rgba(245,158,11,0.10)",
+    route: "/(tabs)/venue",
+  },
+  {
+    label: "FAQ",
+    subtitle: "Frequently asked questions",
+    icon: "help-circle-outline" as const,
+    color: "#0ea5e9",
+    bg: "rgba(14,165,233,0.10)",
+    route: "/faq",
+  },
+];
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
-  const isWeb = Platform.OS === "web";
 
   const allSessions = [...SESSIONS, ...PARA_SESSIONS];
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
@@ -116,43 +150,41 @@ export default function HomeScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: insets.top,
+          paddingTop: insets.top + 8,
           paddingBottom: insets.bottom + 100,
         },
         contentStyle,
       ]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.heroSection}>
-        <Pressable onPress={handleLogoTap} hitSlop={8} style={styles.logoWrapper}>
-          <View style={styles.logoPill}>
+      {/* ── Compact Hero ── */}
+      <Pressable onPress={handleLogoTap} hitSlop={8}>
+        <View style={styles.heroRow}>
+          <View style={[styles.logoSmallWrap, { backgroundColor: "#ffffff", shadowColor: colors.foreground }]}>
             <Image
               source={require("../../assets/images/uoa-logo.png")}
-              style={styles.logo}
+              style={styles.logoSmall}
               resizeMode="contain"
             />
           </View>
-        </Pressable>
-        <View style={[styles.badge, { backgroundColor: colors.accent }]}>
-          <Ionicons name="eye-outline" size={13} color={colors.primary} />
-          <Text style={[styles.badgeText, { color: colors.primary }]}>
-            {CONFERENCE.dates}
-          </Text>
+          <View style={styles.heroText}>
+            <Text style={[styles.heroBadge, { color: colors.primary }]}>
+              2026 ANNUAL CONGRESS
+            </Text>
+            <Text style={[styles.heroTitle, { color: colors.foreground }]}>
+              UOA Congress
+            </Text>
+            <View style={styles.heroMeta}>
+              <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />
+              <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
+                {CONFERENCE.dates} · {CONFERENCE.location}
+              </Text>
+            </View>
+          </View>
         </View>
-        <Text style={[styles.conferenceName, { color: colors.foreground }]}>
-          {CONFERENCE.name}
-        </Text>
-        <Text style={[styles.tagline, { color: colors.primary }]}>
-          {CONFERENCE.tagline}
-        </Text>
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.locationText, { color: colors.mutedForeground }]}>
-            {CONFERENCE.location}
-          </Text>
-        </View>
-      </View>
+      </Pressable>
 
+      {/* ── Announcement ── */}
       {latestUpdate && (
         <Pressable
           onPress={() => router.push("/updates")}
@@ -163,7 +195,7 @@ export default function HomeScreen() {
           ]}
         >
           <View style={styles.announcementHeader}>
-            <Ionicons name="megaphone-outline" size={15} color={announcementColor} />
+            <Ionicons name="megaphone-outline" size={13} color={announcementColor} />
             <Text style={[styles.announcementLabel, { color: announcementColor }]}>
               {latestUpdate.type === "alert" ? "ALERT" : "ANNOUNCEMENT"}
             </Text>
@@ -174,7 +206,7 @@ export default function HomeScreen() {
           <Text style={[styles.announcementTitle, { color: colors.foreground }]}>
             {latestUpdate.title}
           </Text>
-          <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={3}>
+          <Text style={[styles.announcementBody, { color: colors.mutedForeground }]} numberOfLines={2}>
             {latestUpdate.body}
           </Text>
           <Text style={[styles.announcementSeeAll, { color: announcementColor }]}>
@@ -183,6 +215,7 @@ export default function HomeScreen() {
         </Pressable>
       )}
 
+      {/* ── My Next Session ── */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         My Next Session
       </Text>
@@ -240,12 +273,12 @@ export default function HomeScreen() {
             pressed && { opacity: 0.85 },
           ]}
         >
-          <Ionicons name="bookmark-outline" size={32} color={colors.primary} />
+          <Ionicons name="bookmark-outline" size={28} color={colors.primary} />
           <Text style={[styles.emptySessionTitle, { color: colors.foreground }]}>
             Build Your Personal Schedule
           </Text>
           <Text style={[styles.emptySessionBody, { color: colors.mutedForeground }]}>
-            Tap the bookmark icon on any session in the Schedule or Para tab to save it here.
+            Tap the bookmark icon on any session to save it here.
           </Text>
           <View style={[styles.emptySessionCta, { backgroundColor: colors.primary + "15" }]}>
             <Text style={[styles.emptySessionCtaText, { color: colors.primary }]}>
@@ -255,6 +288,7 @@ export default function HomeScreen() {
         </Pressable>
       )}
 
+      {/* ── Scan QR ── */}
       <Pressable
         onPress={() => router.push("/exhibit-hall?scan=true" as any)}
         style={({ pressed }) => [
@@ -262,14 +296,48 @@ export default function HomeScreen() {
           { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
         ]}
       >
-        <Ionicons name="qr-code-outline" size={22} color="#fff" />
+        <Ionicons name="qr-code-outline" size={20} color="#fff" />
         <Text style={styles.scanQrBtnText}>Scan Booth QR Code</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
       </Pressable>
 
+      {/* ── Quick Access ── */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        Our Sponsors
+        Quick Access
       </Text>
+      <View style={styles.tilesGrid}>
+        {QUICK_TILES.map((tile) => (
+          <Pressable
+            key={tile.label}
+            onPress={() => router.push(tile.route as any)}
+            style={({ pressed }) => [
+              styles.tile,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              pressed && { opacity: 0.80 },
+            ]}
+          >
+            <View style={[styles.tileIconWrap, { backgroundColor: tile.bg }]}>
+              <Ionicons name={tile.icon} size={22} color={tile.color} />
+            </View>
+            <Text style={[styles.tileLabel, { color: colors.foreground }]}>
+              {tile.label}
+            </Text>
+            <Text style={[styles.tileSubtitle, { color: colors.mutedForeground }]} numberOfLines={2}>
+              {tile.subtitle}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* ── Sponsors ── */}
+      <View style={styles.sectionRow}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0, marginBottom: 0 }]}>
+          Our Sponsors
+        </Text>
+        <Pressable onPress={() => router.push("/sponsors")}>
+          <Text style={[styles.seeAll, { color: colors.primary }]}>See all →</Text>
+        </Pressable>
+      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -317,7 +385,6 @@ export default function HomeScreen() {
             <View style={styles.sheetHandle} />
 
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-              {/* Logo + name + tier */}
               <View style={[styles.sheetLogoWrap, { backgroundColor: "#ffffff" }]}>
                 <Image source={{ uri: selectedSponsor.logo }} style={styles.sheetLogo} resizeMode="contain" />
               </View>
@@ -330,10 +397,8 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              {/* Description */}
               <Text style={[styles.sheetDesc, { color: colors.mutedForeground }]}>{selectedSponsor.description}</Text>
 
-              {/* Reps */}
               {selectedSponsor.reps && selectedSponsor.reps.length > 0 && (
                 <View style={styles.repsSection}>
                   <Text style={[styles.repsSectionTitle, { color: colors.foreground }]}>
@@ -370,7 +435,6 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* Visit website */}
               <Pressable
                 onPress={() => { Linking.openURL(selectedSponsor.website); setSelectedSponsor(null); }}
                 style={({ pressed }) => [styles.websiteBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
@@ -388,75 +452,65 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    gap: 6,
-  },
-  heroSection: {
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
     gap: 8,
-    marginBottom: 4,
-    alignItems: "center",
   },
-  logoWrapper: {
-    width: "100%",
-    alignItems: "center",
-  },
-  logoPill: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    width: "80%",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  logo: {
-    width: "100%",
-    height: 220,
-  },
-  badge: {
+
+  /* ── Compact Hero ── */
+  heroRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    gap: 12,
+    paddingVertical: 4,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
+  logoSmallWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    flexShrink: 0,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  conferenceName: {
-    fontSize: 28,
+  logoSmall: {
+    width: 56,
+    height: 56,
+  },
+  heroText: {
+    flex: 1,
+    gap: 2,
+  },
+  heroBadge: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: -0.5,
-    lineHeight: 34,
-    textAlign: "center",
+    letterSpacing: -0.3,
+    lineHeight: 27,
   },
-  tagline: {
-    fontSize: 15,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-  locationRow: {
+  heroMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
   },
-  locationText: {
-    fontSize: 13,
+  heroMetaText: {
+    fontSize: 11,
+    flex: 1,
   },
+
+  /* ── Announcement ── */
   announcementCard: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    gap: 8,
-    marginBottom: 12,
+    padding: 13,
+    gap: 6,
   },
   announcementHeader: {
     flexDirection: "row",
@@ -464,56 +518,54 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   announcementLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.8,
     flex: 1,
   },
   announcementTime: {
-    fontSize: 11,
+    fontSize: 10,
   },
   announcementTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
-    lineHeight: 20,
+    lineHeight: 19,
   },
   announcementBody: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
   },
   announcementSeeAll: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
-    marginTop: 2,
   },
+
+  /* ── Section titles ── */
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
-    marginTop: 12,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 4,
   },
-  scanQrBtn: {
+  sectionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginTop: 4,
+    justifyContent: "space-between",
+    marginTop: 6,
+    marginBottom: 4,
   },
-  scanQrBtnText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
+  seeAll: {
+    fontSize: 13,
+    fontWeight: "600",
   },
+
+  /* ── Next Session ── */
   featuredCard: {
     borderRadius: 16,
     borderWidth: 1,
     borderLeftWidth: 4,
-    padding: 16,
-    gap: 10,
-    marginBottom: 8,
+    padding: 14,
+    gap: 8,
   },
   featuredTrackBadge: {
     alignSelf: "flex-start",
@@ -526,9 +578,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   featuredTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
-    lineHeight: 24,
+    lineHeight: 22,
   },
   featuredMeta: {
     flexDirection: "row",
@@ -542,61 +594,108 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderStyle: "dashed",
-    padding: 24,
+    padding: 20,
     alignItems: "center",
-    gap: 10,
-    marginBottom: 8,
+    gap: 8,
   },
   emptySessionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     textAlign: "center",
   },
   emptySessionBody: {
-    fontSize: 13,
+    fontSize: 12,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 18,
   },
   emptySessionCta: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 20,
-    marginTop: 4,
+    marginTop: 2,
   },
   emptySessionCtaText: {
     fontSize: 13,
     fontWeight: "700",
   },
+
+  /* ── Scan QR ── */
+  scanQrBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  scanQrBtnText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  /* ── Quick Access Tiles ── */
+  tilesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  tile: {
+    width: "47.5%",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 8,
+  },
+  tileIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tileLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  tileSubtitle: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+
+  /* ── Sponsors ── */
   sponsorsScroll: {
-    paddingRight: 20,
-    gap: 12,
+    paddingRight: 16,
+    gap: 10,
     paddingBottom: 8,
   },
   sponsorCard: {
-    width: 140,
+    width: 130,
     borderRadius: 14,
     borderWidth: 1,
-    padding: 14,
+    padding: 12,
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   sponsorLogoWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
+    width: 64,
+    height: 64,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
   sponsorLogo: {
-    width: 60,
-    height: 60,
+    width: 54,
+    height: 54,
   },
   sponsorName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 15,
   },
   tierBadge: {
     paddingHorizontal: 8,
@@ -608,6 +707,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
+
+  /* ── Sponsor Modal ── */
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
