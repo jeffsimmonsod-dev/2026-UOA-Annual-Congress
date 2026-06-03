@@ -12,28 +12,89 @@ import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getSessionsByDay, getParaSessionsByDay } from "@/services/data";
+import type { Session } from "@/types";
 
 const DOCTOR_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
 const PARA_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 const TABS = [...DOCTOR_DAYS, "Para"];
+
+const TRACK_COLORS: Record<string, string> = {
+  "Retinal Disease": "#ef4444",
+  "Neuro-Optometry": "#8b5cf6",
+  Glaucoma: "#10b981",
+  Pharmacology: "#d946ef",
+  "Practice Management": "#3b82f6",
+  "Pediatrics & BV": "#ec4899",
+  "ABO/CPC": "#3b82f6",
+  General: "#64748b",
+  Optical: "#f97316",
+  "Contact Lenses": "#06b6d4",
+  "Clinical Knowledge": "#84cc16",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  CPC: "#0ea5e9",
+  CPO: "#0ea5e9",
+  "ABO/CPO": "#0ea5e9",
+  "Meal / Social": "#f59e0b",
+};
+
+const TRACK_SHORT_LABELS: Record<string, string> = {
+  "Retinal Disease": "Retina",
+  "Neuro-Optometry": "Neuro",
+  Glaucoma: "Glaucoma",
+  Pharmacology: "Pharm",
+  "Practice Management": "Practice",
+  "Pediatrics & BV": "Peds/BV",
+  "Topical Diagnosis": "Anterior Seg",
+  "Ocular Disease": "Ocular Dis.",
+  "Systemic Disease": "Systemic",
+  "Meal / Social": "Social",
+};
+
+function getShortLabel(track: string) {
+  return TRACK_SHORT_LABELS[track] ?? track;
+}
+
+function getUniqueTracks(sessions: Session[]): string[] {
+  const seen = new Set<string>();
+  const tracks: string[] = [];
+  for (const s of sessions) {
+    if (s.track && s.track !== "Meal / Social" && !seen.has(s.track)) {
+      seen.add(s.track);
+      tracks.push(s.track);
+    }
+  }
+  return tracks;
+}
 
 export default function ScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const [activeTab, setActiveTab] = useState("Thu, June 4");
+  const [activeTrack, setActiveTrack] = useState<string | null>(null);
   const doctorSessionsByDay = getSessionsByDay();
   const paraSessionsByDay = getParaSessionsByDay();
   const isWeb = Platform.OS === "web";
   const scrollRef = useRef<ScrollView>(null);
+  const filterScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
+    filterScrollRef.current?.scrollTo({ x: 0, animated: false });
+    setActiveTrack(null);
   }, [activeTab]);
 
   const isPara = activeTab === "Para";
 
-  const doctorSessions = isPara ? [] : (doctorSessionsByDay[activeTab] ?? []);
+  const doctorSessions: Session[] = isPara ? [] : (doctorSessionsByDay[activeTab] ?? []);
+  const ceOnly = doctorSessions.filter((s) => s.track !== "Meal / Social");
+  const trackOptions = getUniqueTracks(ceOnly);
+
+  const filteredSessions = activeTrack
+    ? doctorSessions.filter((s) => s.track === activeTrack)
+    : doctorSessions;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -57,6 +118,7 @@ export default function ScheduleScreen() {
         </Text>
       </View>
 
+      {/* Day tabs */}
       <View
         style={[
           styles.dayTabs,
@@ -109,6 +171,66 @@ export default function ScheduleScreen() {
         })}
       </View>
 
+      {/* Track filter chips — only for Doctor days with 2+ tracks */}
+      {!isPara && trackOptions.length > 1 && (
+        <ScrollView
+          ref={filterScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={[styles.filterStrip, { borderBottomColor: colors.border }]}
+        >
+          {/* "All" chip */}
+          <Pressable
+            onPress={() => setActiveTrack(null)}
+            style={[
+              styles.chip,
+              {
+                backgroundColor: activeTrack === null ? colors.primary : colors.muted,
+                borderColor: activeTrack === null ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                { color: activeTrack === null ? "#fff" : colors.mutedForeground },
+              ]}
+            >
+              All
+            </Text>
+          </Pressable>
+
+          {trackOptions.map((track) => {
+            const trackColor = TRACK_COLORS[track] ?? colors.primary;
+            const isActive = activeTrack === track;
+            return (
+              <Pressable
+                key={track}
+                onPress={() => setActiveTrack(isActive ? null : track)}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: isActive ? trackColor : trackColor + "18",
+                    borderColor: isActive ? trackColor : trackColor + "50",
+                  },
+                ]}
+              >
+                <View style={[styles.chipDot, { backgroundColor: isActive ? "#fff" : trackColor }]} />
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: isActive ? "#fff" : trackColor, fontWeight: isActive ? "700" : "500" },
+                  ]}
+                >
+                  {getShortLabel(track)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[
@@ -142,13 +264,13 @@ export default function ScheduleScreen() {
           })
         ) : (
           <>
-            {doctorSessions.filter(Boolean).map((session) => (
+            {filteredSessions.filter(Boolean).map((session) => (
               <SessionCard key={session.id} session={session} />
             ))}
-            {doctorSessions.length === 0 && (
+            {filteredSessions.length === 0 && (
               <View style={styles.empty}>
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                  No sessions scheduled
+                  No sessions in this track
                 </Text>
               </View>
             )}
@@ -192,6 +314,34 @@ const styles = StyleSheet.create({
   dayCount: {
     fontSize: 10,
     marginTop: 2,
+  },
+  filterStrip: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+  },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 5,
+  },
+  chipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  chipText: {
+    fontSize: 12,
   },
   list: {
     paddingHorizontal: 16,
