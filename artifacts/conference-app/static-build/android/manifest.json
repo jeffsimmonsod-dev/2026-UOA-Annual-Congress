@@ -1,0 +1,125 @@
+{
+  "id": "145376fd-9baf-44e3-be5f-2e8bdc2bd672",
+  "createdAt": "2026-06-03T23:41:14.431Z",
+  "runtimeVersion": "exposdk:54.0.0",
+  "launchAsset": {
+    "key": "bundle-1780530074431-2511",
+    "contentType": "application/javascript",
+    "url": "https://expo-conference-hub.replit.app/1780530074431-2511/_expo/static/js/android/bundle.js"
+  },
+  "assets": [],
+  "metadata": {},
+  "extra": {
+    "eas": {
+      "projectId": "78c58011-2ce2-4113-80cc-da38f4de6e59"
+    },
+    "expoClient": {
+      "name": "UOA Congress 2026",
+      "slug": "conference-app",
+      "version": "2.0.0",
+      "orientation": "portrait",
+      "icon": "./assets/images/app-icon.png",
+      "scheme": "conference-app",
+      "userInterfaceStyle": "automatic",
+      "newArchEnabled": true,
+      "splash": {
+        "image": "./assets/images/app-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
+      "ios": {
+        "supportsTablet": true,
+        "bundleIdentifier": "org.utaheyedoc.congress2026",
+        "buildNumber": "3",
+        "infoPlist": {
+          "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall",
+          "ITSAppUsesNonExemptEncryption": false
+        }
+      },
+      "android": {
+        "package": "org.utaheyedoc.congress2026",
+        "versionCode": 4,
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/images/app-icon-adaptive.png",
+          "backgroundColor": "#ffffff"
+        },
+        "permissions": [
+          "NOTIFICATIONS",
+          "RECEIVE_BOOT_COMPLETED",
+          "VIBRATE",
+          "android.permission.CAMERA",
+          "android.permission.RECORD_AUDIO"
+        ]
+      },
+      "web": {
+        "favicon": "./assets/images/app-icon.png"
+      },
+      "plugins": [
+        [
+          "expo-router",
+          {
+            "origin": "https://replit.com/"
+          }
+        ],
+        "expo-font",
+        "expo-web-browser",
+        "expo-camera"
+      ],
+      "updates": {
+        "enabled": false
+      },
+      "experiments": {
+        "typedRoutes": true,
+        "reactCompiler": true
+      },
+      "extra": {
+        "eas": {
+          "projectId": "78c58011-2ce2-4113-80cc-da38f4de6e59"
+        },
+        "router": {
+          "origin": "https://replit.com/"
+        }
+      },
+      "_internal": {
+        "isDebug": false,
+        "projectRoot": "/home/runner/workspace/artifacts/conference-app",
+        "dynamicConfigPath": {},
+        "staticConfigPath": "/home/runner/workspace/artifacts/conference-app/app.json",
+        "packageJsonPath": "/home/runner/workspace/artifacts/conference-app/package.json",
+        "pluginHistory": {
+          "expo-font": {
+            "name": "expo-font",
+            "version": "14.0.11"
+          },
+          "expo-web-browser": {
+            "name": "expo-web-browser",
+            "version": "15.0.11"
+          },
+          "expo-camera": {
+            "name": "expo-camera",
+            "version": "17.0.10"
+          }
+        }
+      },
+      "sdkVersion": "54.0.0",
+      "platforms": [
+        "ios",
+        "android",
+        "web"
+      ],
+      "hostUri": "expo-conference-hub.replit.app/android"
+    },
+    "expoGo": {
+      "debuggerHost": "expo-conference-hub.replit.app/android",
+      "developer": {
+        "tool": "expo-cli",
+        "projectRoot": "/home/runner/workspace/artifacts/conference-app"
+      },
+      "packagerOpts": {
+        "dev": false
+      },
+      "mainModuleName": "node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.17__@types+react@19.1.17__950497bba3dbc1f6b1863109f86ef06a/node_modules/expo-router/entry"
+    },
+    "scopeKey": "@anonymous/conference-app-2b017bca-25dc-4d03-bc1f-aa6277f66efe"
+  }
+}

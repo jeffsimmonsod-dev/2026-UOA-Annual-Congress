@@ -24,8 +24,21 @@ function findWorkspaceRoot(startDir) {
 const workspaceRoot = findWorkspaceRoot(projectRoot);
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
+function restoreBackup() {
+  const staticBuild = path.join(projectRoot, "static-build");
+  const backupPath = path.join(projectRoot, "static-build.bak");
+  if (fs.existsSync(backupPath)) {
+    if (fs.existsSync(staticBuild)) {
+      fs.rmSync(staticBuild, { recursive: true });
+    }
+    fs.renameSync(backupPath, staticBuild);
+    console.log("Restored previous static-build due to build failure");
+  }
+}
+
 function exitWithError(message) {
   console.error(message);
+  restoreBackup();
   if (metroProcess) {
     metroProcess.kill();
   }
@@ -79,8 +92,13 @@ function prepareDirectories(timestamp) {
   console.log("Preparing build directories...");
 
   const staticBuild = path.join(projectRoot, "static-build");
+  const backupPath = path.join(projectRoot, "static-build.bak");
   if (fs.existsSync(staticBuild)) {
-    fs.rmSync(staticBuild, { recursive: true });
+    if (fs.existsSync(backupPath)) {
+      fs.rmSync(backupPath, { recursive: true });
+    }
+    fs.renameSync(staticBuild, backupPath);
+    console.log("Previous static-build backed up");
   }
 
   const dirs = [
@@ -589,6 +607,11 @@ async function main() {
 
   console.log("Build complete! Deploy to:", baseUrl);
 
+  const backupPath = path.join(projectRoot, "static-build.bak");
+  if (fs.existsSync(backupPath)) {
+    fs.rmSync(backupPath, { recursive: true });
+  }
+
   if (metroProcess) {
     metroProcess.kill();
   }
@@ -597,6 +620,7 @@ async function main() {
 
 main().catch((error) => {
   console.error("Build failed:", error.message);
+  restoreBackup();
   if (metroProcess) {
     metroProcess.kill();
   }
