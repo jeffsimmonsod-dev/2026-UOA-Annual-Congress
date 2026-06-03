@@ -220,6 +220,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s1"],
     tags: ["OCT", "imaging", "diagnosis"],
     copeId: "102606-GO",
+    slidesUrl: "https://www.utaheyedoc.org/docs/OCT_Grand_Rounds_1_hr_handouts.pdf",
   },
   {
     id: "d2",
@@ -234,6 +235,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s1"],
     tags: ["neuro", "optic nerve", "orbit"],
     copeId: "102603-NO",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Neuro_Orbit_Brainteasers_handouts.pdf",
   },
   {
     id: "d3",
@@ -248,6 +250,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s1"],
     tags: ["retina", "pathology", "diagnosis"],
     copeId: "102605-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Retina_Brainteasers_Cases_handouts.pdf",
   },
   {
     id: "d4",
@@ -262,6 +265,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s2"],
     tags: ["glaucoma", "myopia", "diagnosis"],
     copeId: "103826-GL",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Diagnosing_Glc_in_High_Myopes.pdf",
   },
   {
     id: "d5",
@@ -276,6 +280,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s2"],
     tags: ["OCT", "OCT-A", "retina"],
     copeId: "103832-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Crash_Course_in_OCT_and_OCT-A_Final.pdf",
   },
   {
     id: "d6",
@@ -290,6 +295,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s2"],
     tags: ["pharmacology", "drugs", "clinical"],
     copeId: "102609-PH",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Ocular_Pharm-A_Conglomeration...2_hrs_handouts.pdf",
   },
   {
     id: "d7",
@@ -304,6 +310,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s3"],
     tags: ["coding", "billing", "E/M"],
     copeId: "103552-PM",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Choose_the_Code_Billing_Coding_for_the_Clinician.pdf",
   },
   {
     id: "d8",
@@ -318,6 +325,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s3"],
     tags: ["KPIs", "growth", "medical optometry"],
     copeId: "103559-PM",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Using_Medical_KPIs_to_Improve_Disease_Mgmt_1_hour.pdf",
   },
   {
     id: "d9",
@@ -332,6 +340,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s3"],
     tags: ["AI", "technology", "clinical"],
     copeId: "103843-PM",
+    slidesUrl: "https://www.utaheyedoc.org/docs/AI_and_Clinical_Decision_Making_Final.pdf",
   },
   {
     id: "d10",
@@ -346,6 +355,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s3"],
     tags: ["glaucoma", "management", "primary care"],
     copeId: "103548-GL",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Glaucoma_Blueprint_for_Primary_Eye_Care_Final.pdf",
   },
   {
     id: "d11",
@@ -360,6 +370,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s4"],
     tags: ["amblyopia", "binocular vision", "vision therapy"],
     copeId: "103532-FV",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Shifting_Paradigms_Evidence_Based_Binocular_Treatment_of_Amblyopia.pdf",
   },
   {
     id: "d12",
@@ -374,6 +385,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s4"],
     tags: ["TBI", "brain injury", "concussion"],
     copeId: "103531-NO",
+    slidesUrl: "https://www.utaheyedoc.org/docs/Petrosyan_Acquired_Brain_Injury_Mechanisms.pdf",
   },
   {
     id: "d13",
@@ -388,6 +400,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s4", "s5"],
     tags: ["pediatrics", "infants", "workshop"],
     copeId: "103533-FV",
+    slidesUrl: "https://www.utaheyedoc.org/docs/infantworkshopslides.pdf",
   },
   {
     id: "d14",
@@ -401,6 +414,7 @@ export const SESSIONS: Session[] = [
     track: "Neuro-Optometry",
     speakerIds: ["s5"],
     tags: ["concussion", "TBI", "assessment"],
+    slidesUrl: "https://www.utaheyedoc.org/docs/concussionslides.pdf",
   },
   {
     id: "d15",
@@ -415,6 +429,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s6"],
     tags: ["pediatrics", "prescribing", "medications"],
     copeId: "102372-FV",
+    slidesUrl: "https://www.utaheyedoc.org/docs/CommonQuestionsPedsExam2026_utah.pdf",
   },
   {
     id: "d16",
@@ -429,6 +444,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s6"],
     tags: ["binocular vision", "complex cases"],
     copeId: "102992-FV",
+    slidesUrl: "https://www.utaheyedoc.org/docs/BV_Brainteasers2026_Utah.pdf",
   },
   {
     id: "d17",
@@ -443,6 +459,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s6"],
     tags: ["prism", "prescribing", "binocular vision"],
     copeId: "102373-FV",
+    slidesUrl: "https://www.utaheyedoc.org/docs/PrescribingPrism_2026_Utah.pdf",
   },
   {
     id: "d18",
@@ -457,6 +474,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s3"],
     tags: ["culture", "leadership", "practice management"],
     copeId: "103563-PM",
+    slidesUrl: "https://www.utaheyedoc.org/docs/The_Self_Aware_Practice_Final.pdf",
   },
   {
     id: "d19",
@@ -471,6 +489,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s7"],
     tags: ["OCT", "anterior segment", "contact lenses"],
     copeId: "98841-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/4-Friday-Ant_segment_OCT.pdf",
   },
   {
     id: "d20",
@@ -485,6 +504,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s7"],
     tags: ["presbyopia", "pharmacology", "drops"],
     copeId: "98841-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/5-Friday-Presbyopia.pdf",
   },
   {
     id: "d21",
@@ -499,6 +519,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s7"],
     tags: ["revenue", "practice management", "growth"],
     copeId: "99050-PM",
+    slidesUrl: "https://www.utaheyedoc.org/docs/6-Friday-Innovative_Revenue.pdf",
   },
   {
     id: "d22",
@@ -513,6 +534,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s7"],
     tags: ["innovations", "technology", "diagnostics"],
     copeId: "98987-GO",
+    slidesUrl: "https://www.utaheyedoc.org/docs/8-30-Saturday-12_New_innovations.pdf",
   },
   {
     id: "d23",
@@ -527,6 +549,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s7"],
     tags: ["dry eye", "differential diagnosis", "anterior segment"],
     copeId: "98986-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/1030-Saturday-Rule_these_out.pdf",
   },
   {
     id: "d24",
@@ -541,6 +564,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s9"],
     tags: ["pain management", "pharmacology", "ocular"],
     copeId: "100776-PH",
+    slidesUrl: "https://www.utaheyedoc.org/docs/1._Pain_Mgmt_2026_handout_PDF.pdf",
   },
   {
     id: "d25",
@@ -555,6 +579,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s9"],
     tags: ["visual fields", "glaucoma", "neurology"],
     copeId: "100777-GL",
+    slidesUrl: "https://www.utaheyedoc.org/docs/2._VF_defects_beyond_glaucoma_handout_PDF.pdf",
   },
   {
     id: "d26",
@@ -569,6 +594,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s9"],
     tags: ["shingles", "herpes zoster", "systemic disease"],
     copeId: "104181-SD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/3._Painless_Shingles_2026_HANDOUT_PDF.pdf",
   },
   {
     id: "d27",
@@ -583,6 +609,7 @@ export const SESSIONS: Session[] = [
     speakerIds: ["s9"],
     tags: ["anterior segment", "case studies", "diagnosis"],
     copeId: "103102-TD",
+    slidesUrl: "https://www.utaheyedoc.org/docs/4._Mystery_to_Mastery-Ant_Seg_Puzzles_HANDOUT_PDF.pdf",
   },
   // ── Saturday meals & social events ───────────────────────
   {

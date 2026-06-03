@@ -164,7 +164,7 @@ export default function SessionDetailScreen() {
             { color: session.slidesUrl ? colors.primary : colors.mutedForeground },
           ]}
         >
-          {session.slidesUrl ? "Download Slides" : "Slides Coming Soon"}
+          {session.slidesUrl ? "Download Course Handout" : "Handout Coming Soon"}
         </Text>
         {session.slidesUrl && (
           <Ionicons name="open-outline" size={14} color={colors.primary} style={{ marginLeft: "auto" }} />
