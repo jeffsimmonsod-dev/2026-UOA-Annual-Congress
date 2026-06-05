@@ -138,6 +138,8 @@ async function sendToAll(title: string, body: string) {
   return { sent: totalSent, failed: totalFailed };
 }
 
+const STALE_AFTER_MS = 60 * 60 * 1000;
+
 async function processScheduled() {
   try {
     const { rows } = await pool.query(
@@ -146,7 +148,21 @@ async function processScheduled() {
        ORDER BY scheduled_for ASC`
     );
 
+    const now = Date.now();
+
     for (const row of rows) {
+      const scheduledAt = new Date(row.scheduled_for).getTime();
+      if (now - scheduledAt > STALE_AFTER_MS) {
+        await pool.query(
+          `UPDATE congress_scheduled_announcements
+           SET failed_at = NOW(), last_error = $1
+           WHERE id = $2`,
+          [`Announcement expired: more than 1 hour past scheduled time (${row.scheduled_for})`, row.id]
+        );
+        console.log(`Scheduled announcement expired without sending: "${row.title}" (id=${row.id})`);
+        continue;
+      }
+
       try {
         const result = await sendToAll(row.title, row.body);
         await pool.query(
