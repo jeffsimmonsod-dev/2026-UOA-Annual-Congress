@@ -115,7 +115,26 @@ export default function HomeScreen() {
 
   const allSessions = [...SESSIONS, ...PARA_SESSIONS];
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
-  const nextSession: Session | null = savedSessions[0] ?? null;
+
+  const DAY_DATES: Record<string, string> = {
+    "Thu, June 4": "2026-06-04",
+    "Fri, June 5": "2026-06-05",
+    "Sat, June 6": "2026-06-06",
+    "Sun, June 7": "2026-06-07",
+  };
+
+  function getSessionEndDate(session: Session): Date {
+    const dateStr = DAY_DATES[session.day];
+    if (!dateStr) return new Date(0);
+    const endMinutes = parseMinutes(session.endTime);
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setMinutes(d.getMinutes() + endMinutes);
+    return d;
+  }
+
+  const now = new Date();
+  const upcomingSaved = savedSessions.filter((s) => getSessionEndDate(s) > now);
+  const nextSession: Session | null = upcomingSaved[0] ?? null;
   const trackColor = nextSession ? (TRACK_COLORS[nextSession.track] ?? colors.primary) : colors.primary;
   const [selectedSponsor, setSelectedSponsor] = useState<Sponsor | null>(null);
   const logoTapCountRef = useRef(0);
