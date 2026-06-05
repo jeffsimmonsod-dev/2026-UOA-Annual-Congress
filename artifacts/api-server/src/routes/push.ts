@@ -24,6 +24,10 @@ function isAuthorizedBody(adminPin: string | undefined): boolean {
   }
 }
 
+function isValidExpoToken(token: string): boolean {
+  return /^ExponentPushToken\[.+\]$/.test(token);
+}
+
 async function ensureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_push_tokens (
@@ -37,14 +41,28 @@ async function ensureTables() {
       body TEXT NOT NULL,
       scheduled_for TIMESTAMP NOT NULL,
       sent_at TIMESTAMP,
+      failed_at TIMESTAMP,
+      attempts INT NOT NULL DEFAULT 0,
+      last_error TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    ALTER TABLE congress_scheduled_announcements
+      ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS last_error TEXT
+  `).catch(() => {});
+  await pool.query(`
+    DELETE FROM congress_push_tokens
+    WHERE token NOT LIKE 'ExponentPushToken[%'
+  `).catch(() => {});
 }
 
 ensureTables().catch(console.error);
 
 const EXPO_PUSH_BATCH_SIZE = 100;
+const MAX_SEND_ATTEMPTS = 3;
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -54,13 +72,22 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+interface ExpoTicket {
+  status: "ok" | "error";
+  id?: string;
+  message?: string;
+  details?: { error?: string };
+}
+
 async function sendToAll(title: string, body: string) {
   const { rows } = await pool.query(`SELECT token FROM congress_push_tokens`);
   const tokens = rows.map((r: { token: string }) => r.token);
-  if (tokens.length === 0) return { sent: 0 };
+  if (tokens.length === 0) return { sent: 0, failed: 0 };
 
   const batches = chunkArray(tokens, EXPO_PUSH_BATCH_SIZE);
   let totalSent = 0;
+  let totalFailed = 0;
+  const invalidTokens: string[] = [];
 
   for (const batch of batches) {
     const messages = batch.map((to) => ({
@@ -82,33 +109,69 @@ async function sendToAll(title: string, body: string) {
     });
 
     if (!response.ok) {
-      throw new Error(`Expo push API error: ${response.status}`);
+      const errText = await response.text().catch(() => response.status.toString());
+      throw new Error(`Expo push API error ${response.status}: ${errText}`);
     }
 
-    totalSent += batch.length;
+    const result = (await response.json()) as { data: ExpoTicket[] };
+    const tickets: ExpoTicket[] = result.data ?? [];
+
+    tickets.forEach((ticket, i) => {
+      if (ticket.status === "ok") {
+        totalSent++;
+      } else {
+        totalFailed++;
+        const errCode = ticket.details?.error;
+        if (errCode === "DeviceNotRegistered") {
+          invalidTokens.push(batch[i]);
+        }
+      }
+    });
   }
 
-  return { sent: totalSent };
+  if (invalidTokens.length > 0) {
+    for (const token of invalidTokens) {
+      await pool.query(`DELETE FROM congress_push_tokens WHERE token = $1`, [token]).catch(() => {});
+    }
+  }
+
+  return { sent: totalSent, failed: totalFailed };
 }
 
 async function processScheduled() {
   try {
     const { rows } = await pool.query(
       `SELECT * FROM congress_scheduled_announcements
-       WHERE sent_at IS NULL AND scheduled_for <= NOW()
+       WHERE sent_at IS NULL AND failed_at IS NULL AND scheduled_for <= NOW()
        ORDER BY scheduled_for ASC`
     );
 
     for (const row of rows) {
       try {
-        await sendToAll(row.title, row.body);
+        const result = await sendToAll(row.title, row.body);
         await pool.query(
-          `UPDATE congress_scheduled_announcements SET sent_at = NOW() WHERE id = $1`,
+          `UPDATE congress_scheduled_announcements SET sent_at = NOW(), attempts = attempts + 1 WHERE id = $1`,
           [row.id]
         );
-        console.log(`Scheduled announcement sent: "${row.title}" (id=${row.id})`);
+        console.log(`Scheduled announcement sent: "${row.title}" (id=${row.id}) → sent=${result.sent} failed=${result.failed}`);
       } catch (err) {
-        console.error(`Failed to send scheduled announcement id=${row.id}:`, err);
+        const attempts = (row.attempts ?? 0) + 1;
+        const errMsg = String(err);
+        if (attempts >= MAX_SEND_ATTEMPTS) {
+          await pool.query(
+            `UPDATE congress_scheduled_announcements
+             SET attempts = $1, last_error = $2, failed_at = NOW()
+             WHERE id = $3`,
+            [attempts, errMsg, row.id]
+          );
+          console.error(`Scheduled announcement permanently failed after ${attempts} attempts (id=${row.id}): ${errMsg}`);
+        } else {
+          await pool.query(
+            `UPDATE congress_scheduled_announcements SET attempts = $1, last_error = $2 WHERE id = $3`,
+            [attempts, errMsg, row.id]
+          );
+          console.error(`Scheduled announcement attempt ${attempts}/${MAX_SEND_ATTEMPTS} failed (id=${row.id}): ${errMsg}`);
+        }
       }
     }
   } catch (err) {
@@ -122,6 +185,10 @@ router.post("/push/register", async (req, res) => {
   const { token } = req.body as { token?: string };
   if (!token || typeof token !== "string") {
     res.status(400).json({ error: "token required" });
+    return;
+  }
+  if (!isValidExpoToken(token)) {
+    res.status(400).json({ error: "Invalid push token format" });
     return;
   }
   await pool.query(
@@ -153,7 +220,11 @@ router.post("/push/send", async (req, res) => {
 
   try {
     const result = await sendToAll(title, body);
-    res.json({ success: true, ...result, message: result.sent === 0 ? "No registered devices" : `Sent to ${result.sent} device(s)` });
+    res.json({
+      success: true,
+      ...result,
+      message: result.sent === 0 ? "No registered devices" : `Sent to ${result.sent} device(s)`,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to send notifications", details: String(err) });
   }

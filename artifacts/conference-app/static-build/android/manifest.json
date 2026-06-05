@@ -1,11 +1,11 @@
 {
-  "id": "7ba7bb7f-8337-4a47-9e88-9d3d83e25470",
-  "createdAt": "2026-06-05T06:24:41.876Z",
+  "id": "139512b7-a262-4a96-91de-5dc69ff31678",
+  "createdAt": "2026-06-05T06:32:14.757Z",
   "runtimeVersion": "exposdk:54.0.0",
   "launchAsset": {
-    "key": "bundle-1780640681876-511",
+    "key": "bundle-1780641134757-1412",
     "contentType": "application/javascript",
-    "url": "https://expo-conference-hub.replit.app/1780640681876-511/_expo/static/js/android/bundle.js"
+    "url": "https://expo-conference-hub.replit.app/1780641134757-1412/_expo/static/js/android/bundle.js"
   },
   "assets": [],
   "metadata": {},

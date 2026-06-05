@@ -63,6 +63,9 @@ interface ScheduledAnnouncement {
   body: string;
   scheduled_for: string;
   sent_at: string | null;
+  failed_at: string | null;
+  attempts: number;
+  last_error: string | null;
 }
 
 function formatScheduledDate(iso: string) {
@@ -522,8 +525,9 @@ export default function AdminScreen() {
     Linking.openURL(`${API_BASE}/admin/qr-codes`);
   };
 
-  const pending = scheduledList.filter((a) => !a.sent_at);
+  const pending = scheduledList.filter((a) => !a.sent_at && !a.failed_at);
   const sent = scheduledList.filter((a) => a.sent_at);
+  const failed = scheduledList.filter((a) => a.failed_at && !a.sent_at);
 
   if (step === "pin") {
     return (
@@ -777,7 +781,7 @@ export default function AdminScreen() {
 
               {scheduledLoading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
-              ) : pending.length === 0 && sent.length === 0 ? (
+              ) : pending.length === 0 && sent.length === 0 && failed.length === 0 ? (
                 <Text style={[styles.hint, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 8 }]}>
                   No scheduled announcements yet.
                 </Text>
@@ -806,9 +810,29 @@ export default function AdminScreen() {
                     </>
                   )}
 
+                  {failed.length > 0 && (
+                    <>
+                      <Text style={[styles.scheduledSectionLabel, { color: "#ef4444", marginTop: pending.length > 0 ? 12 : 0 }]}>FAILED TO SEND</Text>
+                      {failed.map((item) => (
+                        <View key={item.id} style={[styles.scheduledItem, { borderColor: "#ef444440", backgroundColor: "#ef444408" }]}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.scheduledItemTitle, { color: colors.foreground }]}>{item.title}</Text>
+                            <Text style={[styles.scheduledItemBody, { color: colors.mutedForeground }]} numberOfLines={1}>{item.body}</Text>
+                            <View style={styles.scheduledItemTimeRow}>
+                              <Ionicons name="alert-circle-outline" size={12} color="#ef4444" />
+                              <Text style={[styles.scheduledItemTime, { color: "#ef4444" }]}>
+                                Scheduled for {formatScheduledDate(item.scheduled_for)} · {item.attempts} attempt{item.attempts !== 1 ? "s" : ""}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </>
+                  )}
+
                   {sent.length > 0 && (
                     <>
-                      <Text style={[styles.scheduledSectionLabel, { color: colors.mutedForeground, marginTop: pending.length > 0 ? 12 : 0 }]}>SENT</Text>
+                      <Text style={[styles.scheduledSectionLabel, { color: colors.mutedForeground, marginTop: (pending.length > 0 || failed.length > 0) ? 12 : 0 }]}>SENT</Text>
                       {sent.map((item) => (
                         <View key={item.id} style={[styles.scheduledItem, { borderColor: colors.border, opacity: 0.6 }]}>
                           <View style={{ flex: 1 }}>
