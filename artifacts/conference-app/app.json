@@ -2,7 +2,7 @@
   "expo": {
     "name": "UOA Congress 2026",
     "slug": "conference-app",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "conference-app",
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "org.utaheyedoc.congress2026",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-adaptive.png",
         "backgroundColor": "#ffffff"
