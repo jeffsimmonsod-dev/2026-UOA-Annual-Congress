@@ -27,7 +27,6 @@ jobs:
           version: latest
 
       - name: Install dependencies
-        working-directory: artifacts/conference-app
         run: pnpm install
 
       - name: Build Android AAB
