@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.utaheyedoc.congress2026",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSCameraUsageDescription": "Used to scan booth QR codes in the exhibit hall",
         "ITSAppUsesNonExemptEncryption": false
