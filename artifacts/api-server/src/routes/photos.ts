@@ -49,6 +49,18 @@ const upload = multer({
 });
 
 async function ensureTables() {
+  // Ensure conferences table exists first so FK constraints can reference it
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conferences (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      organization VARCHAR(255) NOT NULL DEFAULT ''
+    );
+    INSERT INTO conferences (id, name, organization)
+    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
+    ON CONFLICT (id) DO NOTHING;
+  `).catch(() => {});
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_photos (
       id                 TEXT PRIMARY KEY,
@@ -346,6 +358,15 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
       res.status(403).json({ error: "Invalid session token" });
       return;
     }
+    // Verify the photo belongs to this conference before mutating likes
+    const photoCheck = await pool.query(
+      `SELECT 1 FROM congress_photos WHERE id = $1 AND conference_id = $2`,
+      [req.params.id, req.conferenceId]
+    );
+    if (photoCheck.rows.length === 0) {
+      res.status(404).json({ error: "Photo not found" });
+      return;
+    }
     const existing = await pool.query(
       `SELECT 1 FROM congress_photo_likes WHERE photo_id = $1 AND device_id = $2`,
       [req.params.id, sessionToken]
@@ -458,10 +479,10 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
 
-    // Verify that this object path belongs to an existing (non-deleted) photo
+    // Verify that this object path belongs to an existing (non-deleted) photo in this conference
     const dbCheck = await pool.query(
-      `SELECT id FROM congress_photos WHERE object_path = $1 LIMIT 1`,
-      [objectPath]
+      `SELECT id FROM congress_photos WHERE object_path = $1 AND conference_id = $2 LIMIT 1`,
+      [objectPath, req.conferenceId]
     );
     if (dbCheck.rows.length === 0) {
       res.status(404).json({ error: "Object not found" });

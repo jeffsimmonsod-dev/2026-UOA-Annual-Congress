@@ -28,6 +28,18 @@ function isAdmin(req: { headers: Record<string, string | string[] | undefined> }
 }
 
 async function ensureTables() {
+  // Ensure conferences table exists first so FK constraints can reference it
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conferences (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      organization VARCHAR(255) NOT NULL DEFAULT ''
+    );
+    INSERT INTO conferences (id, name, organization)
+    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
+    ON CONFLICT (id) DO NOTHING;
+  `).catch(() => {});
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_voting_state (
       id INTEGER PRIMARY KEY DEFAULT 1,

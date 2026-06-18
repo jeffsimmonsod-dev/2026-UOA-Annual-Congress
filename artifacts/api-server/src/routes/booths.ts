@@ -25,6 +25,18 @@ function clientIp(req: Request): string {
 }
 
 async function ensureTables() {
+  // Ensure conferences table exists first so FK constraints can reference it
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conferences (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      organization VARCHAR(255) NOT NULL DEFAULT ''
+    );
+    INSERT INTO conferences (id, name, organization)
+    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
+    ON CONFLICT (id) DO NOTHING;
+  `).catch(() => {});
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_booths (
       id SERIAL PRIMARY KEY,
@@ -165,11 +177,11 @@ async function ensureTables() {
 
 ensureTables().catch(console.error);
 
-async function resolveAttendee(token: string): Promise<{ id: number } | null> {
+async function resolveAttendee(token: string, conferenceId: number): Promise<{ id: number } | null> {
   if (!token || typeof token !== "string" || token.length < 16 || token.length > 128) return null;
   const { rows } = await pool.query(
-    "SELECT id FROM congress_attendees WHERE token = $1",
-    [token]
+    "SELECT id FROM congress_attendees WHERE token = $1 AND conference_id = $2",
+    [token, conferenceId]
   );
   return rows.length > 0 ? rows[0] : null;
 }
@@ -213,7 +225,7 @@ router.patch("/attendees/profile", async (req: Request, res: Response) => {
     email?: string;
     emailConsent?: boolean;
   };
-  const attendee = await resolveAttendee(attendeeToken ?? "");
+  const attendee = await resolveAttendee(attendeeToken ?? "", req.conferenceId);
   if (!attendee) return res.status(403).json({ error: "Invalid attendee token" });
 
   await pool.query(
@@ -226,7 +238,7 @@ router.patch("/attendees/profile", async (req: Request, res: Response) => {
 // GET /api/booths?attendeeToken=xxx  — list all booths with visit status
 router.get("/booths", async (req: Request, res: Response) => {
   const token = (req.query.attendeeToken as string) || "";
-  const attendee = token ? await resolveAttendee(token) : null;
+  const attendee = token ? await resolveAttendee(token, req.conferenceId) : null;
   const attendeeId = attendee?.id ?? null;
 
   const { rows } = await pool.query(
@@ -275,7 +287,7 @@ router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) =
 router.post("/booths/checkin-nonce", async (req: Request, res: Response) => {
   const { attendeeToken, boothId } = req.body as { attendeeToken?: string; boothId?: number };
 
-  const attendee = await resolveAttendee(attendeeToken ?? "");
+  const attendee = await resolveAttendee(attendeeToken ?? "", req.conferenceId);
   if (!attendee) return res.status(403).json({ error: "Invalid attendee token" });
 
   if (!boothId || isNaN(Number(boothId))) {
@@ -314,7 +326,7 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const attendee = await resolveAttendee(attendeeToken);
+  const attendee = await resolveAttendee(attendeeToken, req.conferenceId);
   if (!attendee) return res.status(403).json({ error: "Invalid attendee token" });
 
   const boothRes = await pool.query(
@@ -390,8 +402,10 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
             CASE WHEN v.email_consent = TRUE THEN v.attendee_email ELSE NULL END AS attendee_email,
             v.email_consent, v.attendee_id, v.visited_at
      FROM congress_booth_visits v
-     WHERE v.attendee_id IS NOT NULL
-     ORDER BY v.visited_at ASC`
+     JOIN congress_booths b ON b.id = v.booth_id
+     WHERE v.attendee_id IS NOT NULL AND b.conference_id = $1
+     ORDER BY v.visited_at ASC`,
+    [req.conferenceId]
   );
   const visitsByBooth: Record<number, typeof visits> = {};
   for (const v of visits) {

@@ -61,8 +61,8 @@ export default function VotingScreen() {
       deviceIdRef.current = deviceId;
       try {
         const [stateRes, statusRes] = await Promise.all([
-          fetch(`${API_BASE}/api/voting/state`),
-          fetch(`${API_BASE}/api/voting/status/${encodeURIComponent(deviceId)}`),
+          apiFetch(`${API_BASE}/api/voting/state`),
+          apiFetch(`${API_BASE}/api/voting/status/${encodeURIComponent(deviceId)}`),
         ]);
         const stateData = await stateRes.json();
         const statusData = await statusRes.json();
