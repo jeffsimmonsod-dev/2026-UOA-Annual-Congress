@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router, type Request, type Response } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
@@ -235,7 +236,7 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
       [sourceId]
     );
     for (const b of boothsRes.rows) {
-      const newToken = require("crypto").randomBytes(16).toString("hex");
+      const newToken = crypto.randomBytes(16).toString("hex");
       await client.query(
         `INSERT INTO congress_booths (conference_id, name, company, booth_number, description, secret_token)
          VALUES ($1,$2,$3,$4,$5,$6)`,

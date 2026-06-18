@@ -89,6 +89,20 @@ async function ensureTables() {
     ALTER TABLE congress_attendees
     ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
   `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_booths
+        ADD CONSTRAINT fk_booths_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_attendees
+        ADD CONSTRAINT fk_attendees_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
 
   await pool.query(`
     ALTER TABLE congress_booth_visits

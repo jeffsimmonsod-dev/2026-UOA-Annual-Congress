@@ -100,6 +100,21 @@ async function ensureTables() {
       END IF;
     END $$;
   `).catch(() => {});
+
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_voting_state
+        ADD CONSTRAINT fk_voting_state_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_votes
+        ADD CONSTRAINT fk_votes_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
 }
 
 let tablesReady = false;

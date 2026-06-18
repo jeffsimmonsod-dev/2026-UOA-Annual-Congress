@@ -83,6 +83,20 @@ async function ensureTables() {
     ALTER TABLE congress_sessions ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
   `).catch(() => {});
   await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_photos
+        ADD CONSTRAINT fk_photos_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_sessions
+        ADD CONSTRAINT fk_sessions_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+  await pool.query(`
     ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS delete_token TEXT;
   `);
   // Backfill any existing photos that were uploaded before delete_token was introduced

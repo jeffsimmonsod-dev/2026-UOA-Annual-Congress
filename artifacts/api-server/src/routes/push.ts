@@ -67,6 +67,20 @@ async function ensureTables() {
     DELETE FROM congress_push_tokens
     WHERE token NOT LIKE 'ExponentPushToken[%'
   `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_push_tokens
+        ADD CONSTRAINT fk_push_tokens_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_scheduled_announcements
+        ADD CONSTRAINT fk_sched_ann_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
 }
 
 ensureTables().catch((err) => logger.error({ err }, "push ensureTable error"));

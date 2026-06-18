@@ -18,8 +18,9 @@ function isAuthorized(req: Request): boolean {
   }
 }
 
-// GET /admin/qr-codes — show PIN login form
-router.get("/admin/qr-codes", (_req: Request, res: Response) => {
+// GET /admin/qr-codes — show PIN login form (accepts ?conferenceId=N query param)
+router.get("/admin/qr-codes", (req: Request, res: Response) => {
+  const conferenceId = parseInt((req.query.conferenceId as string) ?? "1", 10) || 1;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -45,6 +46,7 @@ router.get("/admin/qr-codes", (_req: Request, res: Response) => {
     <h1>Admin Access</h1>
     <p>Enter the UOA admin PIN to view and print exhibitor QR codes.</p>
     <form method="POST" action="">
+      <input type="hidden" name="conferenceId" value="${conferenceId}" />
       <label for="pin">Admin PIN</label>
       <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" required />
       <button type="submit">View QR Codes</button>
@@ -57,6 +59,7 @@ router.get("/admin/qr-codes", (_req: Request, res: Response) => {
 // POST /admin/qr-codes — verify PIN in request body then render QR sheet
 router.post("/admin/qr-codes", async (req: Request, res: Response) => {
   const submittedPin: string = (req.body?.pin as string) ?? "";
+  const conferenceId = parseInt((req.body?.conferenceId as string) ?? "1", 10) || 1;
 
   try {
     if (submittedPin !== getAdminPin()) {
@@ -85,6 +88,7 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
     <h1>Admin Access</h1>
     <p>Enter the UOA admin PIN to view and print exhibitor QR codes.</p>
     <form method="POST" action="">
+      <input type="hidden" name="conferenceId" value="${conferenceId}" />
       <label for="pin">Admin PIN</label>
       <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" required />
       <button type="submit">View QR Codes</button>
@@ -101,7 +105,9 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
   const { rows } = await pool.query(
     `SELECT id, name, company, booth_number, secret_token
      FROM congress_booths
-     ORDER BY booth_number ASC, name ASC`
+     WHERE conference_id = $1
+     ORDER BY booth_number ASC, name ASC`,
+    [conferenceId]
   );
 
   if (rows.length === 0) {
@@ -181,7 +187,9 @@ router.get("/booths/admin/qr-codes", async (req: Request, res: Response) => {
   const { rows } = await pool.query(
     `SELECT id, name, company, booth_number
      FROM congress_booths
-     ORDER BY booth_number ASC, name ASC`
+     WHERE conference_id = $1
+     ORDER BY booth_number ASC, name ASC`,
+    [req.conferenceId]
   );
 
   res.json({ booths: rows });
@@ -199,8 +207,8 @@ router.get("/booths/admin/:id/qr", async (req: Request, res: Response) => {
   }
 
   const { rows } = await pool.query(
-    "SELECT id, secret_token FROM congress_booths WHERE id = $1",
-    [boothId]
+    "SELECT id, secret_token FROM congress_booths WHERE id = $1 AND conference_id = $2",
+    [boothId, req.conferenceId]
   );
   if (rows.length === 0) {
     return res.status(404).json({ error: "Booth not found" });
