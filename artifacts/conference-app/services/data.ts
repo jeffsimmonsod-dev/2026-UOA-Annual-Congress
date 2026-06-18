@@ -1,18 +1,19 @@
 import type { Session, Speaker, Sponsor, Venue, Update, FaqItem } from "@/types";
+import conferenceConfig from "@/conference.config";
 
 export const CONFERENCE = {
-  name: "2026 UOA Annual Congress",
-  tagline: "Utah Optometric Association",
-  dates: "June 4–7, 2026",
-  location: "Grand Hyatt Deer Valley, Park City, UT",
+  name: conferenceConfig.conferenceName,
+  tagline: conferenceConfig.organizationName,
+  dates: conferenceConfig.dates,
+  location: conferenceConfig.location,
   welcomeMessage:
     "Welcome to the 2026 UOA Annual Congress at the beautiful, brand-new Grand Hyatt Deer Valley Hotel in Park City, Utah! We have a wonderful, dynamic program planned — multi-track education for doctors, hands-on workshops, paraoptometric education, our annual Golf Tournament, and more. We look forward to seeing you there!",
-  registrationUrl: "https://www.utaheyedoc.org/2026_uoa_annual_congress.php",
+  registrationUrl: conferenceConfig.registrationUrl,
   hotelPhone: "1-435-731-4564",
   hotelBookingUrl: "https://www.hyatt.com/en-US/group-booking/SLCVD/G-UTOP",
-  contactPhone: "801-364-9103",
-  contactEmail: "uoa@utaheyedoc.org",
-  contactName: "Chanae",
+  contactPhone: conferenceConfig.contactPhone,
+  contactEmail: conferenceConfig.contactEmail,
+  contactName: conferenceConfig.contactName,
 };
 
 export const REGISTRATION = {

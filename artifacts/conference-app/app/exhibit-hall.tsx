@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/context/ProfileContext";
 import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
+import conferenceConfig from "@/conference.config";
 
 const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
 // Actual pixel dimensions of exhibit-hall-map.png
@@ -336,11 +337,12 @@ const SORTED_EXHIBITORS = [...EXHIBITOR_DIRECTORY].sort((a, b) =>
   a.company.localeCompare(b.company)
 );
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
-const ATTENDEE_TOKEN_KEY = "@uoa2026/attendeeToken";
-const PASSPORT_CACHE_KEY  = "@uoa2026/passportCache";
-const PENDING_CHECKINS_KEY = "@uoa2026/pendingCheckins";
+const CONF_NS = `@${conferenceConfig.conferenceId}`;
+const ATTENDEE_TOKEN_KEY = `${CONF_NS}/attendeeToken`;
+const PASSPORT_CACHE_KEY  = `${CONF_NS}/passportCache`;
+const PENDING_CHECKINS_KEY = `${CONF_NS}/pendingCheckins`;
 
 interface PendingCheckin {
   boothId: number;
@@ -554,7 +556,7 @@ export default function ExhibitHallScreen() {
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
     if (scanned || !attendeeToken) return;
-    const prefix = "uoa2026:booth:";
+    const prefix = `${conferenceConfig.conferenceId}:booth:`;
     if (!data.startsWith(prefix)) {
       Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
       return;
