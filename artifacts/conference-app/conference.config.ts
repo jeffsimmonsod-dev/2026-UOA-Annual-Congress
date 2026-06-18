@@ -63,7 +63,9 @@ const conferenceConfig: ConferenceConfig = {
   tagDarkColor: "#312e81",
   tagDarkForegroundColor: "#a5b4fc",
 
-  apiBaseUrl: process.env.EXPO_PUBLIC_DOMAIN ?? "",
+  apiBaseUrl: process.env.EXPO_PUBLIC_DOMAIN
+    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+    : "",
 };
 
 export default conferenceConfig;
