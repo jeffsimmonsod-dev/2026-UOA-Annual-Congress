@@ -9,4 +9,9 @@
 export interface ConferenceCloneInput {
   /** @minLength 1 */
   name: string;
+  cloneTheme?: boolean;
+  cloneSpeakers?: boolean;
+  cloneSessions?: boolean;
+  cloneSponsors?: boolean;
+  cloneBooths?: boolean;
 }

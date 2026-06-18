@@ -168,6 +168,11 @@ export const CloneConferenceHeader = zod.object({
 
 export const CloneConferenceBody = zod.object({
   name: zod.string().min(1),
+  cloneTheme: zod.boolean().optional(),
+  cloneSpeakers: zod.boolean().optional(),
+  cloneSessions: zod.boolean().optional(),
+  cloneSponsors: zod.boolean().optional(),
+  cloneBooths: zod.boolean().optional(),
 });
 
 /**

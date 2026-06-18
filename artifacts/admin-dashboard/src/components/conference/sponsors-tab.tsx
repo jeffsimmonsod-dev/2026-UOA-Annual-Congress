@@ -1,21 +1,31 @@
-import { useState } from "react";
 import { useAdmin } from "@/hooks/use-admin";
 import { useListConferenceSponsors, useBulkImportSponsors, getListConferenceSponsorsQueryKey } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { CsvImport } from "./csv-import";
+import type { CsvColumn } from "./csv-import";
+
+const SPONSOR_COLUMNS: CsvColumn[] = [
+  { key: "name", label: "Name", required: true },
+  { key: "tier", label: "Tier", required: true },
+  { key: "website", label: "Website" },
+  { key: "logoUrl", label: "Logo URL" },
+  { key: "description", label: "Description" },
+  { key: "externalId", label: "External ID" },
+];
+
+const TIER_BADGES: Record<string, string> = {
+  Platinum: "bg-slate-100 text-slate-700",
+  Gold: "bg-yellow-50 text-yellow-700",
+  Silver: "bg-gray-100 text-gray-600",
+  Bronze: "bg-orange-50 text-orange-700",
+};
 
 export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
   const { pin } = useAdmin();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [jsonInput, setJsonInput] = useState("");
-  const [replaceAll, setReplaceAll] = useState(false);
 
   const { data: listData, isLoading } = useListConferenceSponsors(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -26,51 +36,30 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
     request: { headers: { "X-Admin-Pin": pin || "" } }
   });
 
-  const handleImport = () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
-      if (!Array.isArray(parsed)) throw new Error("Input must be an array of objects");
-      
-      importSponsors.mutate({ id: conferenceId, data: { sponsors: parsed, replaceAll } }, {
+  const handleImport = (rows: Record<string, unknown>[], replaceAll: boolean) => {
+    importSponsors.mutate(
+      { id: conferenceId, data: { sponsors: rows as never, replaceAll } },
+      {
         onSuccess: (res) => {
           queryClient.invalidateQueries({ queryKey: getListConferenceSponsorsQueryKey(conferenceId) });
           toast({ title: "Import successful", description: `Imported ${res.imported} sponsors.` });
-          setJsonInput("");
         },
         onError: () => {
-          toast({ variant: "destructive", title: "Import failed" });
+          toast({ variant: "destructive", title: "Import failed", description: "Check that name and tier columns are present." });
         }
-      });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Invalid JSON", description: err.message });
-    }
+      }
+    );
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Bulk Import Sponsors</CardTitle>
-          <CardDescription>Paste JSON array of sponsor objects.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea 
-            placeholder='[{"name": "Acme Corp", "tier": "Gold", "externalId": "spon_1"}]' 
-            value={jsonInput}
-            onChange={(e) => setJsonInput(e.target.value)}
-            className="font-mono text-sm h-32"
-          />
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Switch id="replace-all" checked={replaceAll} onCheckedChange={setReplaceAll} />
-              <Label htmlFor="replace-all">Replace all existing</Label>
-            </div>
-            <Button onClick={handleImport} disabled={!jsonInput || importSponsors.isPending}>
-              {importSponsors.isPending ? "Importing..." : "Import JSON"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <CsvImport
+        title="Import Sponsors"
+        description="Upload a CSV file to add or replace sponsors. Tier values: Platinum, Gold, Silver, Bronze."
+        columns={SPONSOR_COLUMNS}
+        onImport={handleImport}
+        isPending={importSponsors.isPending}
+      />
 
       <div className="rounded-md border bg-card">
         <Table>
@@ -85,13 +74,23 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
             {isLoading ? (
               <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
             ) : listData?.sponsors.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No sponsors found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No sponsors yet. Import a CSV to get started.</TableCell></TableRow>
             ) : (
               listData?.sponsors.map(s => (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell>{s.tier}</TableCell>
-                  <TableCell>{s.website || "-"}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${TIER_BADGES[s.tier] ?? "bg-muted text-muted-foreground"}`}>
+                      {s.tier}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {s.website ? (
+                      <a href={s.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
+                        {s.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                      </a>
+                    ) : "-"}
+                  </TableCell>
                 </TableRow>
               ))
             )}

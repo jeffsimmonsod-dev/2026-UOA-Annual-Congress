@@ -534,6 +534,11 @@ router.get("/conferences/:id/config", async (req: Request, res: Response) => {
       return;
     }
     const c = rows[0];
+    const adminAccess = isAdmin(req);
+    if (!c.published && !adminAccess) {
+      res.status(404).json({ error: "Conference not found" });
+      return;
+    }
     res.json({
       conferenceId: c.id,
       conferenceName: c.name,
@@ -645,7 +650,23 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
     return;
   }
 
-  const { name, organization } = req.body as { name?: string; organization?: string };
+  const {
+    name,
+    organization,
+    cloneTheme = true,
+    cloneSpeakers = true,
+    cloneSessions = true,
+    cloneSponsors = true,
+    cloneBooths = false,
+  } = req.body as {
+    name?: string;
+    organization?: string;
+    cloneTheme?: boolean;
+    cloneSpeakers?: boolean;
+    cloneSessions?: boolean;
+    cloneSponsors?: boolean;
+    cloneBooths?: boolean;
+  };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required for the cloned conference" });
     return;
@@ -678,13 +699,13 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
         (organization ?? src.organization).trim(),
         src.dates,
         src.location,
-        src.primary_color,
-        src.primary_dark_color,
-        src.secondary_color,
-        src.secondary_dark_color,
-        src.accent_color,
-        src.accent_foreground_color,
-        src.logo_url,
+        cloneTheme ? src.primary_color : "#4f46e5",
+        cloneTheme ? src.primary_dark_color : "#818cf8",
+        cloneTheme ? src.secondary_color : "#f1f5f9",
+        cloneTheme ? src.secondary_dark_color : "#1e293b",
+        cloneTheme ? src.accent_color : "#e0e7ff",
+        cloneTheme ? src.accent_foreground_color : "#3730a3",
+        cloneTheme ? src.logo_url : null,
         src.feature_voting,
         src.feature_photos,
         src.feature_exhibit_hall,
@@ -693,91 +714,99 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
     const newConf = newConfRes.rows[0];
     const newId = newConf.id;
 
-    // Clone booths with fresh secret tokens
-    const boothsRes = await client.query(
-      `SELECT name, company, booth_number, description FROM congress_booths WHERE conference_id = $1`,
-      [sourceId]
-    );
-    for (const b of boothsRes.rows) {
-      const newToken = crypto.randomBytes(16).toString("hex");
-      await client.query(
-        `INSERT INTO congress_booths (conference_id, name, company, booth_number, description, secret_token)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [newId, b.name, b.company, b.booth_number, b.description, newToken]
+    // Conditionally clone booths with fresh secret tokens
+    let boothsCopied = 0;
+    if (cloneBooths) {
+      const boothsRes = await client.query(
+        `SELECT name, company, booth_number, description FROM congress_booths WHERE conference_id = $1`,
+        [sourceId]
       );
+      for (const b of boothsRes.rows) {
+        const newToken = crypto.randomBytes(16).toString("hex");
+        await client.query(
+          `INSERT INTO congress_booths (conference_id, name, company, booth_number, description, secret_token)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [newId, b.name, b.company, b.booth_number, b.description, newToken]
+        );
+      }
+      boothsCopied = boothsRes.rows.length;
     }
 
-    // Clone speakers
-    const speakersRes = await client.query(
-      `SELECT external_id, name, title, company, bio, photo_url, session_ids
-       FROM conference_speakers WHERE conference_id = $1`,
-      [sourceId]
-    );
-    for (const sp of speakersRes.rows) {
-      await client.query(
-        `INSERT INTO conference_speakers
-           (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [newId, sp.external_id, sp.name, sp.title, sp.company, sp.bio, sp.photo_url, sp.session_ids]
+    // Conditionally clone speakers
+    let speakersCopied = 0;
+    if (cloneSpeakers) {
+      const speakersRes = await client.query(
+        `SELECT external_id, name, title, company, bio, photo_url, session_ids
+         FROM conference_speakers WHERE conference_id = $1`,
+        [sourceId]
       );
+      for (const sp of speakersRes.rows) {
+        await client.query(
+          `INSERT INTO conference_speakers
+             (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [newId, sp.external_id, sp.name, sp.title, sp.company, sp.bio, sp.photo_url, sp.session_ids]
+        );
+      }
+      speakersCopied = speakersRes.rows.length;
     }
 
-    // Clone sessions (both doc and para)
-    const sessionsRes = await client.query(
-      `SELECT external_id, title, description, start_time, end_time,
-              day, room, track, speaker_ids, tags, is_para
-       FROM conference_sessions WHERE conference_id = $1`,
-      [sourceId]
-    );
-    for (const s of sessionsRes.rows) {
-      await client.query(
-        `INSERT INTO conference_sessions
-           (conference_id, external_id, title, description, start_time, end_time,
-            day, room, track, speaker_ids, tags, is_para)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [
-          newId, s.external_id, s.title, s.description, s.start_time, s.end_time,
-          s.day, s.room, s.track, s.speaker_ids, s.tags, s.is_para,
-        ]
+    // Conditionally clone sessions (both doc and para)
+    let sessionsCopied = 0;
+    if (cloneSessions) {
+      const sessionsRes = await client.query(
+        `SELECT external_id, title, description, start_time, end_time,
+                day, room, track, speaker_ids, tags, is_para
+         FROM conference_sessions WHERE conference_id = $1`,
+        [sourceId]
       );
+      for (const s of sessionsRes.rows) {
+        await client.query(
+          `INSERT INTO conference_sessions
+             (conference_id, external_id, title, description, start_time, end_time,
+              day, room, track, speaker_ids, tags, is_para)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [
+            newId, s.external_id, s.title, s.description, s.start_time, s.end_time,
+            s.day, s.room, s.track, s.speaker_ids, s.tags, s.is_para,
+          ]
+        );
+      }
+      sessionsCopied = sessionsRes.rows.length;
     }
 
-    // Clone sponsors
-    const sponsorsRes = await client.query(
-      `SELECT external_id, name, tier, website, logo_url, description
-       FROM conference_sponsors WHERE conference_id = $1`,
-      [sourceId]
-    );
-    for (const sp of sponsorsRes.rows) {
-      await client.query(
-        `INSERT INTO conference_sponsors
-           (conference_id, external_id, name, tier, website, logo_url, description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [newId, sp.external_id, sp.name, sp.tier, sp.website, sp.logo_url, sp.description]
+    // Conditionally clone sponsors
+    let sponsorsCopied = 0;
+    if (cloneSponsors) {
+      const sponsorsRes = await client.query(
+        `SELECT external_id, name, tier, website, logo_url, description
+         FROM conference_sponsors WHERE conference_id = $1`,
+        [sourceId]
       );
+      for (const sp of sponsorsRes.rows) {
+        await client.query(
+          `INSERT INTO conference_sponsors
+             (conference_id, external_id, name, tier, website, logo_url, description)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [newId, sp.external_id, sp.name, sp.tier, sp.website, sp.logo_url, sp.description]
+        );
+      }
+      sponsorsCopied = sponsorsRes.rows.length;
     }
 
     await client.query("COMMIT");
 
     logger.info(
-      {
-        sourceId,
-        newId,
-        name,
-        boothsCopied: boothsRes.rows.length,
-        speakersCopied: speakersRes.rows.length,
-        sessionsCopied: sessionsRes.rows.length,
-        sponsorsCopied: sponsorsRes.rows.length,
-      },
+      { sourceId, newId, name, boothsCopied, speakersCopied, sessionsCopied, sponsorsCopied },
       "conference cloned"
     );
 
     res.status(201).json({
       conference: newConf,
-      boothsCopied: boothsRes.rows.length,
-      speakersCopied: speakersRes.rows.length,
-      sessionsCopied: sessionsRes.rows.length,
-      sponsorsCopied: sponsorsRes.rows.length,
+      boothsCopied,
+      speakersCopied,
+      sessionsCopied,
+      sponsorsCopied,
     });
   } catch (err) {
     await client.query("ROLLBACK");

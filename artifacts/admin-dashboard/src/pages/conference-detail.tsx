@@ -23,6 +23,7 @@ export default function ConferenceDetail() {
   }
 
   const { data: config, isLoading, error } = useGetConferenceConfig(conferenceId, {
+    request: { headers: { "X-Admin-Pin": pin || "" } },
     query: { enabled: !!conferenceId, queryKey: getGetConferenceConfigQueryKey(conferenceId) }
   });
 
