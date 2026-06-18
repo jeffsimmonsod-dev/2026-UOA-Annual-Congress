@@ -14,10 +14,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useProfile } from "@/context/ProfileContext";
 
 export default function OnboardingModal() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { profile, profileLoaded, saveProfile } = useProfile();
 
@@ -74,17 +76,17 @@ export default function OnboardingModal() {
           showsVerticalScrollIndicator={false}
         >
           <Image
-            source={require("../assets/images/uoa-logo.png")}
+            source={conf.logoAsset}
             style={styles.logo}
             resizeMode="contain"
           />
 
           <View style={styles.welcomeBlock}>
             <Text style={[styles.welcomeTitle, { color: colors.foreground }]}>
-              Welcome to the{"\n"}2026 UOA Annual Congress
+              Welcome to the{"\n"}{conf.conferenceName}
             </Text>
             <Text style={[styles.welcomeSubtitle, { color: colors.mutedForeground }]}>
-              June 4–7 · Grand Hyatt Deer Valley
+              {conf.dates} · {conf.location.split(",")[0]}
             </Text>
           </View>
 

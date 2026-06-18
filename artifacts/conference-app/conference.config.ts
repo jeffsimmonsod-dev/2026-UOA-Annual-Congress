@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from "react-native";
+
 export interface ConferenceConfig {
   conferenceId: number;
   conferenceName: string;
@@ -13,9 +15,10 @@ export interface ConferenceConfig {
   websiteLabel: string;
   creditType: string;
   paraCreditType: string;
-  logoAsset: ReturnType<typeof require>;
+  logoAsset: ImageSourcePropType;
   primaryColor: string;
   primaryDarkColor: string;
+  secondaryColor: string;
   accentColor: string;
   accentForegroundColor: string;
   accentDarkColor: string;
@@ -50,6 +53,7 @@ const conferenceConfig: ConferenceConfig = {
 
   primaryColor: "#4f46e5",
   primaryDarkColor: "#818cf8",
+  secondaryColor: "#f1f5f9",
   accentColor: "#e0e7ff",
   accentForegroundColor: "#3730a3",
   accentDarkColor: "#312e81",

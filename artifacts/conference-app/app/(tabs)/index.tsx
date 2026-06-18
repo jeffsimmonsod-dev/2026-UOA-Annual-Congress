@@ -183,7 +183,7 @@ export default function HomeScreen() {
         <View style={styles.heroRow}>
           <View style={[styles.logoSmallWrap, { backgroundColor: "#ffffff", shadowColor: colors.foreground }]}>
             <Image
-              source={require("../../assets/images/uoa-logo.png")}
+              source={conf.logoAsset}
               style={styles.logoSmall}
               resizeMode="contain"
             />

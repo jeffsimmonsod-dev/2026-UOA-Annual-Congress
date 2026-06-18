@@ -20,6 +20,7 @@ import OnboardingModal from "@/components/OnboardingModal";
 import NotificationPromptModal from "@/components/NotificationPromptModal";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { ScheduleProvider } from "@/context/ScheduleContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
 
@@ -71,21 +72,23 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <ProfileProvider>
-            <ScheduleProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                  <OnboardingModal />
-                  {Platform.OS !== "web" && <NotificationPromptModal />}
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </ScheduleProvider>
-          </ProfileProvider>
-        </QueryClientProvider>
-      </ErrorBoundary>
+      <ThemeProvider>
+        <ErrorBoundary>
+          <QueryClientProvider client={queryClient}>
+            <ProfileProvider>
+              <ScheduleProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                    <OnboardingModal />
+                    {Platform.OS !== "web" && <NotificationPromptModal />}
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </ScheduleProvider>
+            </ProfileProvider>
+          </QueryClientProvider>
+        </ErrorBoundary>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
