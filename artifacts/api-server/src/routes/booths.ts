@@ -81,6 +81,16 @@ async function ensureTables() {
   `);
 
   await pool.query(`
+    ALTER TABLE congress_booths
+    ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
+  `).catch(() => {});
+
+  await pool.query(`
+    ALTER TABLE congress_attendees
+    ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
+  `).catch(() => {});
+
+  await pool.query(`
     ALTER TABLE congress_booth_visits
     ADD COLUMN IF NOT EXISTS attendee_id INTEGER REFERENCES congress_attendees(id) ON DELETE CASCADE;
   `);
@@ -175,8 +185,8 @@ router.post("/attendees/register", async (req: Request, res: Response) => {
 
   const token = crypto.randomBytes(32).toString("hex");
   const { rows } = await pool.query(
-    `INSERT INTO congress_attendees (token) VALUES ($1) RETURNING id`,
-    [token]
+    `INSERT INTO congress_attendees (token, conference_id) VALUES ($1, $2) RETURNING id`,
+    [token, req.conferenceId]
   );
   res.json({ attendeeToken: token, attendeeId: rows[0].id });
 });
@@ -213,8 +223,9 @@ router.get("/booths", async (req: Request, res: Response) => {
               ELSE FALSE
             END AS visited
      FROM congress_booths b
+     WHERE b.conference_id = $2
      ORDER BY b.booth_number ASC, b.name ASC`,
-    [attendeeId]
+    [attendeeId, req.conferenceId]
   );
   const total = rows.length;
   const visitedCount = rows.filter((r) => r.visited).length;
@@ -229,7 +240,10 @@ router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) =
   const boothId = parseInt(req.params.id, 10);
   if (isNaN(boothId)) return res.status(400).json({ error: "Invalid booth ID" });
 
-  const boothRes = await pool.query("SELECT id FROM congress_booths WHERE id = $1", [boothId]);
+  const boothRes = await pool.query(
+    "SELECT id FROM congress_booths WHERE id = $1 AND conference_id = $2",
+    [boothId, req.conferenceId]
+  );
   if (boothRes.rows.length === 0) return res.status(404).json({ error: "Booth not found" });
 
   const code = crypto.randomBytes(16).toString("hex");
@@ -254,7 +268,10 @@ router.post("/booths/checkin-nonce", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Missing boothId" });
   }
 
-  const boothRes = await pool.query("SELECT id FROM congress_booths WHERE id = $1", [boothId]);
+  const boothRes = await pool.query(
+    "SELECT id FROM congress_booths WHERE id = $1 AND conference_id = $2",
+    [boothId, req.conferenceId]
+  );
   if (boothRes.rows.length === 0) return res.status(404).json({ error: "Booth not found" });
 
   const nonce = crypto.randomBytes(24).toString("hex");
@@ -287,8 +304,8 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
   if (!attendee) return res.status(403).json({ error: "Invalid attendee token" });
 
   const boothRes = await pool.query(
-    "SELECT id, name, company, booth_number, secret_token FROM congress_booths WHERE id = $1",
-    [boothId]
+    "SELECT id, name, company, booth_number, secret_token FROM congress_booths WHERE id = $1 AND conference_id = $2",
+    [boothId, req.conferenceId]
   );
   if (boothRes.rows.length === 0) {
     return res.status(404).json({ error: "Booth not found" });
@@ -334,7 +351,9 @@ router.get("/booths/admin", async (req: Request, res: Response) => {
     `SELECT b.id, b.name, b.company, b.booth_number, b.description, b.created_at,
             (SELECT COUNT(*) FROM congress_booth_visits v WHERE v.booth_id = b.id AND v.attendee_id IS NOT NULL) AS visit_count
      FROM congress_booths b
-     ORDER BY b.booth_number ASC, b.name ASC`
+     WHERE b.conference_id = $1
+     ORDER BY b.booth_number ASC, b.name ASC`,
+    [req.conferenceId]
   );
   res.json({ booths: rows });
 });
@@ -348,7 +367,9 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
     `SELECT b.id, b.name, b.company, b.booth_number,
             (SELECT COUNT(*) FROM congress_booth_visits v WHERE v.booth_id = b.id AND v.attendee_id IS NOT NULL) AS visit_count
      FROM congress_booths b
-     ORDER BY visit_count DESC, b.booth_number ASC`
+     WHERE b.conference_id = $1
+     ORDER BY visit_count DESC, b.booth_number ASC`,
+    [req.conferenceId]
   );
   const { rows: visits } = await pool.query(
     `SELECT v.booth_id, v.attendee_name,
@@ -377,7 +398,10 @@ router.get("/booths/admin/entries", async (req: Request, res: Response) => {
   if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
-  const totalRes = await pool.query("SELECT COUNT(*) as count FROM congress_booths");
+  const totalRes = await pool.query(
+    "SELECT COUNT(*) as count FROM congress_booths WHERE conference_id = $1",
+    [req.conferenceId]
+  );
   const total = parseInt(totalRes.rows[0].count, 10);
   if (total === 0) return res.json({ entries: [], total: 0 });
 
@@ -387,11 +411,12 @@ router.get("/booths/admin/entries", async (req: Request, res: Response) => {
             COUNT(DISTINCT v.booth_id) AS booths_visited,
             MAX(v.visited_at) AS last_visit
      FROM congress_booth_visits v
-     WHERE v.attendee_id IS NOT NULL
+     JOIN congress_booths b ON b.id = v.booth_id
+     WHERE v.attendee_id IS NOT NULL AND b.conference_id = $1
      GROUP BY v.attendee_id
-     HAVING COUNT(DISTINCT v.booth_id) = $1
+     HAVING COUNT(DISTINCT v.booth_id) = $2
      ORDER BY last_visit ASC`,
-    [total]
+    [req.conferenceId, total]
   );
   res.json({ entries: rows, total, raffleCount: rows.length });
 });
@@ -412,9 +437,9 @@ router.post("/booths", async (req: Request, res: Response) => {
   }
   const secretToken = crypto.randomBytes(16).toString("hex");
   const { rows } = await pool.query(
-    `INSERT INTO congress_booths (name, company, booth_number, description, secret_token)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [name, company, boothNumber || null, description || null, secretToken]
+    `INSERT INTO congress_booths (name, company, booth_number, description, secret_token, conference_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [name, company, boothNumber || null, description || null, secretToken, req.conferenceId]
   );
   res.json({ booth: rows[0] });
 });
@@ -424,7 +449,10 @@ router.delete("/booths/:id", async (req: Request, res: Response) => {
   if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
-  await pool.query("DELETE FROM congress_booths WHERE id = $1", [req.params.id]);
+  await pool.query(
+    "DELETE FROM congress_booths WHERE id = $1 AND conference_id = $2",
+    [req.params.id, req.conferenceId]
+  );
   res.json({ success: true });
 });
 

@@ -17,6 +17,7 @@ import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getDeviceId } from "@/services/deviceId";
 
 import conferenceConfig from "@/conference.config";
+import { apiFetch } from "@/services/apiFetch";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 const OFFICER_SLATE = [
@@ -105,7 +106,7 @@ export default function VotingScreen() {
     setSubmitError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/voting/submit`, {
+      const res = await apiFetch(`${API_BASE}/api/voting/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

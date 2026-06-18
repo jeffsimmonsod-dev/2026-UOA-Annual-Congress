@@ -22,6 +22,7 @@ import { useColors } from "@/hooks/useColors";
 import { sendPushNotification } from "@/services/pushNotifications";
 
 import conferenceConfig from "@/conference.config";
+import { apiFetch } from "@/services/apiFetch";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type Step = "pin" | "dashboard";
@@ -137,7 +138,7 @@ export default function AdminScreen() {
     setPinVerifying(true);
     setPinError("");
     try {
-      const res = await fetch(`${API_BASE}/api/admin/verify`, {
+      const res = await apiFetch(`${API_BASE}/api/admin/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
@@ -195,7 +196,7 @@ export default function AdminScreen() {
 
     setScheduling(true);
     try {
-      const res = await fetch(`${API_BASE}/api/push/schedule`, {
+      const res = await apiFetch(`${API_BASE}/api/push/schedule`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -258,7 +259,7 @@ export default function AdminScreen() {
   const fetchScheduled = useCallback(async () => {
     setScheduledLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/push/scheduled`, {
+      const res = await apiFetch(`${API_BASE}/api/push/scheduled`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -276,7 +277,7 @@ export default function AdminScreen() {
         text: "Cancel It",
         style: "destructive",
         onPress: async () => {
-          await fetch(`${API_BASE}/api/push/scheduled/${item.id}`, {
+          await apiFetch(`${API_BASE}/api/push/scheduled/${item.id}`, {
             method: "DELETE",
             headers: { "x-admin-pin": verifiedPin },
           });
@@ -289,7 +290,7 @@ export default function AdminScreen() {
   const fetchBooths = useCallback(async () => {
     setBoothsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/booths/admin`, {
+      const res = await apiFetch(`${API_BASE}/api/booths/admin`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -303,7 +304,7 @@ export default function AdminScreen() {
   const fetchRaffle = useCallback(async () => {
     setRaffleLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/booths/admin/entries`, {
+      const res = await apiFetch(`${API_BASE}/api/booths/admin/entries`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -317,7 +318,7 @@ export default function AdminScreen() {
   const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/booths/admin/analytics`, {
+      const res = await apiFetch(`${API_BASE}/api/booths/admin/analytics`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -330,7 +331,7 @@ export default function AdminScreen() {
   const fetchAdminPhotos = useCallback(async () => {
     setPhotosLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/photos/admin`, {
+      const res = await apiFetch(`${API_BASE}/api/photos/admin`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -344,7 +345,7 @@ export default function AdminScreen() {
   const fetchVotingResults = useCallback(async () => {
     setVotingLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/voting/results`, {
+      const res = await apiFetch(`${API_BASE}/api/voting/results`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (res.ok) {
@@ -360,7 +361,7 @@ export default function AdminScreen() {
       return;
     }
     setVotingAction(action);
-    await fetch(`${API_BASE}/api/voting/${action}`, {
+    await apiFetch(`${API_BASE}/api/voting/${action}`, {
       method: "POST",
       headers: { "x-admin-pin": verifiedPin },
     });
@@ -371,7 +372,7 @@ export default function AdminScreen() {
   const handleVotingReset = async () => {
     setShowResetConfirm(false);
     setVotingAction("reset");
-    await fetch(`${API_BASE}/api/voting/reset`, {
+    await apiFetch(`${API_BASE}/api/voting/reset`, {
       method: "POST",
       headers: { "x-admin-pin": verifiedPin },
     });
@@ -391,7 +392,7 @@ export default function AdminScreen() {
           onPress: async () => {
             setDeletingPhotoId(photoId);
             try {
-              const res = await fetch(`${API_BASE}/api/photos/${photoId}`, {
+              const res = await apiFetch(`${API_BASE}/api/photos/${photoId}`, {
                 method: "DELETE",
                 headers: { "x-admin-pin": verifiedPin },
               });
@@ -463,7 +464,7 @@ export default function AdminScreen() {
     }
     setAddingBooth(true);
     try {
-      const res = await fetch(`${API_BASE}/api/booths`, {
+      const res = await apiFetch(`${API_BASE}/api/booths`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-admin-pin": verifiedPin },
         body: JSON.stringify({ name: newBoothName.trim(), company: newBoothCompany.trim(), boothNumber: newBoothNumber.trim() }),
@@ -488,7 +489,7 @@ export default function AdminScreen() {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          await fetch(`${API_BASE}/api/booths/${booth.id}`, {
+          await apiFetch(`${API_BASE}/api/booths/${booth.id}`, {
             method: "DELETE",
             headers: { "x-admin-pin": verifiedPin },
           });
@@ -503,7 +504,7 @@ export default function AdminScreen() {
     if (liveQrState[boothId]?.dataUrl) return;
     setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: true } }));
     try {
-      const qrRes = await fetch(`${API_BASE}/api/booths/admin/${boothId}/qr`, {
+      const qrRes = await apiFetch(`${API_BASE}/api/booths/admin/${boothId}/qr`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (!qrRes.ok) {

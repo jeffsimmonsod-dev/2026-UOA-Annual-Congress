@@ -7,10 +7,12 @@ import qrCodesRouter from "./qr-codes";
 import mapCalibrateRouter from "./map-calibrate";
 import adminRouter from "./admin";
 import votingRouter from "./voting";
+import conferencesRouter from "./conferences";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(conferencesRouter);
 router.use(pushRouter);
 router.use(photosRouter);
 router.use(boothsRouter);

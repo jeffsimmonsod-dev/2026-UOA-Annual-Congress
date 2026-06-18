@@ -26,6 +26,7 @@ import { useProfile } from "@/context/ProfileContext";
 import ZoomableImage from "@/components/ZoomableImage";
 
 import conferenceConfig from "@/conference.config";
+import { apiFetch } from "@/services/apiFetch";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 const PHOTO_TOKENS_KEY = "@photo_delete_tokens";
 const SESSION_TOKEN_KEY = "@photo_session_token";
@@ -33,7 +34,7 @@ const SESSION_TOKEN_KEY = "@photo_session_token";
 async function getOrCreateSessionToken(): Promise<string> {
   const stored = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
   if (stored) return stored;
-  const res = await fetch(`${API_BASE}/api/photos/session`, {
+  const res = await apiFetch(`${API_BASE}/api/photos/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
@@ -98,7 +99,7 @@ export default function PhotosScreen() {
   const fetchPhotos = useCallback(async () => {
     try {
       const tokenParam = sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : "";
-      const res = await fetch(`${API_BASE}/api/photos${tokenParam}`);
+      const res = await apiFetch(`${API_BASE}/api/photos${tokenParam}`);
       const data = await res.json();
       setPhotos(data.photos ?? []);
     } catch {
@@ -131,7 +132,7 @@ export default function PhotosScreen() {
             setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
             if (fullscreenPhoto?.id === photo.id) setFullscreenPhoto(null);
             try {
-              await fetch(`${API_BASE}/api/photos/${photo.id}`, {
+              await apiFetch(`${API_BASE}/api/photos/${photo.id}`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deleteToken }),
@@ -155,7 +156,7 @@ export default function PhotosScreen() {
       )
     );
     try {
-      const res = await fetch(`${API_BASE}/api/photos/${photo.id}/like`, {
+      const res = await apiFetch(`${API_BASE}/api/photos/${photo.id}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionToken }),
@@ -212,7 +213,7 @@ export default function PhotosScreen() {
         form.append("uploaderName", uploaderName);
         form.append("caption", caption.trim());
         form.append("sessionToken", sessionToken);
-        const res = await fetch(`${API_BASE}/api/photos/upload`, {
+        const res = await apiFetch(`${API_BASE}/api/photos/upload`, {
           method: "POST",
           body: form,
         });

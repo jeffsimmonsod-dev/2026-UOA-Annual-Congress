@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import compression from "compression";
 import pinoHttp from "pino-http";
@@ -31,6 +31,13 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const raw = req.headers["x-conference-id"];
+  const parsed = Array.isArray(raw) ? parseInt(raw[0], 10) : parseInt(raw ?? "", 10);
+  req.conferenceId = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  next();
+});
 
 app.use("/api", router);
 

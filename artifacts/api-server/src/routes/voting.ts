@@ -46,6 +46,60 @@ async function ensureTables() {
       submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await pool.query(`
+    ALTER TABLE congress_voting_state DROP CONSTRAINT IF EXISTS congress_voting_state_id_check
+  `).catch(() => {});
+
+  await pool.query(`
+    ALTER TABLE congress_voting_state
+      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
+  `).catch(() => {});
+
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_voting_state_conference'
+      ) THEN
+        ALTER TABLE congress_voting_state
+          ADD CONSTRAINT uq_voting_state_conference UNIQUE (conference_id);
+      END IF;
+    END $$;
+  `).catch(() => {});
+
+  await pool.query(`
+    INSERT INTO congress_voting_state (conference_id, is_open)
+    VALUES (1, false)
+    ON CONFLICT (conference_id) DO NOTHING
+  `).catch(() => {});
+
+  await pool.query(`
+    ALTER TABLE congress_votes
+      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
+  `).catch(() => {});
+
+  await pool.query(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'congress_votes_device_id_key'
+        AND conrelid = 'congress_votes'::regclass
+      ) THEN
+        ALTER TABLE congress_votes DROP CONSTRAINT congress_votes_device_id_key;
+      END IF;
+    END $$;
+  `).catch(() => {});
+
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_votes_conf_device'
+      ) THEN
+        ALTER TABLE congress_votes
+          ADD CONSTRAINT uq_votes_conf_device UNIQUE (conference_id, device_id);
+      END IF;
+    END $$;
+  `).catch(() => {});
 }
 
 let tablesReady = false;
@@ -61,7 +115,8 @@ router.get("/voting/state", async (req, res) => {
   try {
     await withTables(async () => {
       const result = await pool.query(
-        "SELECT is_open FROM congress_voting_state WHERE id = 1"
+        "SELECT is_open FROM congress_voting_state WHERE conference_id = $1",
+        [req.conferenceId]
       );
       const isOpen = result.rows[0]?.is_open ?? false;
       res.json({ isOpen });
@@ -81,8 +136,8 @@ router.get("/voting/status/:deviceId", async (req, res) => {
   try {
     await withTables(async () => {
       const result = await pool.query(
-        "SELECT slate_vote, trustee_votes, submitted_at FROM congress_votes WHERE device_id = $1",
-        [deviceId]
+        "SELECT slate_vote, trustee_votes, submitted_at FROM congress_votes WHERE conference_id = $1 AND device_id = $2",
+        [req.conferenceId, deviceId]
       );
       if (result.rows.length === 0) {
         res.json({ hasVoted: false });
@@ -130,7 +185,8 @@ router.post("/voting/submit", async (req, res) => {
   try {
     await withTables(async () => {
       const stateResult = await pool.query(
-        "SELECT is_open FROM congress_voting_state WHERE id = 1"
+        "SELECT is_open FROM congress_voting_state WHERE conference_id = $1",
+        [req.conferenceId]
       );
       if (!stateResult.rows[0]?.is_open) {
         res.status(403).json({ error: "Voting is currently closed." });
@@ -139,9 +195,9 @@ router.post("/voting/submit", async (req, res) => {
 
       try {
         await pool.query(
-          `INSERT INTO congress_votes (device_id, slate_vote, trustee_votes)
-           VALUES ($1, $2, $3)`,
-          [deviceId.trim(), slateVote, trustees]
+          `INSERT INTO congress_votes (device_id, slate_vote, trustee_votes, conference_id)
+           VALUES ($1, $2, $3, $4)`,
+          [deviceId.trim(), slateVote, trustees, req.conferenceId]
         );
         logger.info({ deviceId: deviceId.trim(), slateVote, trustees }, "vote submitted");
         res.json({ success: true });
@@ -167,14 +223,15 @@ router.get("/voting/results", async (req, res) => {
   try {
     await withTables(async () => {
       const [stateResult, totalResult, slateResult, trusteeResult] = await Promise.all([
-        pool.query("SELECT is_open FROM congress_voting_state WHERE id = 1"),
-        pool.query("SELECT COUNT(*) AS count FROM congress_votes"),
+        pool.query("SELECT is_open FROM congress_voting_state WHERE conference_id = $1", [req.conferenceId]),
+        pool.query("SELECT COUNT(*) AS count FROM congress_votes WHERE conference_id = $1", [req.conferenceId]),
         pool.query(`
           SELECT slate_vote, COUNT(*) AS count
           FROM congress_votes
+          WHERE conference_id = $1
           GROUP BY slate_vote
-        `),
-        pool.query("SELECT trustee_votes FROM congress_votes"),
+        `, [req.conferenceId]),
+        pool.query("SELECT trustee_votes FROM congress_votes WHERE conference_id = $1", [req.conferenceId]),
       ]);
 
       const isOpen: boolean = stateResult.rows[0]?.is_open ?? false;
@@ -218,7 +275,9 @@ router.post("/voting/open", async (req, res) => {
   try {
     await withTables(async () => {
       await pool.query(
-        "UPDATE congress_voting_state SET is_open = true WHERE id = 1"
+        `INSERT INTO congress_voting_state (conference_id, is_open) VALUES ($1, true)
+         ON CONFLICT (conference_id) DO UPDATE SET is_open = true`,
+        [req.conferenceId]
       );
       res.json({ success: true, isOpen: true });
     });
@@ -236,7 +295,9 @@ router.post("/voting/close", async (req, res) => {
   try {
     await withTables(async () => {
       await pool.query(
-        "UPDATE congress_voting_state SET is_open = false WHERE id = 1"
+        `INSERT INTO congress_voting_state (conference_id, is_open) VALUES ($1, false)
+         ON CONFLICT (conference_id) DO UPDATE SET is_open = false`,
+        [req.conferenceId]
       );
       res.json({ success: true, isOpen: false });
     });
@@ -253,9 +314,11 @@ router.post("/voting/reset", async (req, res) => {
   }
   try {
     await withTables(async () => {
-      await pool.query("DELETE FROM congress_votes");
+      await pool.query("DELETE FROM congress_votes WHERE conference_id = $1", [req.conferenceId]);
       await pool.query(
-        "UPDATE congress_voting_state SET is_open = false WHERE id = 1"
+        `INSERT INTO congress_voting_state (conference_id, is_open) VALUES ($1, false)
+         ON CONFLICT (conference_id) DO UPDATE SET is_open = false`,
+        [req.conferenceId]
       );
       logger.warn("Voting reset by admin");
       res.json({ success: true });

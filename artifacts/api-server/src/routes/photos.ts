@@ -77,6 +77,12 @@ async function ensureTables() {
     ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS drive_file_id TEXT;
   `);
   await pool.query(`
+    ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
+  `).catch(() => {});
+  await pool.query(`
+    ALTER TABLE congress_sessions ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1;
+  `).catch(() => {});
+  await pool.query(`
     ALTER TABLE congress_photos ADD COLUMN IF NOT EXISTS delete_token TEXT;
   `);
   // Backfill any existing photos that were uploaded before delete_token was introduced
@@ -142,8 +148,8 @@ router.post("/photos/session", async (req: Request, res: Response) => {
   try {
     const sessionToken = randomUUID();
     await pool.query(
-      `INSERT INTO congress_sessions (session_token) VALUES ($1)`,
-      [sessionToken]
+      `INSERT INTO congress_sessions (session_token, conference_id) VALUES ($1, $2)`,
+      [sessionToken, req.conferenceId]
     );
     res.status(201).json({ sessionToken });
   } catch (err) {
@@ -178,10 +184,10 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     return;
   }
 
-  // Verify the session token was issued by this server
+  // Verify the session token was issued by this server for this conference
   const sessionCheck = await pool.query(
-    `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
-    [sessionToken]
+    `SELECT 1 FROM congress_sessions WHERE session_token = $1 AND conference_id = $2 LIMIT 1`,
+    [sessionToken, req.conferenceId]
   );
   if (sessionCheck.rows.length === 0) {
     res.status(403).json({ error: "Invalid session token" });
@@ -246,9 +252,9 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     }
 
     await pool.query(
-      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption, drive_file_id, delete_token)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, objectPath, cleanName, sessionToken, cleanCaption, driveFileId, deleteToken]
+      `INSERT INTO congress_photos (id, object_path, uploader_name, uploader_device_id, caption, drive_file_id, delete_token, conference_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, objectPath, cleanName, sessionToken, cleanCaption, driveFileId, deleteToken, req.conferenceId]
     );
 
     const row = {
@@ -276,8 +282,8 @@ router.get("/photos", async (req: Request, res: Response) => {
     let validatedToken: string | undefined;
     if (sessionToken) {
       const check = await pool.query(
-        `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
-        [sessionToken]
+        `SELECT 1 FROM congress_sessions WHERE session_token = $1 AND conference_id = $2 LIMIT 1`,
+        [sessionToken, req.conferenceId]
       );
       if (check.rows.length > 0) validatedToken = sessionToken;
     }
@@ -291,9 +297,10 @@ router.get("/photos", async (req: Request, res: Response) => {
          ) AS liked_by_me
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
+       WHERE p.conference_id = $2
        GROUP BY p.id
        ORDER BY p.created_at DESC`,
-      [validatedToken ?? ""]
+      [validatedToken ?? "", req.conferenceId]
     );
     res.json({ photos: result.rows.map((r) => photoToJSON(r, validatedToken)) });
   } catch (err) {
@@ -316,10 +323,10 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
     return;
   }
   try {
-    // Validate the session token was issued by this server
+    // Validate the session token was issued by this server for this conference
     const sessionCheck = await pool.query(
-      `SELECT 1 FROM congress_sessions WHERE session_token = $1 LIMIT 1`,
-      [sessionToken]
+      `SELECT 1 FROM congress_sessions WHERE session_token = $1 AND conference_id = $2 LIMIT 1`,
+      [sessionToken, req.conferenceId]
     );
     if (sessionCheck.rows.length === 0) {
       res.status(403).json({ error: "Invalid session token" });
@@ -345,8 +352,8 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
          EXISTS(SELECT 1 FROM congress_photo_likes WHERE photo_id = p.id AND device_id = $1) AS liked_by_me
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
-       WHERE p.id = $2 GROUP BY p.id`,
-      [sessionToken, req.params.id]
+       WHERE p.id = $2 AND p.conference_id = $3 GROUP BY p.id`,
+      [sessionToken, req.params.id, req.conferenceId]
     );
     if (result.rows.length === 0) { res.status(404).json({ error: "Photo not found" }); return; }
     res.json(photoToJSON(result.rows[0], sessionToken));
@@ -362,8 +369,8 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
   if (isAdmin) {
     try {
       const result = await pool.query(
-        `DELETE FROM congress_photos WHERE id = $1 RETURNING id`,
-        [req.params.id]
+        `DELETE FROM congress_photos WHERE id = $1 AND conference_id = $2 RETURNING id`,
+        [req.params.id, req.conferenceId]
       );
       if (result.rows.length === 0) {
         res.status(404).json({ error: "Photo not found" }); return;
@@ -379,9 +386,9 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
   if (!deleteToken) { res.status(400).json({ error: "deleteToken required" }); return; }
   try {
     const result = await pool.query(
-      `DELETE FROM congress_photos WHERE id = $1 AND delete_token = $2
+      `DELETE FROM congress_photos WHERE id = $1 AND delete_token = $2 AND conference_id = $3
        RETURNING id, object_path, drive_file_id`,
-      [req.params.id, deleteToken]
+      [req.params.id, deleteToken, req.conferenceId]
     );
     if (result.rows.length === 0) {
       res.status(403).json({ error: "Photo not found or no permission" }); return;
@@ -420,8 +427,10 @@ router.get("/photos/admin", async (req: Request, res: Response) => {
               COUNT(l.photo_id)::int AS likes
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
+       WHERE p.conference_id = $1
        GROUP BY p.id
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC`,
+      [req.conferenceId]
     );
     res.json({ photos: result.rows.map((r) => photoToJSON(r)) });
   } catch (err) {

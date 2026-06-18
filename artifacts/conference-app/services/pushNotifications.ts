@@ -2,6 +2,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { apiFetch } from "./apiFetch";
 
 // Expo Go on Android SDK 53+ removed push notification native support.
 // Any expo-notifications API call throws in that environment.
@@ -62,7 +63,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
     const apiBase = getApiBase();
     if (apiBase) {
-      await fetch(`${apiBase}/api/push/register`, {
+      await apiFetch(`${apiBase}/api/push/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -86,7 +87,7 @@ export async function sendPushNotification(
     return { success: false, message: "API server not configured" };
   }
   try {
-    const response = await fetch(`${apiBase}/api/push/send`, {
+    const response = await apiFetch(`${apiBase}/api/push/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, body, adminPin }),

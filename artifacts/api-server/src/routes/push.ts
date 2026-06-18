@@ -1,5 +1,7 @@
 import { Router, type Request } from "express";
 import { pool } from "../lib/db";
+import { logger } from "../lib/logger";
+
 const router = Router();
 
 function getAdminPin(): string {
@@ -54,12 +56,20 @@ async function ensureTables() {
       ADD COLUMN IF NOT EXISTS last_error TEXT
   `).catch(() => {});
   await pool.query(`
+    ALTER TABLE congress_push_tokens
+      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
+  `).catch(() => {});
+  await pool.query(`
+    ALTER TABLE congress_scheduled_announcements
+      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
+  `).catch(() => {});
+  await pool.query(`
     DELETE FROM congress_push_tokens
     WHERE token NOT LIKE 'ExponentPushToken[%'
   `).catch(() => {});
 }
 
-ensureTables().catch(console.error);
+ensureTables().catch((err) => logger.error({ err }, "push ensureTable error"));
 
 const EXPO_PUSH_BATCH_SIZE = 100;
 const MAX_SEND_ATTEMPTS = 3;
@@ -79,8 +89,11 @@ interface ExpoTicket {
   details?: { error?: string };
 }
 
-async function sendToAll(title: string, body: string) {
-  const { rows } = await pool.query(`SELECT token FROM congress_push_tokens`);
+async function sendToAll(title: string, body: string, conferenceId: number) {
+  const { rows } = await pool.query(
+    `SELECT token FROM congress_push_tokens WHERE conference_id = $1`,
+    [conferenceId]
+  );
   const tokens = rows.map((r: { token: string }) => r.token);
   if (tokens.length === 0) return { sent: 0, failed: 0 };
 
@@ -131,7 +144,10 @@ async function sendToAll(title: string, body: string) {
 
   if (invalidTokens.length > 0) {
     for (const token of invalidTokens) {
-      await pool.query(`DELETE FROM congress_push_tokens WHERE token = $1`, [token]).catch(() => {});
+      await pool.query(
+        `DELETE FROM congress_push_tokens WHERE token = $1 AND conference_id = $2`,
+        [token, conferenceId]
+      ).catch(() => {});
     }
   }
 
@@ -159,17 +175,17 @@ async function processScheduled() {
            WHERE id = $2`,
           [`Announcement expired: more than 1 hour past scheduled time (${row.scheduled_for})`, row.id]
         );
-        console.log(`Scheduled announcement expired without sending: "${row.title}" (id=${row.id})`);
+        logger.warn({ id: row.id, title: row.title }, "Scheduled announcement expired without sending");
         continue;
       }
 
       try {
-        const result = await sendToAll(row.title, row.body);
+        const result = await sendToAll(row.title, row.body, row.conference_id ?? 1);
         await pool.query(
           `UPDATE congress_scheduled_announcements SET sent_at = NOW(), attempts = attempts + 1 WHERE id = $1`,
           [row.id]
         );
-        console.log(`Scheduled announcement sent: "${row.title}" (id=${row.id}) → sent=${result.sent} failed=${result.failed}`);
+        logger.info({ id: row.id, title: row.title, sent: result.sent, failed: result.failed }, "Scheduled announcement sent");
       } catch (err) {
         const attempts = (row.attempts ?? 0) + 1;
         const errMsg = String(err);
@@ -180,18 +196,18 @@ async function processScheduled() {
              WHERE id = $3`,
             [attempts, errMsg, row.id]
           );
-          console.error(`Scheduled announcement permanently failed after ${attempts} attempts (id=${row.id}): ${errMsg}`);
+          logger.error({ id: row.id, attempts, errMsg }, "Scheduled announcement permanently failed");
         } else {
           await pool.query(
             `UPDATE congress_scheduled_announcements SET attempts = $1, last_error = $2 WHERE id = $3`,
             [attempts, errMsg, row.id]
           );
-          console.error(`Scheduled announcement attempt ${attempts}/${MAX_SEND_ATTEMPTS} failed (id=${row.id}): ${errMsg}`);
+          logger.error({ id: row.id, attempt: attempts, errMsg }, "Scheduled announcement attempt failed");
         }
       }
     }
   } catch (err) {
-    console.error("processScheduled error:", err);
+    logger.error({ err }, "processScheduled error");
   }
 }
 
@@ -207,13 +223,17 @@ router.post("/push/register", async (req, res) => {
     res.status(400).json({ error: "Invalid push token format" });
     return;
   }
+  const conferenceId = req.conferenceId;
   await pool.query(
-    `INSERT INTO congress_push_tokens (token, last_seen)
-     VALUES ($1, NOW())
-     ON CONFLICT (token) DO UPDATE SET last_seen = NOW()`,
-    [token]
+    `INSERT INTO congress_push_tokens (token, conference_id, last_seen)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (token) DO UPDATE SET last_seen = NOW(), conference_id = $2`,
+    [token, conferenceId]
   );
-  const { rows } = await pool.query(`SELECT COUNT(*) AS cnt FROM congress_push_tokens`);
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM congress_push_tokens WHERE conference_id = $1`,
+    [conferenceId]
+  );
   res.json({ success: true, registered: parseInt(rows[0].cnt, 10) });
 });
 
@@ -235,7 +255,7 @@ router.post("/push/send", async (req, res) => {
   }
 
   try {
-    const result = await sendToAll(title, body);
+    const result = await sendToAll(title, body, req.conferenceId);
     res.json({
       success: true,
       ...result,
@@ -275,9 +295,9 @@ router.post("/push/schedule", async (req, res) => {
   }
 
   const { rows } = await pool.query(
-    `INSERT INTO congress_scheduled_announcements (title, body, scheduled_for)
-     VALUES ($1, $2, $3) RETURNING *`,
-    [title, body, scheduledDate]
+    `INSERT INTO congress_scheduled_announcements (title, body, scheduled_for, conference_id)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [title, body, scheduledDate, req.conferenceId]
   );
 
   res.json({ success: true, announcement: rows[0] });
@@ -291,7 +311,9 @@ router.get("/push/scheduled", async (req, res) => {
 
   const { rows } = await pool.query(
     `SELECT * FROM congress_scheduled_announcements
-     ORDER BY scheduled_for ASC`
+     WHERE conference_id = $1
+     ORDER BY scheduled_for ASC`,
+    [req.conferenceId]
   );
 
   res.json({ announcements: rows });
@@ -304,8 +326,8 @@ router.delete("/push/scheduled/:id", async (req, res) => {
   }
 
   const { rows } = await pool.query(
-    `DELETE FROM congress_scheduled_announcements WHERE id = $1 AND sent_at IS NULL RETURNING id`,
-    [req.params.id]
+    `DELETE FROM congress_scheduled_announcements WHERE id = $1 AND conference_id = $2 AND sent_at IS NULL RETURNING id`,
+    [req.params.id, req.conferenceId]
   );
 
   if (rows.length === 0) {
@@ -317,7 +339,10 @@ router.delete("/push/scheduled/:id", async (req, res) => {
 });
 
 router.get("/push/stats", async (req, res) => {
-  const { rows } = await pool.query(`SELECT COUNT(*) AS cnt FROM congress_push_tokens`);
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM congress_push_tokens WHERE conference_id = $1`,
+    [req.conferenceId]
+  );
   res.json({ registeredDevices: parseInt(rows[0].cnt, 10) });
 });
 

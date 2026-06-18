@@ -29,6 +29,7 @@ import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/context/ProfileContext";
 import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
 import conferenceConfig from "@/conference.config";
+import { apiFetch } from "@/services/apiFetch";
 
 const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
 // Actual pixel dimensions of exhibit-hall-map.png
@@ -357,7 +358,7 @@ async function getOrCreateAttendeeToken(): Promise<string> {
     if (stored) return stored;
   } catch {}
   try {
-    const res = await fetch(`${API_BASE}/api/attendees/register`, { method: "POST" });
+    const res = await apiFetch(`${API_BASE}/api/attendees/register`, { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       const token: string = data.attendeeToken;
@@ -454,7 +455,7 @@ export default function ExhibitHallScreen() {
 
       for (const checkin of pending) {
         try {
-          const res = await fetch(`${API_BASE}/api/booths/checkin`, {
+          const res = await apiFetch(`${API_BASE}/api/booths/checkin`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -494,7 +495,7 @@ export default function ExhibitHallScreen() {
     const remainingPending = await flushPendingQueue(attendeeToken, profile?.emailConsent ?? false);
     setPendingCount(remainingPending);
     try {
-      const res = await fetch(`${API_BASE}/api/booths?attendeeToken=${encodeURIComponent(attendeeToken)}`);
+      const res = await apiFetch(`${API_BASE}/api/booths?attendeeToken=${encodeURIComponent(attendeeToken)}`);
       if (res.ok) {
         const data: PassportData = await res.json();
         setPassport(data);
@@ -577,7 +578,7 @@ export default function ExhibitHallScreen() {
     if (!attendeeToken) return;
     setCheckingIn(true);
     try {
-      const res = await fetch(`${API_BASE}/api/booths/checkin`, {
+      const res = await apiFetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ boothId, secretToken, attendeeToken, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
