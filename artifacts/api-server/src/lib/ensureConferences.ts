@@ -18,6 +18,7 @@ export async function ensureConferencesTable(): Promise<void> {
       feature_voting        BOOLEAN NOT NULL DEFAULT false,
       feature_photos        BOOLEAN NOT NULL DEFAULT false,
       feature_exhibit_hall  BOOLEAN NOT NULL DEFAULT false,
+      published             BOOLEAN NOT NULL DEFAULT false,
       created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 

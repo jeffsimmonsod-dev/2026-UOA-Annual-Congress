@@ -8,3 +8,271 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface AdminPinInput {
+  pin: string;
+}
+
+export interface AdminVerifyResult {
+  valid: boolean;
+}
+
+export interface ConferenceRow {
+  id: number;
+  name: string;
+  organization: string;
+  /** @nullable */
+  dates?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  primary_color?: string | null;
+  /** @nullable */
+  primary_dark_color?: string | null;
+  /** @nullable */
+  secondary_color?: string | null;
+  /** @nullable */
+  secondary_dark_color?: string | null;
+  /** @nullable */
+  accent_color?: string | null;
+  /** @nullable */
+  accent_foreground_color?: string | null;
+  /** @nullable */
+  logo_url?: string | null;
+  feature_voting?: boolean;
+  feature_photos?: boolean;
+  feature_exhibit_hall?: boolean;
+  published?: boolean;
+  created_at?: string;
+}
+
+export interface ConferenceList {
+  conferences: ConferenceRow[];
+}
+
+export interface ConferenceConfig {
+  conferenceId: number;
+  conferenceName: string;
+  organizationName: string;
+  dates?: string;
+  location?: string;
+  primaryColor?: string;
+  primaryDarkColor?: string;
+  secondaryColor?: string;
+  secondaryDarkColor?: string;
+  accentColor?: string;
+  accentForegroundColor?: string;
+  /** @nullable */
+  logoUrl?: string | null;
+  featureVoting?: boolean;
+  featurePhotos?: boolean;
+  featureExhibitHall?: boolean;
+}
+
+export interface ConferenceInput {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  organization: string;
+  dates?: string;
+  location?: string;
+  primaryColor?: string;
+  primaryDarkColor?: string;
+  secondaryColor?: string;
+  secondaryDarkColor?: string;
+  accentColor?: string;
+  accentForegroundColor?: string;
+  logoUrl?: string;
+  featureVoting?: boolean;
+  featurePhotos?: boolean;
+  featureExhibitHall?: boolean;
+}
+
+export interface ConferenceUpdate {
+  name?: string;
+  organization?: string;
+  dates?: string;
+  location?: string;
+  primaryColor?: string;
+  primaryDarkColor?: string;
+  secondaryColor?: string;
+  secondaryDarkColor?: string;
+  accentColor?: string;
+  accentForegroundColor?: string;
+  logoUrl?: string;
+  featureVoting?: boolean;
+  featurePhotos?: boolean;
+  featureExhibitHall?: boolean;
+  published?: boolean;
+}
+
+export interface ConferenceCloneInput {
+  /** @minLength 1 */
+  name: string;
+}
+
+export interface ConferenceCloneResult {
+  conference: ConferenceRow;
+  boothsCopied?: number;
+  speakersCopied?: number;
+  sessionsCopied?: number;
+  sponsorsCopied?: number;
+}
+
+export interface Speaker {
+  id: number;
+  conference_id: number;
+  external_id: string;
+  name: string;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  company?: string | null;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  photo_url?: string | null;
+  session_ids?: string[];
+}
+
+export interface SpeakerList {
+  speakers: Speaker[];
+}
+
+export interface SpeakerRecord {
+  externalId?: string;
+  name: string;
+  title?: string;
+  organization?: string;
+  bio?: string;
+  photoUrl?: string;
+}
+
+export interface SpeakerBulkInput {
+  speakers: SpeakerRecord[];
+  replaceAll?: boolean;
+}
+
+export interface Session {
+  id: number;
+  conference_id: number;
+  external_id: string;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  start_time?: string | null;
+  /** @nullable */
+  end_time?: string | null;
+  /** @nullable */
+  day?: string | null;
+  /** @nullable */
+  room?: string | null;
+  /** @nullable */
+  track?: string | null;
+  speaker_ids?: string[];
+  tags?: string[];
+  is_para?: boolean;
+}
+
+export interface SessionList {
+  sessions: Session[];
+}
+
+export interface SessionRecord {
+  externalId?: string;
+  title: string;
+  description?: string;
+  day?: string;
+  startTime?: string;
+  endTime?: string;
+  track?: string;
+  speakerIds?: string[];
+  room?: string;
+  tags?: string[];
+  isPara?: boolean;
+}
+
+export interface SessionBulkInput {
+  sessions: SessionRecord[];
+  replaceAll?: boolean;
+}
+
+export interface Sponsor {
+  id: number;
+  conference_id: number;
+  external_id: string;
+  name: string;
+  tier: string;
+  /** @nullable */
+  website?: string | null;
+  /** @nullable */
+  logo_url?: string | null;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface SponsorList {
+  sponsors: Sponsor[];
+}
+
+export interface SponsorRecord {
+  externalId?: string;
+  name: string;
+  tier: string;
+  website?: string;
+  logoUrl?: string;
+  description?: string;
+}
+
+export interface SponsorBulkInput {
+  sponsors: SponsorRecord[];
+  replaceAll?: boolean;
+}
+
+export type BulkImportResultErrorsItem = {
+  row?: number;
+  message?: string;
+};
+
+export interface BulkImportResult {
+  imported: number;
+  errors: BulkImportResultErrorsItem[];
+}
+
+export interface PushNotificationInput {
+  title: string;
+  body: string;
+  adminPin: string;
+}
+
+export interface PushSendResult {
+  success: boolean;
+  sent?: number;
+  failed?: number;
+  message?: string;
+}
+
+export interface PushStats {
+  registeredDevices: number;
+}
+
+export interface VotingState {
+  isOpen: boolean;
+}
+
+export type VotingResultsSlateResults = { [key: string]: number };
+
+export type VotingResultsTrusteeResults = { [key: string]: number };
+
+export interface VotingResults {
+  isOpen: boolean;
+  totalVotes: number;
+  slateResults: VotingResultsSlateResults;
+  trusteeResults: VotingResultsTrusteeResults;
+}
+
+export interface VotingActionResult {
+  success: boolean;
+  isOpen?: boolean;
+}

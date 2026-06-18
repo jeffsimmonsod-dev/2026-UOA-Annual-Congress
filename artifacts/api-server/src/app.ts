@@ -41,6 +41,7 @@ const CONFERENCE_EXEMPT = [
   /^\/api\/healthz$/,
   /^\/api\/conferences(\/|$)/,
   /^\/api\/admin\/qr-codes/,
+  /^\/api\/admin\/verify$/,
 ];
 
 app.use((req: Request, res: Response, next: NextFunction) => {

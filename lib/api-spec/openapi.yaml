@@ -10,13 +10,27 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: conferences
+    description: Conference management
+  - name: sessions
+    description: Conference sessions
+  - name: speakers
+    description: Conference speakers
+  - name: sponsors
+    description: Conference sponsors
+  - name: push
+    description: Push notifications
+  - name: voting
+    description: Voting management
+  - name: admin
+    description: Admin operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,509 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /admin/verify:
+    post:
+      operationId: verifyAdmin
+      tags: [admin]
+      summary: Verify admin PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminPinInput"
+      responses:
+        "200":
+          description: PIN verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVerifyResult"
+        "401":
+          description: Invalid PIN
+
+  /conferences:
+    get:
+      operationId: listConferences
+      tags: [conferences]
+      summary: List all conferences
+      parameters:
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conference list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceList"
+        "401":
+          description: Unauthorized
+    post:
+      operationId: createConference
+      tags: [conferences]
+      summary: Create a conference
+      parameters:
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConferenceInput"
+      responses:
+        "201":
+          description: Created conference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceRow"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/config:
+    get:
+      operationId: getConferenceConfig
+      tags: [conferences]
+      summary: Get conference config
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conference config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceConfig"
+        "404":
+          description: Not found
+
+  /conferences/{id}:
+    patch:
+      operationId: updateConference
+      tags: [conferences]
+      summary: Update conference settings and branding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConferenceUpdate"
+      responses:
+        "200":
+          description: Updated conference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceRow"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /conferences/{id}/clone:
+    post:
+      operationId: cloneConference
+      tags: [conferences]
+      summary: Clone a conference and its structural data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConferenceCloneInput"
+      responses:
+        "201":
+          description: Cloned conference result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConferenceCloneResult"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/speakers:
+    get:
+      operationId: listConferenceSpeakers
+      tags: [speakers]
+      summary: List speakers for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Speakers list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeakerList"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/speakers/bulk:
+    post:
+      operationId: bulkImportSpeakers
+      tags: [speakers]
+      summary: Bulk import speakers for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeakerBulkInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/sessions:
+    get:
+      operationId: listConferenceSessions
+      tags: [sessions]
+      summary: List sessions for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/sessions/bulk:
+    post:
+      operationId: bulkImportSessions
+      tags: [sessions]
+      summary: Bulk import sessions for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionBulkInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/sponsors:
+    get:
+      operationId: listConferenceSponsors
+      tags: [sponsors]
+      summary: List sponsors for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sponsors list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SponsorList"
+        "401":
+          description: Unauthorized
+
+  /conferences/{id}/sponsors/bulk:
+    post:
+      operationId: bulkImportSponsors
+      tags: [sponsors]
+      summary: Bulk import sponsors for a conference
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SponsorBulkInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResult"
+        "401":
+          description: Unauthorized
+
+  /push/send:
+    post:
+      operationId: sendPushNotification
+      tags: [push]
+      summary: Send a push notification to all registered devices
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushNotificationInput"
+      responses:
+        "200":
+          description: Send result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushSendResult"
+        "401":
+          description: Unauthorized
+
+  /push/stats:
+    get:
+      operationId: getPushStats
+      tags: [push]
+      summary: Get registered device count
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Push stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushStats"
+
+  /voting/state:
+    get:
+      operationId: getVotingState
+      tags: [voting]
+      summary: Get voting open/closed state
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Voting state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingState"
+
+  /voting/results:
+    get:
+      operationId: getVotingResults
+      tags: [voting]
+      summary: Get voting results (admin only)
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Voting results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingResults"
+        "401":
+          description: Unauthorized
+
+  /voting/open:
+    post:
+      operationId: openVoting
+      tags: [voting]
+      summary: Open voting for a conference
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingActionResult"
+        "401":
+          description: Unauthorized
+
+  /voting/close:
+    post:
+      operationId: closeVoting
+      tags: [voting]
+      summary: Close voting for a conference
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingActionResult"
+        "401":
+          description: Unauthorized
+
+  /voting/reset:
+    post:
+      operationId: resetVoting
+      tags: [voting]
+      summary: Reset all votes for a conference
+      parameters:
+        - name: X-Conference-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotingActionResult"
+        "401":
+          description: Unauthorized
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +551,477 @@ components:
       required:
         - status
 
+    AdminPinInput:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+
+    AdminVerifyResult:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+
+    ConferenceRow:
+      type: object
+      required: [id, name, organization]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        organization:
+          type: string
+        dates:
+          type: ["string", "null"]
+        location:
+          type: ["string", "null"]
+        primary_color:
+          type: ["string", "null"]
+        primary_dark_color:
+          type: ["string", "null"]
+        secondary_color:
+          type: ["string", "null"]
+        secondary_dark_color:
+          type: ["string", "null"]
+        accent_color:
+          type: ["string", "null"]
+        accent_foreground_color:
+          type: ["string", "null"]
+        logo_url:
+          type: ["string", "null"]
+        feature_voting:
+          type: boolean
+        feature_photos:
+          type: boolean
+        feature_exhibit_hall:
+          type: boolean
+        published:
+          type: boolean
+        created_at:
+          type: string
+
+    ConferenceList:
+      type: object
+      required: [conferences]
+      properties:
+        conferences:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConferenceRow"
+
+    ConferenceConfig:
+      type: object
+      required: [conferenceId, conferenceName, organizationName]
+      properties:
+        conferenceId:
+          type: integer
+        conferenceName:
+          type: string
+        organizationName:
+          type: string
+        dates:
+          type: string
+        location:
+          type: string
+        primaryColor:
+          type: string
+        primaryDarkColor:
+          type: string
+        secondaryColor:
+          type: string
+        secondaryDarkColor:
+          type: string
+        accentColor:
+          type: string
+        accentForegroundColor:
+          type: string
+        logoUrl:
+          type: ["string", "null"]
+        featureVoting:
+          type: boolean
+        featurePhotos:
+          type: boolean
+        featureExhibitHall:
+          type: boolean
+
+    ConferenceInput:
+      type: object
+      required: [name, organization]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        organization:
+          type: string
+          minLength: 1
+        dates:
+          type: string
+        location:
+          type: string
+        primaryColor:
+          type: string
+        primaryDarkColor:
+          type: string
+        secondaryColor:
+          type: string
+        secondaryDarkColor:
+          type: string
+        accentColor:
+          type: string
+        accentForegroundColor:
+          type: string
+        logoUrl:
+          type: string
+        featureVoting:
+          type: boolean
+        featurePhotos:
+          type: boolean
+        featureExhibitHall:
+          type: boolean
+
+    ConferenceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        organization:
+          type: string
+        dates:
+          type: string
+        location:
+          type: string
+        primaryColor:
+          type: string
+        primaryDarkColor:
+          type: string
+        secondaryColor:
+          type: string
+        secondaryDarkColor:
+          type: string
+        accentColor:
+          type: string
+        accentForegroundColor:
+          type: string
+        logoUrl:
+          type: string
+        featureVoting:
+          type: boolean
+        featurePhotos:
+          type: boolean
+        featureExhibitHall:
+          type: boolean
+        published:
+          type: boolean
+
+    ConferenceCloneInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    ConferenceCloneResult:
+      type: object
+      required: [conference]
+      properties:
+        conference:
+          $ref: "#/components/schemas/ConferenceRow"
+        boothsCopied:
+          type: integer
+        speakersCopied:
+          type: integer
+        sessionsCopied:
+          type: integer
+        sponsorsCopied:
+          type: integer
+
+    Speaker:
+      type: object
+      required: [id, conference_id, external_id, name]
+      properties:
+        id:
+          type: integer
+        conference_id:
+          type: integer
+        external_id:
+          type: string
+        name:
+          type: string
+        title:
+          type: ["string", "null"]
+        company:
+          type: ["string", "null"]
+        bio:
+          type: ["string", "null"]
+        photo_url:
+          type: ["string", "null"]
+        session_ids:
+          type: array
+          items:
+            type: string
+
+    SpeakerList:
+      type: object
+      required: [speakers]
+      properties:
+        speakers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Speaker"
+
+    SpeakerRecord:
+      type: object
+      required: [name]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        title:
+          type: string
+        organization:
+          type: string
+        bio:
+          type: string
+        photoUrl:
+          type: string
+
+    SpeakerBulkInput:
+      type: object
+      required: [speakers]
+      properties:
+        speakers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpeakerRecord"
+        replaceAll:
+          type: boolean
+
+    Session:
+      type: object
+      required: [id, conference_id, external_id, title]
+      properties:
+        id:
+          type: integer
+        conference_id:
+          type: integer
+        external_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        start_time:
+          type: ["string", "null"]
+        end_time:
+          type: ["string", "null"]
+        day:
+          type: ["string", "null"]
+        room:
+          type: ["string", "null"]
+        track:
+          type: ["string", "null"]
+        speaker_ids:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        is_para:
+          type: boolean
+
+    SessionList:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+
+    SessionRecord:
+      type: object
+      required: [title]
+      properties:
+        externalId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        day:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        track:
+          type: string
+        speakerIds:
+          type: array
+          items:
+            type: string
+        room:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        isPara:
+          type: boolean
+
+    SessionBulkInput:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionRecord"
+        replaceAll:
+          type: boolean
+
+    Sponsor:
+      type: object
+      required: [id, conference_id, external_id, name, tier]
+      properties:
+        id:
+          type: integer
+        conference_id:
+          type: integer
+        external_id:
+          type: string
+        name:
+          type: string
+        tier:
+          type: string
+        website:
+          type: ["string", "null"]
+        logo_url:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+
+    SponsorList:
+      type: object
+      required: [sponsors]
+      properties:
+        sponsors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sponsor"
+
+    SponsorRecord:
+      type: object
+      required: [name, tier]
+      properties:
+        externalId:
+          type: string
+        name:
+          type: string
+        tier:
+          type: string
+        website:
+          type: string
+        logoUrl:
+          type: string
+        description:
+          type: string
+
+    SponsorBulkInput:
+      type: object
+      required: [sponsors]
+      properties:
+        sponsors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SponsorRecord"
+        replaceAll:
+          type: boolean
+
+    BulkImportResult:
+      type: object
+      required: [imported, errors]
+      properties:
+        imported:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              message:
+                type: string
+
+    PushNotificationInput:
+      type: object
+      required: [title, body, adminPin]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        adminPin:
+          type: string
+
+    PushSendResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        sent:
+          type: integer
+        failed:
+          type: integer
+        message:
+          type: string
+
+    PushStats:
+      type: object
+      required: [registeredDevices]
+      properties:
+        registeredDevices:
+          type: integer
+
+    VotingState:
+      type: object
+      required: [isOpen]
+      properties:
+        isOpen:
+          type: boolean
+
+    VotingResults:
+      type: object
+      required: [isOpen, totalVotes, slateResults, trusteeResults]
+      properties:
+        isOpen:
+          type: boolean
+        totalVotes:
+          type: integer
+        slateResults:
+          type: object
+          additionalProperties:
+            type: integer
+        trusteeResults:
+          type: object
+          additionalProperties:
+            type: integer
+
+    VotingActionResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        isOpen:
+          type: boolean

@@ -8,9 +8,454 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
+});
+
+/**
+ * @summary Verify admin PIN
+ */
+export const VerifyAdminBody = zod.object({
+  pin: zod.string(),
+});
+
+export const VerifyAdminResponse = zod.object({
+  valid: zod.boolean(),
+});
+
+/**
+ * @summary List all conferences
+ */
+export const ListConferencesHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ListConferencesResponse = zod.object({
+  conferences: zod.array(
+    zod.object({
+      id: zod.number(),
+      name: zod.string(),
+      organization: zod.string(),
+      dates: zod.string().nullish(),
+      location: zod.string().nullish(),
+      primary_color: zod.string().nullish(),
+      primary_dark_color: zod.string().nullish(),
+      secondary_color: zod.string().nullish(),
+      secondary_dark_color: zod.string().nullish(),
+      accent_color: zod.string().nullish(),
+      accent_foreground_color: zod.string().nullish(),
+      logo_url: zod.string().nullish(),
+      feature_voting: zod.boolean().optional(),
+      feature_photos: zod.boolean().optional(),
+      feature_exhibit_hall: zod.boolean().optional(),
+      published: zod.boolean().optional(),
+      created_at: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Create a conference
+ */
+export const CreateConferenceHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const CreateConferenceBody = zod.object({
+  name: zod.string().min(1),
+  organization: zod.string().min(1),
+  dates: zod.string().optional(),
+  location: zod.string().optional(),
+  primaryColor: zod.string().optional(),
+  primaryDarkColor: zod.string().optional(),
+  secondaryColor: zod.string().optional(),
+  secondaryDarkColor: zod.string().optional(),
+  accentColor: zod.string().optional(),
+  accentForegroundColor: zod.string().optional(),
+  logoUrl: zod.string().optional(),
+  featureVoting: zod.boolean().optional(),
+  featurePhotos: zod.boolean().optional(),
+  featureExhibitHall: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get conference config
+ */
+export const GetConferenceConfigParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetConferenceConfigResponse = zod.object({
+  conferenceId: zod.number(),
+  conferenceName: zod.string(),
+  organizationName: zod.string(),
+  dates: zod.string().optional(),
+  location: zod.string().optional(),
+  primaryColor: zod.string().optional(),
+  primaryDarkColor: zod.string().optional(),
+  secondaryColor: zod.string().optional(),
+  secondaryDarkColor: zod.string().optional(),
+  accentColor: zod.string().optional(),
+  accentForegroundColor: zod.string().optional(),
+  logoUrl: zod.string().nullish(),
+  featureVoting: zod.boolean().optional(),
+  featurePhotos: zod.boolean().optional(),
+  featureExhibitHall: zod.boolean().optional(),
+});
+
+/**
+ * @summary Update conference settings and branding
+ */
+export const UpdateConferenceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateConferenceHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateConferenceBody = zod.object({
+  name: zod.string().optional(),
+  organization: zod.string().optional(),
+  dates: zod.string().optional(),
+  location: zod.string().optional(),
+  primaryColor: zod.string().optional(),
+  primaryDarkColor: zod.string().optional(),
+  secondaryColor: zod.string().optional(),
+  secondaryDarkColor: zod.string().optional(),
+  accentColor: zod.string().optional(),
+  accentForegroundColor: zod.string().optional(),
+  logoUrl: zod.string().optional(),
+  featureVoting: zod.boolean().optional(),
+  featurePhotos: zod.boolean().optional(),
+  featureExhibitHall: zod.boolean().optional(),
+  published: zod.boolean().optional(),
+});
+
+export const UpdateConferenceResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  organization: zod.string(),
+  dates: zod.string().nullish(),
+  location: zod.string().nullish(),
+  primary_color: zod.string().nullish(),
+  primary_dark_color: zod.string().nullish(),
+  secondary_color: zod.string().nullish(),
+  secondary_dark_color: zod.string().nullish(),
+  accent_color: zod.string().nullish(),
+  accent_foreground_color: zod.string().nullish(),
+  logo_url: zod.string().nullish(),
+  feature_voting: zod.boolean().optional(),
+  feature_photos: zod.boolean().optional(),
+  feature_exhibit_hall: zod.boolean().optional(),
+  published: zod.boolean().optional(),
+  created_at: zod.string().optional(),
+});
+
+/**
+ * @summary Clone a conference and its structural data
+ */
+export const CloneConferenceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CloneConferenceHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const CloneConferenceBody = zod.object({
+  name: zod.string().min(1),
+});
+
+/**
+ * @summary List speakers for a conference
+ */
+export const ListConferenceSpeakersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListConferenceSpeakersHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ListConferenceSpeakersResponse = zod.object({
+  speakers: zod.array(
+    zod.object({
+      id: zod.number(),
+      conference_id: zod.number(),
+      external_id: zod.string(),
+      name: zod.string(),
+      title: zod.string().nullish(),
+      company: zod.string().nullish(),
+      bio: zod.string().nullish(),
+      photo_url: zod.string().nullish(),
+      session_ids: zod.array(zod.string()).optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Bulk import speakers for a conference
+ */
+export const BulkImportSpeakersParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const BulkImportSpeakersHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const BulkImportSpeakersBody = zod.object({
+  speakers: zod.array(
+    zod.object({
+      externalId: zod.string().optional(),
+      name: zod.string(),
+      title: zod.string().optional(),
+      organization: zod.string().optional(),
+      bio: zod.string().optional(),
+      photoUrl: zod.string().optional(),
+    }),
+  ),
+  replaceAll: zod.boolean().optional(),
+});
+
+export const BulkImportSpeakersResponse = zod.object({
+  imported: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number().optional(),
+      message: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary List sessions for a conference
+ */
+export const ListConferenceSessionsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListConferenceSessionsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ListConferenceSessionsResponse = zod.object({
+  sessions: zod.array(
+    zod.object({
+      id: zod.number(),
+      conference_id: zod.number(),
+      external_id: zod.string(),
+      title: zod.string(),
+      description: zod.string().nullish(),
+      start_time: zod.string().nullish(),
+      end_time: zod.string().nullish(),
+      day: zod.string().nullish(),
+      room: zod.string().nullish(),
+      track: zod.string().nullish(),
+      speaker_ids: zod.array(zod.string()).optional(),
+      tags: zod.array(zod.string()).optional(),
+      is_para: zod.boolean().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Bulk import sessions for a conference
+ */
+export const BulkImportSessionsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const BulkImportSessionsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const BulkImportSessionsBody = zod.object({
+  sessions: zod.array(
+    zod.object({
+      externalId: zod.string().optional(),
+      title: zod.string(),
+      description: zod.string().optional(),
+      day: zod.string().optional(),
+      startTime: zod.string().optional(),
+      endTime: zod.string().optional(),
+      track: zod.string().optional(),
+      speakerIds: zod.array(zod.string()).optional(),
+      room: zod.string().optional(),
+      tags: zod.array(zod.string()).optional(),
+      isPara: zod.boolean().optional(),
+    }),
+  ),
+  replaceAll: zod.boolean().optional(),
+});
+
+export const BulkImportSessionsResponse = zod.object({
+  imported: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number().optional(),
+      message: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary List sponsors for a conference
+ */
+export const ListConferenceSponsorsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListConferenceSponsorsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ListConferenceSponsorsResponse = zod.object({
+  sponsors: zod.array(
+    zod.object({
+      id: zod.number(),
+      conference_id: zod.number(),
+      external_id: zod.string(),
+      name: zod.string(),
+      tier: zod.string(),
+      website: zod.string().nullish(),
+      logo_url: zod.string().nullish(),
+      description: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Bulk import sponsors for a conference
+ */
+export const BulkImportSponsorsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const BulkImportSponsorsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const BulkImportSponsorsBody = zod.object({
+  sponsors: zod.array(
+    zod.object({
+      externalId: zod.string().optional(),
+      name: zod.string(),
+      tier: zod.string(),
+      website: zod.string().optional(),
+      logoUrl: zod.string().optional(),
+      description: zod.string().optional(),
+    }),
+  ),
+  replaceAll: zod.boolean().optional(),
+});
+
+export const BulkImportSponsorsResponse = zod.object({
+  imported: zod.number(),
+  errors: zod.array(
+    zod.object({
+      row: zod.number().optional(),
+      message: zod.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Send a push notification to all registered devices
+ */
+export const SendPushNotificationHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+});
+
+export const SendPushNotificationBody = zod.object({
+  title: zod.string(),
+  body: zod.string(),
+  adminPin: zod.string(),
+});
+
+export const SendPushNotificationResponse = zod.object({
+  success: zod.boolean(),
+  sent: zod.number().optional(),
+  failed: zod.number().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Get registered device count
+ */
+export const GetPushStatsHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod.string().optional(),
+});
+
+export const GetPushStatsResponse = zod.object({
+  registeredDevices: zod.number(),
+});
+
+/**
+ * @summary Get voting open/closed state
+ */
+export const GetVotingStateHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+});
+
+export const GetVotingStateResponse = zod.object({
+  isOpen: zod.boolean(),
+});
+
+/**
+ * @summary Get voting results (admin only)
+ */
+export const GetVotingResultsHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod.string(),
+});
+
+export const GetVotingResultsResponse = zod.object({
+  isOpen: zod.boolean(),
+  totalVotes: zod.number(),
+  slateResults: zod.record(zod.string(), zod.number()),
+  trusteeResults: zod.record(zod.string(), zod.number()),
+});
+
+/**
+ * @summary Open voting for a conference
+ */
+export const OpenVotingHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod.string(),
+});
+
+export const OpenVotingResponse = zod.object({
+  success: zod.boolean(),
+  isOpen: zod.boolean().optional(),
+});
+
+/**
+ * @summary Close voting for a conference
+ */
+export const CloseVotingHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod.string(),
+});
+
+export const CloseVotingResponse = zod.object({
+  success: zod.boolean(),
+  isOpen: zod.boolean().optional(),
+});
+
+/**
+ * @summary Reset all votes for a conference
+ */
+export const ResetVotingHeader = zod.object({
+  "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ResetVotingResponse = zod.object({
+  success: zod.boolean(),
+  isOpen: zod.boolean().optional(),
 });

@@ -5,18 +5,45 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  AdminPinInput,
+  AdminVerifyResult,
+  BulkImportResult,
+  ConferenceCloneInput,
+  ConferenceCloneResult,
+  ConferenceConfig,
+  ConferenceInput,
+  ConferenceList,
+  ConferenceRow,
+  ConferenceUpdate,
+  HealthStatus,
+  PushNotificationInput,
+  PushSendResult,
+  PushStats,
+  SessionBulkInput,
+  SessionList,
+  SpeakerBulkInput,
+  SpeakerList,
+  SponsorBulkInput,
+  SponsorList,
+  VotingActionResult,
+  VotingResults,
+  VotingState,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -25,7 +52,6 @@ type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const getHealthCheckUrl = () => {
@@ -99,3 +125,1590 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Verify admin PIN
+ */
+export const getVerifyAdminUrl = () => {
+  return `/api/admin/verify`;
+};
+
+export const verifyAdmin = async (
+  adminPinInput: AdminPinInput,
+  options?: RequestInit,
+): Promise<AdminVerifyResult> => {
+  return customFetch<AdminVerifyResult>(getVerifyAdminUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminPinInput),
+  });
+};
+
+export const getVerifyAdminMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyAdmin>>,
+    TError,
+    { data: BodyType<AdminPinInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof verifyAdmin>>,
+  TError,
+  { data: BodyType<AdminPinInput> },
+  TContext
+> => {
+  const mutationKey = ["verifyAdmin"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof verifyAdmin>>,
+    { data: BodyType<AdminPinInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return verifyAdmin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VerifyAdminMutationResult = NonNullable<
+  Awaited<ReturnType<typeof verifyAdmin>>
+>;
+export type VerifyAdminMutationBody = BodyType<AdminPinInput>;
+export type VerifyAdminMutationError = ErrorType<void>;
+
+/**
+ * @summary Verify admin PIN
+ */
+export const useVerifyAdmin = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyAdmin>>,
+    TError,
+    { data: BodyType<AdminPinInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof verifyAdmin>>,
+  TError,
+  { data: BodyType<AdminPinInput> },
+  TContext
+> => {
+  return useMutation(getVerifyAdminMutationOptions(options));
+};
+
+/**
+ * @summary List all conferences
+ */
+export const getListConferencesUrl = () => {
+  return `/api/conferences`;
+};
+
+export const listConferences = async (
+  options?: RequestInit,
+): Promise<ConferenceList> => {
+  return customFetch<ConferenceList>(getListConferencesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConferencesQueryKey = () => {
+  return [`/api/conferences`] as const;
+};
+
+export const getListConferencesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConferences>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConferences>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListConferencesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listConferences>>> = ({
+    signal,
+  }) => listConferences({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConferences>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConferencesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConferences>>
+>;
+export type ListConferencesQueryError = ErrorType<void>;
+
+/**
+ * @summary List all conferences
+ */
+
+export function useListConferences<
+  TData = Awaited<ReturnType<typeof listConferences>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConferences>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConferencesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a conference
+ */
+export const getCreateConferenceUrl = () => {
+  return `/api/conferences`;
+};
+
+export const createConference = async (
+  conferenceInput: ConferenceInput,
+  options?: RequestInit,
+): Promise<ConferenceRow> => {
+  return customFetch<ConferenceRow>(getCreateConferenceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(conferenceInput),
+  });
+};
+
+export const getCreateConferenceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createConference>>,
+    TError,
+    { data: BodyType<ConferenceInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createConference>>,
+  TError,
+  { data: BodyType<ConferenceInput> },
+  TContext
+> => {
+  const mutationKey = ["createConference"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createConference>>,
+    { data: BodyType<ConferenceInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createConference(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateConferenceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createConference>>
+>;
+export type CreateConferenceMutationBody = BodyType<ConferenceInput>;
+export type CreateConferenceMutationError = ErrorType<void>;
+
+/**
+ * @summary Create a conference
+ */
+export const useCreateConference = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createConference>>,
+    TError,
+    { data: BodyType<ConferenceInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createConference>>,
+  TError,
+  { data: BodyType<ConferenceInput> },
+  TContext
+> => {
+  return useMutation(getCreateConferenceMutationOptions(options));
+};
+
+/**
+ * @summary Get conference config
+ */
+export const getGetConferenceConfigUrl = (id: number) => {
+  return `/api/conferences/${id}/config`;
+};
+
+export const getConferenceConfig = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ConferenceConfig> => {
+  return customFetch<ConferenceConfig>(getGetConferenceConfigUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetConferenceConfigQueryKey = (id: number) => {
+  return [`/api/conferences/${id}/config`] as const;
+};
+
+export const getGetConferenceConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getConferenceConfig>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConferenceConfig>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetConferenceConfigQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getConferenceConfig>>
+  > = ({ signal }) => getConferenceConfig(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getConferenceConfig>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetConferenceConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getConferenceConfig>>
+>;
+export type GetConferenceConfigQueryError = ErrorType<void>;
+
+/**
+ * @summary Get conference config
+ */
+
+export function useGetConferenceConfig<
+  TData = Awaited<ReturnType<typeof getConferenceConfig>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConferenceConfig>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetConferenceConfigQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update conference settings and branding
+ */
+export const getUpdateConferenceUrl = (id: number) => {
+  return `/api/conferences/${id}`;
+};
+
+export const updateConference = async (
+  id: number,
+  conferenceUpdate: ConferenceUpdate,
+  options?: RequestInit,
+): Promise<ConferenceRow> => {
+  return customFetch<ConferenceRow>(getUpdateConferenceUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(conferenceUpdate),
+  });
+};
+
+export const getUpdateConferenceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConference>>,
+    TError,
+    { id: number; data: BodyType<ConferenceUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateConference>>,
+  TError,
+  { id: number; data: BodyType<ConferenceUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateConference"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateConference>>,
+    { id: number; data: BodyType<ConferenceUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateConference(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateConferenceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateConference>>
+>;
+export type UpdateConferenceMutationBody = BodyType<ConferenceUpdate>;
+export type UpdateConferenceMutationError = ErrorType<void>;
+
+/**
+ * @summary Update conference settings and branding
+ */
+export const useUpdateConference = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConference>>,
+    TError,
+    { id: number; data: BodyType<ConferenceUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateConference>>,
+  TError,
+  { id: number; data: BodyType<ConferenceUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateConferenceMutationOptions(options));
+};
+
+/**
+ * @summary Clone a conference and its structural data
+ */
+export const getCloneConferenceUrl = (id: number) => {
+  return `/api/conferences/${id}/clone`;
+};
+
+export const cloneConference = async (
+  id: number,
+  conferenceCloneInput: ConferenceCloneInput,
+  options?: RequestInit,
+): Promise<ConferenceCloneResult> => {
+  return customFetch<ConferenceCloneResult>(getCloneConferenceUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(conferenceCloneInput),
+  });
+};
+
+export const getCloneConferenceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cloneConference>>,
+    TError,
+    { id: number; data: BodyType<ConferenceCloneInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cloneConference>>,
+  TError,
+  { id: number; data: BodyType<ConferenceCloneInput> },
+  TContext
+> => {
+  const mutationKey = ["cloneConference"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cloneConference>>,
+    { id: number; data: BodyType<ConferenceCloneInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return cloneConference(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CloneConferenceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cloneConference>>
+>;
+export type CloneConferenceMutationBody = BodyType<ConferenceCloneInput>;
+export type CloneConferenceMutationError = ErrorType<void>;
+
+/**
+ * @summary Clone a conference and its structural data
+ */
+export const useCloneConference = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cloneConference>>,
+    TError,
+    { id: number; data: BodyType<ConferenceCloneInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cloneConference>>,
+  TError,
+  { id: number; data: BodyType<ConferenceCloneInput> },
+  TContext
+> => {
+  return useMutation(getCloneConferenceMutationOptions(options));
+};
+
+/**
+ * @summary List speakers for a conference
+ */
+export const getListConferenceSpeakersUrl = (id: number) => {
+  return `/api/conferences/${id}/speakers`;
+};
+
+export const listConferenceSpeakers = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SpeakerList> => {
+  return customFetch<SpeakerList>(getListConferenceSpeakersUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConferenceSpeakersQueryKey = (id: number) => {
+  return [`/api/conferences/${id}/speakers`] as const;
+};
+
+export const getListConferenceSpeakersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConferenceSpeakers>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSpeakers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListConferenceSpeakersQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listConferenceSpeakers>>
+  > = ({ signal }) => listConferenceSpeakers(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConferenceSpeakers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConferenceSpeakersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConferenceSpeakers>>
+>;
+export type ListConferenceSpeakersQueryError = ErrorType<void>;
+
+/**
+ * @summary List speakers for a conference
+ */
+
+export function useListConferenceSpeakers<
+  TData = Awaited<ReturnType<typeof listConferenceSpeakers>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSpeakers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConferenceSpeakersQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Bulk import speakers for a conference
+ */
+export const getBulkImportSpeakersUrl = (id: number) => {
+  return `/api/conferences/${id}/speakers/bulk`;
+};
+
+export const bulkImportSpeakers = async (
+  id: number,
+  speakerBulkInput: SpeakerBulkInput,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(getBulkImportSpeakersUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(speakerBulkInput),
+  });
+};
+
+export const getBulkImportSpeakersMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSpeakers>>,
+    TError,
+    { id: number; data: BodyType<SpeakerBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkImportSpeakers>>,
+  TError,
+  { id: number; data: BodyType<SpeakerBulkInput> },
+  TContext
+> => {
+  const mutationKey = ["bulkImportSpeakers"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkImportSpeakers>>,
+    { id: number; data: BodyType<SpeakerBulkInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return bulkImportSpeakers(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkImportSpeakersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkImportSpeakers>>
+>;
+export type BulkImportSpeakersMutationBody = BodyType<SpeakerBulkInput>;
+export type BulkImportSpeakersMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk import speakers for a conference
+ */
+export const useBulkImportSpeakers = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSpeakers>>,
+    TError,
+    { id: number; data: BodyType<SpeakerBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkImportSpeakers>>,
+  TError,
+  { id: number; data: BodyType<SpeakerBulkInput> },
+  TContext
+> => {
+  return useMutation(getBulkImportSpeakersMutationOptions(options));
+};
+
+/**
+ * @summary List sessions for a conference
+ */
+export const getListConferenceSessionsUrl = (id: number) => {
+  return `/api/conferences/${id}/sessions`;
+};
+
+export const listConferenceSessions = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SessionList> => {
+  return customFetch<SessionList>(getListConferenceSessionsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConferenceSessionsQueryKey = (id: number) => {
+  return [`/api/conferences/${id}/sessions`] as const;
+};
+
+export const getListConferenceSessionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConferenceSessions>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSessions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListConferenceSessionsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listConferenceSessions>>
+  > = ({ signal }) => listConferenceSessions(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConferenceSessions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConferenceSessionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConferenceSessions>>
+>;
+export type ListConferenceSessionsQueryError = ErrorType<void>;
+
+/**
+ * @summary List sessions for a conference
+ */
+
+export function useListConferenceSessions<
+  TData = Awaited<ReturnType<typeof listConferenceSessions>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSessions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConferenceSessionsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Bulk import sessions for a conference
+ */
+export const getBulkImportSessionsUrl = (id: number) => {
+  return `/api/conferences/${id}/sessions/bulk`;
+};
+
+export const bulkImportSessions = async (
+  id: number,
+  sessionBulkInput: SessionBulkInput,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(getBulkImportSessionsUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sessionBulkInput),
+  });
+};
+
+export const getBulkImportSessionsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSessions>>,
+    TError,
+    { id: number; data: BodyType<SessionBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkImportSessions>>,
+  TError,
+  { id: number; data: BodyType<SessionBulkInput> },
+  TContext
+> => {
+  const mutationKey = ["bulkImportSessions"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkImportSessions>>,
+    { id: number; data: BodyType<SessionBulkInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return bulkImportSessions(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkImportSessionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkImportSessions>>
+>;
+export type BulkImportSessionsMutationBody = BodyType<SessionBulkInput>;
+export type BulkImportSessionsMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk import sessions for a conference
+ */
+export const useBulkImportSessions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSessions>>,
+    TError,
+    { id: number; data: BodyType<SessionBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkImportSessions>>,
+  TError,
+  { id: number; data: BodyType<SessionBulkInput> },
+  TContext
+> => {
+  return useMutation(getBulkImportSessionsMutationOptions(options));
+};
+
+/**
+ * @summary List sponsors for a conference
+ */
+export const getListConferenceSponsorsUrl = (id: number) => {
+  return `/api/conferences/${id}/sponsors`;
+};
+
+export const listConferenceSponsors = async (
+  id: number,
+  options?: RequestInit,
+): Promise<SponsorList> => {
+  return customFetch<SponsorList>(getListConferenceSponsorsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConferenceSponsorsQueryKey = (id: number) => {
+  return [`/api/conferences/${id}/sponsors`] as const;
+};
+
+export const getListConferenceSponsorsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConferenceSponsors>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSponsors>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListConferenceSponsorsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listConferenceSponsors>>
+  > = ({ signal }) => listConferenceSponsors(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConferenceSponsors>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConferenceSponsorsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConferenceSponsors>>
+>;
+export type ListConferenceSponsorsQueryError = ErrorType<void>;
+
+/**
+ * @summary List sponsors for a conference
+ */
+
+export function useListConferenceSponsors<
+  TData = Awaited<ReturnType<typeof listConferenceSponsors>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listConferenceSponsors>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConferenceSponsorsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Bulk import sponsors for a conference
+ */
+export const getBulkImportSponsorsUrl = (id: number) => {
+  return `/api/conferences/${id}/sponsors/bulk`;
+};
+
+export const bulkImportSponsors = async (
+  id: number,
+  sponsorBulkInput: SponsorBulkInput,
+  options?: RequestInit,
+): Promise<BulkImportResult> => {
+  return customFetch<BulkImportResult>(getBulkImportSponsorsUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sponsorBulkInput),
+  });
+};
+
+export const getBulkImportSponsorsMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSponsors>>,
+    TError,
+    { id: number; data: BodyType<SponsorBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkImportSponsors>>,
+  TError,
+  { id: number; data: BodyType<SponsorBulkInput> },
+  TContext
+> => {
+  const mutationKey = ["bulkImportSponsors"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkImportSponsors>>,
+    { id: number; data: BodyType<SponsorBulkInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return bulkImportSponsors(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkImportSponsorsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkImportSponsors>>
+>;
+export type BulkImportSponsorsMutationBody = BodyType<SponsorBulkInput>;
+export type BulkImportSponsorsMutationError = ErrorType<void>;
+
+/**
+ * @summary Bulk import sponsors for a conference
+ */
+export const useBulkImportSponsors = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportSponsors>>,
+    TError,
+    { id: number; data: BodyType<SponsorBulkInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkImportSponsors>>,
+  TError,
+  { id: number; data: BodyType<SponsorBulkInput> },
+  TContext
+> => {
+  return useMutation(getBulkImportSponsorsMutationOptions(options));
+};
+
+/**
+ * @summary Send a push notification to all registered devices
+ */
+export const getSendPushNotificationUrl = () => {
+  return `/api/push/send`;
+};
+
+export const sendPushNotification = async (
+  pushNotificationInput: PushNotificationInput,
+  options?: RequestInit,
+): Promise<PushSendResult> => {
+  return customFetch<PushSendResult>(getSendPushNotificationUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(pushNotificationInput),
+  });
+};
+
+export const getSendPushNotificationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendPushNotification>>,
+    TError,
+    { data: BodyType<PushNotificationInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendPushNotification>>,
+  TError,
+  { data: BodyType<PushNotificationInput> },
+  TContext
+> => {
+  const mutationKey = ["sendPushNotification"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendPushNotification>>,
+    { data: BodyType<PushNotificationInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return sendPushNotification(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendPushNotificationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendPushNotification>>
+>;
+export type SendPushNotificationMutationBody = BodyType<PushNotificationInput>;
+export type SendPushNotificationMutationError = ErrorType<void>;
+
+/**
+ * @summary Send a push notification to all registered devices
+ */
+export const useSendPushNotification = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendPushNotification>>,
+    TError,
+    { data: BodyType<PushNotificationInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendPushNotification>>,
+  TError,
+  { data: BodyType<PushNotificationInput> },
+  TContext
+> => {
+  return useMutation(getSendPushNotificationMutationOptions(options));
+};
+
+/**
+ * @summary Get registered device count
+ */
+export const getGetPushStatsUrl = () => {
+  return `/api/push/stats`;
+};
+
+export const getPushStats = async (
+  options?: RequestInit,
+): Promise<PushStats> => {
+  return customFetch<PushStats>(getGetPushStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPushStatsQueryKey = () => {
+  return [`/api/push/stats`] as const;
+};
+
+export const getGetPushStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPushStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPushStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPushStatsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPushStats>>> = ({
+    signal,
+  }) => getPushStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPushStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPushStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPushStats>>
+>;
+export type GetPushStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get registered device count
+ */
+
+export function useGetPushStats<
+  TData = Awaited<ReturnType<typeof getPushStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPushStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPushStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get voting open/closed state
+ */
+export const getGetVotingStateUrl = () => {
+  return `/api/voting/state`;
+};
+
+export const getVotingState = async (
+  options?: RequestInit,
+): Promise<VotingState> => {
+  return customFetch<VotingState>(getGetVotingStateUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVotingStateQueryKey = () => {
+  return [`/api/voting/state`] as const;
+};
+
+export const getGetVotingStateQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVotingState>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingState>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVotingStateQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getVotingState>>> = ({
+    signal,
+  }) => getVotingState({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingState>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVotingStateQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVotingState>>
+>;
+export type GetVotingStateQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get voting open/closed state
+ */
+
+export function useGetVotingState<
+  TData = Awaited<ReturnType<typeof getVotingState>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingState>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVotingStateQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get voting results (admin only)
+ */
+export const getGetVotingResultsUrl = () => {
+  return `/api/voting/results`;
+};
+
+export const getVotingResults = async (
+  options?: RequestInit,
+): Promise<VotingResults> => {
+  return customFetch<VotingResults>(getGetVotingResultsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVotingResultsQueryKey = () => {
+  return [`/api/voting/results`] as const;
+};
+
+export const getGetVotingResultsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVotingResults>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingResults>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVotingResultsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVotingResults>>
+  > = ({ signal }) => getVotingResults({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingResults>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVotingResultsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVotingResults>>
+>;
+export type GetVotingResultsQueryError = ErrorType<void>;
+
+/**
+ * @summary Get voting results (admin only)
+ */
+
+export function useGetVotingResults<
+  TData = Awaited<ReturnType<typeof getVotingResults>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVotingResults>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVotingResultsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Open voting for a conference
+ */
+export const getOpenVotingUrl = () => {
+  return `/api/voting/open`;
+};
+
+export const openVoting = async (
+  options?: RequestInit,
+): Promise<VotingActionResult> => {
+  return customFetch<VotingActionResult>(getOpenVotingUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getOpenVotingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof openVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof openVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["openVoting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof openVoting>>,
+    void
+  > = () => {
+    return openVoting(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OpenVotingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof openVoting>>
+>;
+
+export type OpenVotingMutationError = ErrorType<void>;
+
+/**
+ * @summary Open voting for a conference
+ */
+export const useOpenVoting = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof openVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof openVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getOpenVotingMutationOptions(options));
+};
+
+/**
+ * @summary Close voting for a conference
+ */
+export const getCloseVotingUrl = () => {
+  return `/api/voting/close`;
+};
+
+export const closeVoting = async (
+  options?: RequestInit,
+): Promise<VotingActionResult> => {
+  return customFetch<VotingActionResult>(getCloseVotingUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCloseVotingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof closeVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof closeVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["closeVoting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof closeVoting>>,
+    void
+  > = () => {
+    return closeVoting(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CloseVotingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof closeVoting>>
+>;
+
+export type CloseVotingMutationError = ErrorType<void>;
+
+/**
+ * @summary Close voting for a conference
+ */
+export const useCloseVoting = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof closeVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof closeVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCloseVotingMutationOptions(options));
+};
+
+/**
+ * @summary Reset all votes for a conference
+ */
+export const getResetVotingUrl = () => {
+  return `/api/voting/reset`;
+};
+
+export const resetVoting = async (
+  options?: RequestInit,
+): Promise<VotingActionResult> => {
+  return customFetch<VotingActionResult>(getResetVotingUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getResetVotingMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["resetVoting"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetVoting>>,
+    void
+  > = () => {
+    return resetVoting(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetVotingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetVoting>>
+>;
+
+export type ResetVotingMutationError = ErrorType<void>;
+
+/**
+ * @summary Reset all votes for a conference
+ */
+export const useResetVoting = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetVoting>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetVoting>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getResetVotingMutationOptions(options));
+};

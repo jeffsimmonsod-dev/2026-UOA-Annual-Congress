@@ -134,6 +134,390 @@ ensureStructuralTables().catch((err) =>
   logger.error({ err }, "conferences ensureStructuralTables error")
 );
 
+// GET /api/conferences — list all conferences (admin only)
+router.get("/conferences", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM conferences ORDER BY id ASC`
+    );
+    res.json({ conferences: rows });
+  } catch (err) {
+    req.log.error({ err }, "conferences list error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PATCH /api/conferences/:id — update conference settings and branding
+router.patch("/conferences/:id", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+
+  const {
+    name,
+    organization,
+    dates,
+    location,
+    primaryColor,
+    primaryDarkColor,
+    secondaryColor,
+    secondaryDarkColor,
+    accentColor,
+    accentForegroundColor,
+    logoUrl,
+    featureVoting,
+    featurePhotos,
+    featureExhibitHall,
+    published,
+  } = req.body as Record<string, unknown>;
+
+  // Build dynamic SET clause
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+  if (organization !== undefined) { fields.push(`organization = $${idx++}`); values.push(organization); }
+  if (dates !== undefined) { fields.push(`dates = $${idx++}`); values.push(dates); }
+  if (location !== undefined) { fields.push(`location = $${idx++}`); values.push(location); }
+  if (primaryColor !== undefined) { fields.push(`primary_color = $${idx++}`); values.push(primaryColor); }
+  if (primaryDarkColor !== undefined) { fields.push(`primary_dark_color = $${idx++}`); values.push(primaryDarkColor); }
+  if (secondaryColor !== undefined) { fields.push(`secondary_color = $${idx++}`); values.push(secondaryColor); }
+  if (secondaryDarkColor !== undefined) { fields.push(`secondary_dark_color = $${idx++}`); values.push(secondaryDarkColor); }
+  if (accentColor !== undefined) { fields.push(`accent_color = $${idx++}`); values.push(accentColor); }
+  if (accentForegroundColor !== undefined) { fields.push(`accent_foreground_color = $${idx++}`); values.push(accentForegroundColor); }
+  if (logoUrl !== undefined) { fields.push(`logo_url = $${idx++}`); values.push(logoUrl); }
+  if (featureVoting !== undefined) { fields.push(`feature_voting = $${idx++}`); values.push(featureVoting); }
+  if (featurePhotos !== undefined) { fields.push(`feature_photos = $${idx++}`); values.push(featurePhotos); }
+  if (featureExhibitHall !== undefined) { fields.push(`feature_exhibit_hall = $${idx++}`); values.push(featureExhibitHall); }
+  if (published !== undefined) { fields.push(`published = $${idx++}`); values.push(published); }
+
+  if (fields.length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+
+  values.push(id);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE conferences SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Conference not found" });
+      return;
+    }
+    logger.info({ id, fields }, "conference updated");
+    res.json(rows[0]);
+  } catch (err) {
+    req.log.error({ err }, "conferences update error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /api/conferences/:id/speakers — list speakers
+router.get("/conferences/:id/speakers", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM conference_speakers WHERE conference_id = $1 ORDER BY id ASC`,
+      [id]
+    );
+    res.json({ speakers: rows });
+  } catch (err) {
+    req.log.error({ err }, "speakers list error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/conferences/:id/speakers/bulk — bulk import speakers
+router.post("/conferences/:id/speakers/bulk", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+
+  const { speakers, replaceAll } = req.body as {
+    speakers?: Array<{
+      externalId?: string;
+      name?: string;
+      title?: string;
+      organization?: string;
+      bio?: string;
+      photoUrl?: string;
+    }>;
+    replaceAll?: boolean;
+  };
+
+  if (!Array.isArray(speakers)) {
+    res.status(400).json({ error: "speakers must be an array" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (replaceAll) {
+      await client.query(`DELETE FROM conference_speakers WHERE conference_id = $1`, [id]);
+    }
+    let imported = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < speakers.length; i++) {
+      const sp = speakers[i]!;
+      if (!sp.name?.trim()) {
+        errors.push({ row: i, message: "name is required" });
+        continue;
+      }
+      const externalId = sp.externalId ?? `sp-${Date.now()}-${i}`;
+      try {
+        await client.query(
+          `INSERT INTO conference_speakers
+             (conference_id, external_id, name, title, company, bio, photo_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT (conference_id, external_id)
+           DO UPDATE SET name=$3, title=$4, company=$5, bio=$6, photo_url=$7`,
+          [id, externalId, sp.name.trim(), sp.title ?? null, sp.organization ?? null, sp.bio ?? null, sp.photoUrl ?? null]
+        );
+        imported++;
+      } catch (rowErr) {
+        errors.push({ row: i, message: String(rowErr) });
+      }
+    }
+    await client.query("COMMIT");
+    res.json({ imported, errors });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    req.log.error({ err }, "speakers bulk import error");
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/conferences/:id/sessions — list sessions
+router.get("/conferences/:id/sessions", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM conference_sessions WHERE conference_id = $1 ORDER BY day, start_time, id ASC`,
+      [id]
+    );
+    res.json({ sessions: rows });
+  } catch (err) {
+    req.log.error({ err }, "sessions list error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/conferences/:id/sessions/bulk — bulk import sessions
+router.post("/conferences/:id/sessions/bulk", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+
+  const { sessions, replaceAll } = req.body as {
+    sessions?: Array<{
+      externalId?: string;
+      title?: string;
+      description?: string;
+      day?: string;
+      startTime?: string;
+      endTime?: string;
+      track?: string;
+      speakerIds?: string[];
+      room?: string;
+      tags?: string[];
+      isPara?: boolean;
+    }>;
+    replaceAll?: boolean;
+  };
+
+  if (!Array.isArray(sessions)) {
+    res.status(400).json({ error: "sessions must be an array" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (replaceAll) {
+      await client.query(`DELETE FROM conference_sessions WHERE conference_id = $1`, [id]);
+    }
+    let imported = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < sessions.length; i++) {
+      const s = sessions[i]!;
+      if (!s.title?.trim()) {
+        errors.push({ row: i, message: "title is required" });
+        continue;
+      }
+      const externalId = s.externalId ?? `sess-${Date.now()}-${i}`;
+      const isPara = s.isPara ?? false;
+      try {
+        await client.query(
+          `INSERT INTO conference_sessions
+             (conference_id, external_id, title, description, start_time, end_time,
+              day, room, track, speaker_ids, tags, is_para)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT (conference_id, external_id, is_para)
+           DO UPDATE SET title=$3, description=$4, start_time=$5, end_time=$6,
+             day=$7, room=$8, track=$9, speaker_ids=$10, tags=$11`,
+          [
+            id, externalId, s.title.trim(), s.description ?? null,
+            s.startTime ?? null, s.endTime ?? null, s.day ?? null,
+            s.room ?? null, s.track ?? null,
+            s.speakerIds ?? [], s.tags ?? [], isPara,
+          ]
+        );
+        imported++;
+      } catch (rowErr) {
+        errors.push({ row: i, message: String(rowErr) });
+      }
+    }
+    await client.query("COMMIT");
+    res.json({ imported, errors });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    req.log.error({ err }, "sessions bulk import error");
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/conferences/:id/sponsors — list sponsors
+router.get("/conferences/:id/sponsors", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM conference_sponsors WHERE conference_id = $1 ORDER BY tier, name ASC`,
+      [id]
+    );
+    res.json({ sponsors: rows });
+  } catch (err) {
+    req.log.error({ err }, "sponsors list error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/conferences/:id/sponsors/bulk — bulk import sponsors
+router.post("/conferences/:id/sponsors/bulk", async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const id = parseInt(req.params["id"] as string, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid conference id" });
+    return;
+  }
+
+  const { sponsors, replaceAll } = req.body as {
+    sponsors?: Array<{
+      externalId?: string;
+      name?: string;
+      tier?: string;
+      website?: string;
+      logoUrl?: string;
+      description?: string;
+    }>;
+    replaceAll?: boolean;
+  };
+
+  if (!Array.isArray(sponsors)) {
+    res.status(400).json({ error: "sponsors must be an array" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (replaceAll) {
+      await client.query(`DELETE FROM conference_sponsors WHERE conference_id = $1`, [id]);
+    }
+    let imported = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+    for (let i = 0; i < sponsors.length; i++) {
+      const sp = sponsors[i]!;
+      if (!sp.name?.trim()) {
+        errors.push({ row: i, message: "name is required" });
+        continue;
+      }
+      if (!sp.tier?.trim()) {
+        errors.push({ row: i, message: "tier is required" });
+        continue;
+      }
+      const externalId = sp.externalId ?? `spon-${Date.now()}-${i}`;
+      try {
+        await client.query(
+          `INSERT INTO conference_sponsors
+             (conference_id, external_id, name, tier, website, logo_url, description)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT (conference_id, external_id)
+           DO UPDATE SET name=$3, tier=$4, website=$5, logo_url=$6, description=$7`,
+          [id, externalId, sp.name.trim(), sp.tier.trim(), sp.website ?? null, sp.logoUrl ?? null, sp.description ?? null]
+        );
+        imported++;
+      } catch (rowErr) {
+        errors.push({ row: i, message: String(rowErr) });
+      }
+    }
+    await client.query("COMMIT");
+    res.json({ imported, errors });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    req.log.error({ err }, "sponsors bulk import error");
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    client.release();
+  }
+});
+
 router.get("/conferences/:id/config", async (req: Request, res: Response) => {
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
