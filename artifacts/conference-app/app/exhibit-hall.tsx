@@ -1127,7 +1127,7 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
   },
   boothTooltipBadge: {
-    backgroundColor: "#4f46e5",
+    backgroundColor: conferenceConfig.primaryColor,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 3,

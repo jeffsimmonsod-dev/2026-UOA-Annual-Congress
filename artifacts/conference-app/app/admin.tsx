@@ -431,7 +431,7 @@ export default function AdminScreen() {
     const csv = lines.join("\n");
     try {
       await Share.share({
-        title: "UOA Congress 2026 – Sponsor Visit Report",
+        title: `${conferenceConfig.conferenceName} – Sponsor Visit Report`,
         message: csv,
       });
     } catch {}
@@ -962,7 +962,7 @@ export default function AdminScreen() {
 
                       {isExpanded && (
                         <View style={[styles.boothExpanded, { borderTopColor: colors.border }]}>
-                          <View style={[styles.liveQrBadge, { backgroundColor: "#4f46e518", borderColor: "#4f46e540" }]}>
+                          <View style={[styles.liveQrBadge, { backgroundColor: `${colors.primary}18`, borderColor: `${colors.primary}40` }]}>
                             <Ionicons name="qr-code-outline" size={13} color={colors.primary} />
                             <Text style={[styles.liveQrBadgeText, { color: colors.primary }]}>Static QR — print and place at booth for attendees to scan</Text>
                           </View>
