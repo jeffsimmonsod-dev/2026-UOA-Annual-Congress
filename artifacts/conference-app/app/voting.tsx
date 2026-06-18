@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getDeviceId } from "@/services/deviceId";
 
@@ -38,6 +39,7 @@ type PageState = "loading" | "closed" | "vote" | "already_voted" | "submitted";
 
 export default function VotingScreen() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const isWeb = Platform.OS === "web";
@@ -176,7 +178,7 @@ export default function VotingScreen() {
           </Text>
           <Text style={[styles.statusDesc, { color: colors.mutedForeground }]}>
             {pageState === "submitted"
-              ? "Your ballot has been recorded. Thank you for participating in the 2026 UOA Business Meeting."
+              ? `Your ballot has been recorded. Thank you for participating in the ${conf.conferenceName} Business Meeting.`
               : "Your vote has already been submitted from this device."}
           </Text>
           <Pressable
@@ -216,7 +218,7 @@ export default function VotingScreen() {
           Business Meeting Voting
         </Text>
         <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
-          2026 UOA Annual Congress · June 4–7, 2026
+          {conf.conferenceName} · {conf.dates}
         </Text>
       </View>
 

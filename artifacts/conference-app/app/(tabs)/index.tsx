@@ -14,9 +14,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useSchedule } from "@/context/ScheduleContext";
-import { CONFERENCE, SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
+import { SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
 import type { Session, Sponsor } from "@/types";
 
 function formatDate(iso: string): string {
@@ -109,6 +110,7 @@ const QUICK_TILES = [
 
 export default function HomeScreen() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
@@ -188,15 +190,15 @@ export default function HomeScreen() {
           </View>
           <View style={styles.heroText}>
             <Text style={[styles.heroBadge, { color: colors.primary }]}>
-              2026 ANNUAL CONGRESS
+              {conf.conferenceName.toUpperCase()}
             </Text>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-              UOA Congress
+              {conf.organizationName}
             </Text>
             <View style={styles.heroMeta}>
               <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />
               <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
-                {CONFERENCE.dates} · {CONFERENCE.location}
+                {conf.dates} · {conf.location}
               </Text>
             </View>
           </View>

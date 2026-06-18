@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteNote, getAllNotes } from "@/hooks/useNotes";
+import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getSessionById } from "@/services/data";
@@ -47,7 +48,7 @@ function buildNotesText(notes: NoteEntry[]): string {
   });
 
   const lines: string[] = [
-    "2026 UOA Annual Congress — My Notes",
+    `${conferenceConfig.conferenceName} — My Notes`,
     `Downloaded: ${date}`,
     "",
   ];
@@ -80,7 +81,7 @@ function buildNotesText(notes: NoteEntry[]): string {
 
 async function shareNotes(notes: NoteEntry[]) {
   const text = buildNotesText(notes);
-  const filename = "UOA-Congress-2026-Notes.txt";
+  const filename = `${conferenceConfig.conferenceName.replace(/\s+/g, "-")}-Notes.txt`;
 
   if (Platform.OS === "web") {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -94,7 +95,7 @@ async function shareNotes(notes: NoteEntry[]) {
   }
 
   await Share.share(
-    { message: text, title: "2026 UOA Annual Congress — My Notes" },
+    { message: text, title: `${conferenceConfig.conferenceName} — My Notes` },
     { dialogTitle: "Export notes" }
   );
 }
@@ -103,7 +104,7 @@ async function emailNotes(notes: NoteEntry[]) {
   const text = buildNotesText(notes);
   // Trim to stay under mailto URI limits on most mail clients (~8 KB)
   const trimmed = text.length > 7000 ? text.slice(0, 7000) + "\n\n[truncated — use Share to get full notes]" : text;
-  const subject = encodeURIComponent("2026 UOA Annual Congress — My Notes");
+  const subject = encodeURIComponent(`${conferenceConfig.conferenceName} — My Notes`);
   const body = encodeURIComponent(trimmed);
   const url = `mailto:?subject=${subject}&body=${body}`;
   const canOpen = await Linking.canOpenURL(url);

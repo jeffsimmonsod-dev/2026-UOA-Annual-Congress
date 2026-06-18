@@ -1,7 +1,9 @@
+import config from "@/conference.config";
+
 const colors = {
   light: {
     text: "#0f172a",
-    tint: "#4f46e5",
+    tint: config.primaryColor,
 
     background: "#f8fafc",
     foreground: "#0f172a",
@@ -9,7 +11,7 @@ const colors = {
     card: "#ffffff",
     cardForeground: "#0f172a",
 
-    primary: "#4f46e5",
+    primary: config.primaryColor,
     primaryForeground: "#ffffff",
 
     secondary: "#f1f5f9",
@@ -18,8 +20,8 @@ const colors = {
     muted: "#f1f5f9",
     mutedForeground: "#64748b",
 
-    accent: "#e0e7ff",
-    accentForeground: "#3730a3",
+    accent: config.accentColor,
+    accentForeground: config.accentForegroundColor,
 
     destructive: "#ef4444",
     destructiveForeground: "#ffffff",
@@ -27,8 +29,8 @@ const colors = {
     border: "#e2e8f0",
     input: "#e2e8f0",
 
-    tag: "#ddd6fe",
-    tagForeground: "#4338ca",
+    tag: config.tagColor,
+    tagForeground: config.tagForegroundColor,
 
     success: "#10b981",
     warning: "#f59e0b",
@@ -36,7 +38,7 @@ const colors = {
 
   dark: {
     text: "#f1f5f9",
-    tint: "#818cf8",
+    tint: config.primaryDarkColor,
 
     background: "#0f172a",
     foreground: "#f1f5f9",
@@ -44,7 +46,7 @@ const colors = {
     card: "#1e293b",
     cardForeground: "#f1f5f9",
 
-    primary: "#818cf8",
+    primary: config.primaryDarkColor,
     primaryForeground: "#1e1b4b",
 
     secondary: "#1e293b",
@@ -53,8 +55,8 @@ const colors = {
     muted: "#1e293b",
     mutedForeground: "#94a3b8",
 
-    accent: "#312e81",
-    accentForeground: "#c7d2fe",
+    accent: config.accentDarkColor,
+    accentForeground: config.accentDarkForegroundColor,
 
     destructive: "#ef4444",
     destructiveForeground: "#ffffff",
@@ -62,8 +64,8 @@ const colors = {
     border: "#334155",
     input: "#334155",
 
-    tag: "#312e81",
-    tagForeground: "#a5b4fc",
+    tag: config.tagDarkColor,
+    tagForeground: config.tagDarkForegroundColor,
 
     success: "#10b981",
     warning: "#f59e0b",

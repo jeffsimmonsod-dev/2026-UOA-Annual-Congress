@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getParaSessionsByDay } from "@/services/data";
 
@@ -18,6 +19,7 @@ const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 
 export default function ParaScreen() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const [activeDay, setActiveDay] = useState("Thu, June 4");
@@ -46,7 +48,7 @@ export default function ParaScreen() {
               Paraoptometric Education
             </Text>
             <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
-              2026 UOA Annual Congress · ABO/CPC Credit Available
+              {conf.conferenceName} · {conf.paraCreditType}
             </Text>
           </View>
         </View>

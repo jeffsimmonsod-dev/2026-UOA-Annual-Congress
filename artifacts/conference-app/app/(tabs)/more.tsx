@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { CONFERENCE } from "@/services/data";
 
 interface MenuItem {
   label: string;
@@ -24,6 +24,7 @@ interface MenuItem {
 }
 
 const useMenuItems = (): MenuItem[] => {
+  const conf = useConference();
   return [
     {
       label: "Exhibit Hall",
@@ -75,11 +76,11 @@ const useMenuItems = (): MenuItem[] => {
       description: "Frequently asked questions",
     },
     {
-      label: "UOA Conference Website",
+      label: "Conference Website",
       icon: "globe-outline",
       color: "#8b5cf6",
-      action: () => Linking.openURL("https://www.utaheyedoc.org/2026_uoa_annual_congress.php"),
-      description: "utaheyedoc.org · 2026 Annual Congress",
+      action: () => Linking.openURL(conf.websiteUrl),
+      description: conf.websiteLabel,
     },
     {
       label: "Business Meeting Voting",
@@ -93,6 +94,7 @@ const useMenuItems = (): MenuItem[] => {
 
 export default function MoreScreen() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const menuItems = useMenuItems();
@@ -113,7 +115,7 @@ export default function MoreScreen() {
       <View style={[styles.conferenceTag, { backgroundColor: colors.accent }]}>
         <Ionicons name="eye-outline" size={14} color={colors.primary} />
         <Text style={[styles.conferenceTagText, { color: colors.primary }]}>
-          {CONFERENCE.name} · {CONFERENCE.dates}
+          {conf.conferenceName} · {conf.dates}
         </Text>
       </View>
 
@@ -166,19 +168,19 @@ export default function MoreScreen() {
           Need Help?
         </Text>
         <Text style={[styles.contactText, { color: colors.mutedForeground }]}>
-          Contact {CONFERENCE.contactName} at the Utah Optometric Association:{"\n"}
+          Contact {conf.contactName} at the {conf.organizationName}:{"\n"}
           <Text
             style={{ color: colors.primary }}
-            onPress={() => Linking.openURL(`tel:${CONFERENCE.contactPhone}`)}
+            onPress={() => Linking.openURL(`tel:${conf.contactPhone}`)}
           >
-            {CONFERENCE.contactPhone}
+            {conf.contactPhone}
           </Text>
           {" · "}
           <Text
             style={{ color: colors.primary }}
-            onPress={() => Linking.openURL(`mailto:${CONFERENCE.contactEmail}`)}
+            onPress={() => Linking.openURL(`mailto:${conf.contactEmail}`)}
           >
-            {CONFERENCE.contactEmail}
+            {conf.contactEmail}
           </Text>
         </Text>
       </View>

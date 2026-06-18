@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
+import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getSessionsByDay, getParaSessionsByDay } from "@/services/data";
 import type { Session } from "@/types";
@@ -70,6 +71,7 @@ function getUniqueTracks(sessions: Session[]): string[] {
 
 export default function ScheduleScreen() {
   const colors = useColors();
+  const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const [activeTab, setActiveTab] = useState("Thu, June 4");
@@ -113,8 +115,8 @@ export default function ScheduleScreen() {
         </Text>
         <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
           {isPara
-            ? "2026 UOA Annual Congress · ABO/CPC Credit Available"
-            : "2026 UOA Annual Congress · COPE CE Credit"}
+            ? `${conf.conferenceName} · ${conf.paraCreditType}`
+            : `${conf.conferenceName} · ${conf.creditType}`}
         </Text>
       </View>
 
