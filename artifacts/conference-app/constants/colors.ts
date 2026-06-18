@@ -14,10 +14,10 @@ const colors = {
     primary: config.primaryColor,
     primaryForeground: "#ffffff",
 
-    secondary: "#f1f5f9",
+    secondary: config.secondaryColor,
     secondaryForeground: "#1e293b",
 
-    muted: "#f1f5f9",
+    muted: config.secondaryColor,
     mutedForeground: "#64748b",
 
     accent: config.accentColor,
@@ -49,10 +49,10 @@ const colors = {
     primary: config.primaryDarkColor,
     primaryForeground: "#1e1b4b",
 
-    secondary: "#1e293b",
+    secondary: config.secondaryDarkColor,
     secondaryForeground: "#e2e8f0",
 
-    muted: "#1e293b",
+    muted: config.secondaryDarkColor,
     mutedForeground: "#94a3b8",
 
     accent: config.accentDarkColor,

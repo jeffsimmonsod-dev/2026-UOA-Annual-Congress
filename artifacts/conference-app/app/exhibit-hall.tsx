@@ -556,7 +556,7 @@ export default function ExhibitHallScreen() {
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
     if (scanned || !attendeeToken) return;
-    const prefix = `${conferenceConfig.conferenceId}:booth:`;
+    const prefix = `${conferenceConfig.qrBoothPrefix}:booth:`;
     if (!data.startsWith(prefix)) {
       Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
       return;

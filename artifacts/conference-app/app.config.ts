@@ -1,0 +1,70 @@
+import { CONFERENCE_META } from "./conference.meta";
+
+export default {
+  expo: {
+    name: CONFERENCE_META.conferenceName,
+    slug: "conference-app",
+    version: "2.0.1",
+    orientation: "portrait",
+    icon: "./assets/images/app-icon.png",
+    scheme: "conference-app",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/images/app-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff",
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "org.utaheyedoc.congress2026",
+      buildNumber: "4",
+      infoPlist: {
+        NSCameraUsageDescription:
+          "Used to scan booth QR codes in the exhibit hall",
+        ITSAppUsesNonExemptEncryption: false,
+      },
+    },
+    android: {
+      package: "org.utaheyedoc.congress2026",
+      versionCode: 5,
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/app-icon-adaptive.png",
+        backgroundColor: "#ffffff",
+      },
+      permissions: [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+      ],
+    },
+    web: {
+      favicon: "./assets/images/app-icon.png",
+    },
+    plugins: [
+      [
+        "expo-router",
+        {
+          origin: "https://replit.com/",
+        },
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-camera",
+    ],
+    updates: {
+      enabled: false,
+    },
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true,
+    },
+    extra: {
+      eas: {
+        projectId: "78c58011-2ce2-4113-80cc-da38f4de6e59",
+      },
+    },
+  },
+};
