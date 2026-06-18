@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useEffect } from "react";
+import { ImageUp, Loader2 } from "lucide-react";
 
 const updateSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -57,6 +59,8 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
   const { pin } = useAdmin();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const form = useForm<UpdateFormValues>({
     resolver: zodResolver(updateSchema),
@@ -86,6 +90,34 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
     );
   };
 
+  const handleLogoFileUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ variant: "destructive", title: "Please select an image file" });
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const res = await fetch(`/api/conferences/${conferenceId}/logo`, {
+        method: "POST",
+        headers: { "X-Admin-Pin": pin || "" },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || "Upload failed");
+      }
+      const { logoUrl } = await res.json() as { logoUrl: string };
+      form.setValue("logoUrl", logoUrl, { shouldDirty: true });
+      toast({ title: "Logo uploaded successfully" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Logo upload failed", description: String(err) });
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const primaryColor = form.watch("primaryColor") || "#4f46e5";
   const primaryDarkColor = form.watch("primaryDarkColor") || "#818cf8";
   const secondaryColor = form.watch("secondaryColor") || "#f1f5f9";
@@ -93,6 +125,8 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
   const accentColor = form.watch("accentColor") || "#e0e7ff";
   const accentForegroundColor = form.watch("accentForegroundColor") || "#3730a3";
   const logoUrl = form.watch("logoUrl");
+  const conferenceName = form.watch("name") || "Conference Name";
+  const conferenceDates = form.watch("dates") || "Date TBD";
 
   return (
     <div className="space-y-6 max-w-4xl pb-10">
@@ -127,18 +161,63 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
           <Card>
             <CardHeader>
               <CardTitle>Branding</CardTitle>
-              <CardDescription>Colors and logo for the event app.</CardDescription>
+              <CardDescription>Colors and logo that define the event app's visual identity.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Logo */}
+              {/* Logo upload */}
               <FormField control={form.control} name="logoUrl" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Logo URL</FormLabel>
-                  <div className="flex gap-3 items-center">
-                    {logoUrl && (
-                      <img src={logoUrl} alt="logo preview" className="h-10 w-auto rounded border border-border object-contain bg-muted p-1" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    )}
-                    <FormControl><Input data-testid="input-logo-url" placeholder="https://..." {...field} /></FormControl>
+                  <FormLabel>Conference Logo</FormLabel>
+                  <div className="space-y-2">
+                    <div className="flex gap-3 items-center">
+                      {logoUrl && (
+                        <img
+                          src={logoUrl}
+                          alt="logo preview"
+                          className="h-12 w-auto max-w-[120px] rounded border border-border object-contain bg-muted p-1"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      )}
+                      <div className="flex gap-2 items-center flex-1">
+                        <FormControl>
+                          <Input
+                            data-testid="input-logo-url"
+                            placeholder="https://... or upload a file"
+                            {...field}
+                            className="flex-1"
+                          />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={logoUploading}
+                          onClick={() => logoInputRef.current?.click()}
+                          data-testid="button-upload-logo"
+                        >
+                          {logoUploading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <ImageUp className="h-3.5 w-3.5" />
+                          )}
+                          <span className="ml-1.5">{logoUploading ? "Uploading…" : "Upload"}</span>
+                        </Button>
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleLogoFileUpload(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Upload a file (JPEG, PNG, WebP, GIF, or SVG) or paste a URL directly.
+                    </p>
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -180,21 +259,92 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
                 ))}
               </div>
 
-              {/* Live preview strip */}
-              <div className="rounded-lg border border-border p-4 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Color Preview</p>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    { label: "Primary", color: primaryColor },
-                    { label: "Primary Dark", color: primaryDarkColor },
-                    { label: "Secondary", color: secondaryColor },
-                    { label: "Accent", color: accentColor },
-                  ].map(({ label, color }) => (
-                    <div key={label} className="flex items-center gap-1.5">
-                      <div className="h-6 w-6 rounded border border-border shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-xs text-muted-foreground">{label}</span>
+              {/* Live branding preview */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Live App Preview</p>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Simulated home screen and session card based on your current branding.
+                </p>
+                <div className="flex gap-4 flex-wrap">
+                  {/* Home screen mock */}
+                  <div className="w-44 rounded-xl overflow-hidden shadow-md border border-border shrink-0"
+                    style={{ background: secondaryColor }}>
+                    {/* Header */}
+                    <div className="px-3 py-4" style={{ background: primaryColor }}>
+                      {logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt="logo"
+                          className="h-7 w-auto max-w-full object-contain mb-2"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="h-5 w-20 rounded mb-2" style={{ background: `${primaryDarkColor}55` }} />
+                      )}
+                      <p className="text-white text-[11px] font-bold leading-tight line-clamp-2">
+                        {conferenceName}
+                      </p>
+                      <p className="text-white/70 text-[9px] mt-0.5">{conferenceDates}</p>
                     </div>
-                  ))}
+                    {/* Body */}
+                    <div className="px-3 py-2.5 space-y-2">
+                      <p className="text-[9px] font-bold tracking-wider" style={{ color: primaryColor }}>
+                        UPCOMING
+                      </p>
+                      <div className="rounded-lg p-2" style={{ background: accentColor }}>
+                        <p className="text-[9px] font-bold leading-tight" style={{ color: accentForegroundColor }}>
+                          General Session
+                        </p>
+                        <p className="text-[8px] mt-0.5" style={{ color: accentForegroundColor, opacity: 0.75 }}>
+                          9:00 AM · Main Hall
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {["Schedule", "Speakers"].map((label) => (
+                          <div key={label} className="flex-1 rounded py-1.5 text-center" style={{ background: primaryColor }}>
+                            <p className="text-[8px] text-white font-medium">{label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex border-t" style={{ borderColor: `${secondaryDarkColor}20` }}>
+                      {["Home", "Sched", "More"].map((tab) => (
+                        <div key={tab} className="flex-1 py-1.5 text-center">
+                          <div className="w-3 h-3 rounded-sm mx-auto mb-0.5" style={{ background: `${secondaryDarkColor}30` }} />
+                          <p className="text-[7px]" style={{ color: secondaryDarkColor }}>{tab}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Session card mock */}
+                  <div className="w-44 rounded-xl overflow-hidden shadow-md border border-border bg-white shrink-0">
+                    <div className="h-1.5" style={{ background: primaryColor }} />
+                    <div className="px-3 py-3 space-y-1.5">
+                      <span
+                        className="inline-block text-[9px] px-1.5 py-0.5 rounded font-medium"
+                        style={{ background: accentColor, color: accentForegroundColor }}
+                      >
+                        Keynote
+                      </span>
+                      <p className="text-[10px] font-bold text-gray-900 leading-tight">
+                        Opening Keynote Address
+                      </p>
+                      <p className="text-[9px] text-gray-500">9:00 – 10:00 AM · Main Hall</p>
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <div className="h-5 w-5 rounded-full shrink-0" style={{ background: primaryColor }} />
+                        <p className="text-[9px] text-gray-600">Dr. Jane Smith</p>
+                      </div>
+                    </div>
+                    <div className="px-3 pb-3">
+                      <div
+                        className="rounded py-1.5 text-center"
+                        style={{ background: primaryColor }}
+                      >
+                        <p className="text-[9px] text-white font-medium">+ Save to My Schedule</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

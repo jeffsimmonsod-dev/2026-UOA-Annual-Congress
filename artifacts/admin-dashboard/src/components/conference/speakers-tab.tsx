@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAdmin } from "@/hooks/use-admin";
 import {
   useListConferenceSpeakers,
@@ -9,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CsvImport } from "./csv-import";
-import type { CsvColumn } from "./csv-import";
+import type { CsvColumn, CsvServerError } from "./csv-import";
 
 const SPEAKER_COLUMNS: CsvColumn[] = [
   { key: "name", label: "name", required: true },
@@ -24,6 +25,7 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
   const { pin } = useAdmin();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [csvServerErrors, setCsvServerErrors] = useState<CsvServerError[] | null>(null);
 
   const { data: listData, isLoading } = useListConferenceSpeakers(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -52,7 +54,16 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
       {
         onSuccess: (res) => {
           queryClient.invalidateQueries({ queryKey: getListConferenceSpeakersQueryKey(conferenceId) });
-          toast({ title: "Import successful", description: `Imported ${res.imported} speakers.` });
+          const serverErrs = res.errors && res.errors.length > 0 ? res.errors : null;
+          setCsvServerErrors(serverErrs);
+          if (serverErrs) {
+            toast({
+              title: `Imported ${res.imported} speakers`,
+              description: `${res.errors.length} rows were rejected by the server.`,
+            });
+          } else {
+            toast({ title: "Import successful", description: `Imported ${res.imported} speakers.` });
+          }
         },
         onError: () => {
           toast({
@@ -69,10 +80,11 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
     <div className="space-y-6">
       <CsvImport
         title="Import Speakers"
-        description="Upload a CSV file to add or replace speakers. Column headers must match exactly (case-insensitive). Download the template to start."
+        description="Upload a CSV file to add or replace speakers. If your column headers differ from the expected names, a mapping step will let you match them."
         columns={SPEAKER_COLUMNS}
         onImport={handleImport}
         isPending={importSpeakers.isPending}
+        serverErrors={csvServerErrors}
       />
 
       <div className="rounded-md border bg-card">

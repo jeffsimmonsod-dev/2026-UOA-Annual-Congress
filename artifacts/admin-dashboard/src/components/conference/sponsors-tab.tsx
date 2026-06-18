@@ -13,14 +13,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CsvImport } from "./csv-import";
-import type { CsvColumn } from "./csv-import";
+import type { CsvColumn, CsvServerError } from "./csv-import";
 import { Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
 const SPONSOR_COLUMNS: CsvColumn[] = [
   { key: "name", label: "name", required: true },
-  { key: "tier", label: "tier", required: true },
+  {
+    key: "tier",
+    label: "tier",
+    required: true,
+    validate: (v) => {
+      const valid = ["Platinum", "Gold", "Silver", "Bronze"];
+      if (v && !valid.some((t) => t.toLowerCase() === v.toLowerCase())) {
+        return `"tier" must be one of: ${valid.join(", ")}`;
+      }
+      return null;
+    },
+  },
   { key: "website", label: "website" },
   { key: "logoUrl", label: "logoUrl" },
   { key: "description", label: "description" },
@@ -44,6 +55,7 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
   const queryClient = useQueryClient();
   const [manual, setManual] = useState(EMPTY_SPONSOR);
   const [manualOpen, setManualOpen] = useState(false);
+  const [csvServerErrors, setCsvServerErrors] = useState<CsvServerError[] | null>(null);
 
   const { data: listData, isLoading } = useListConferenceSponsors(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -72,7 +84,16 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
       {
         onSuccess: (res) => {
           queryClient.invalidateQueries({ queryKey: getListConferenceSponsorsQueryKey(conferenceId) });
-          toast({ title: "Import successful", description: `Imported ${res.imported} sponsors.` });
+          const serverErrs = res.errors && res.errors.length > 0 ? res.errors : null;
+          setCsvServerErrors(serverErrs);
+          if (serverErrs) {
+            toast({
+              title: `Imported ${res.imported} sponsors`,
+              description: `${res.errors.length} rows were rejected by the server.`,
+            });
+          } else {
+            toast({ title: "Import successful", description: `Imported ${res.imported} sponsors.` });
+          }
         },
         onError: () => {
           toast({
@@ -116,7 +137,6 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
 
   return (
     <div className="space-y-6">
-      {/* Manual entry */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
@@ -201,16 +221,15 @@ export function SponsorsTab({ conferenceId }: { conferenceId: number }) {
         )}
       </Card>
 
-      {/* CSV import */}
       <CsvImport
         title="Bulk Import via CSV"
         description="Upload a CSV to add or replace multiple sponsors at once. Tier values: Platinum, Gold, Silver, Bronze."
         columns={SPONSOR_COLUMNS}
         onImport={handleCsvImport}
         isPending={importSponsors.isPending}
+        serverErrors={csvServerErrors}
       />
 
-      {/* Listing */}
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>

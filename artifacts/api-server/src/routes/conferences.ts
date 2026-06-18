@@ -1,14 +1,19 @@
 import crypto from "crypto";
 import { Router, type Request, type Response } from "express";
+import multer from "multer";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
 import { ensureConferencesTable } from "../lib/ensureConferences";
+import { ObjectStorageService } from "../lib/objectStorage";
 import {
   SEED_SPEAKERS,
   SEED_DOC_SESSIONS,
   SEED_PARA_SESSIONS,
   SEED_SPONSORS,
 } from "../data/uoa2026";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const objectStorageService = new ObjectStorageService();
 
 const router = Router();
 
@@ -814,6 +819,42 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Server error" });
   } finally {
     client.release();
+  }
+});
+
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+
+router.post("/conferences/:id/logo", upload.single("logo"), async (req: Request, res: Response) => {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded. Send a multipart/form-data request with field 'logo'." });
+    return;
+  }
+  if (!ALLOWED_LOGO_TYPES.includes(req.file.mimetype)) {
+    res.status(400).json({ error: "Invalid file type. Accepted: JPEG, PNG, WebP, GIF, SVG." });
+    return;
+  }
+  try {
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+    const gcsRes = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": req.file.mimetype },
+      body: req.file.buffer,
+    });
+    if (!gcsRes.ok) {
+      throw new Error(`GCS upload failed with status ${gcsRes.status}`);
+    }
+
+    const servingUrl = `/api/storage${objectPath}`;
+    res.json({ logoUrl: servingUrl });
+  } catch (err) {
+    req.log.error({ err }, "logo upload error");
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 

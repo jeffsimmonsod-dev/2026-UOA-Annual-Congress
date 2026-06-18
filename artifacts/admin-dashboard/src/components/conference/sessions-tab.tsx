@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAdmin } from "@/hooks/use-admin";
 import {
   useListConferenceSessions,
@@ -9,18 +10,47 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CsvImport } from "./csv-import";
-import type { CsvColumn } from "./csv-import";
+import type { CsvColumn, CsvServerError } from "./csv-import";
 
 function splitList(val: string): string[] {
   if (!val || val.trim() === "") return [];
   return val.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
 }
 
+const TIME_RE = /^\d{1,2}:\d{2}(:\d{2})?$/;
+const VALID_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 const SESSION_COLUMNS: CsvColumn[] = [
   { key: "title", label: "title", required: true },
-  { key: "day", label: "day" },
-  { key: "startTime", label: "startTime" },
-  { key: "endTime", label: "endTime" },
+  {
+    key: "day",
+    label: "day",
+    validate: (v) => {
+      if (!v) return null;
+      if (!VALID_DAYS.some((d) => d.toLowerCase() === v.toLowerCase())) {
+        return `"day" must be one of: ${VALID_DAYS.join(", ")}`;
+      }
+      return null;
+    },
+  },
+  {
+    key: "startTime",
+    label: "startTime",
+    validate: (v) => {
+      if (!v) return null;
+      if (!TIME_RE.test(v)) return '"startTime" must be HH:MM format (e.g. 09:00)';
+      return null;
+    },
+  },
+  {
+    key: "endTime",
+    label: "endTime",
+    validate: (v) => {
+      if (!v) return null;
+      if (!TIME_RE.test(v)) return '"endTime" must be HH:MM format (e.g. 10:30)';
+      return null;
+    },
+  },
   { key: "room", label: "room" },
   { key: "track", label: "track" },
   { key: "description", label: "description" },
@@ -46,6 +76,7 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
   const { pin } = useAdmin();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [csvServerErrors, setCsvServerErrors] = useState<CsvServerError[] | null>(null);
 
   const { data: listData, isLoading } = useListConferenceSessions(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -79,7 +110,16 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
       {
         onSuccess: (res) => {
           queryClient.invalidateQueries({ queryKey: getListConferenceSessionsQueryKey(conferenceId) });
-          toast({ title: "Import successful", description: `Imported ${res.imported} sessions.` });
+          const serverErrs = res.errors && res.errors.length > 0 ? res.errors : null;
+          setCsvServerErrors(serverErrs);
+          if (serverErrs) {
+            toast({
+              title: `Imported ${res.imported} sessions`,
+              description: `${res.errors.length} rows were rejected by the server.`,
+            });
+          } else {
+            toast({ title: "Import successful", description: `Imported ${res.imported} sessions.` });
+          }
         },
         onError: () => {
           toast({
@@ -96,10 +136,11 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
     <div className="space-y-6">
       <CsvImport
         title="Import Sessions"
-        description="Upload a CSV file to add or replace sessions. speakerIds and tags accept comma-separated values. isPara should be true or false."
+        description="Upload a CSV file to add or replace sessions. speakerIds and tags accept comma-separated values. day must be a weekday name; startTime/endTime must be HH:MM."
         columns={SESSION_COLUMNS}
         onImport={handleImport}
         isPending={importSessions.isPending}
+        serverErrors={csvServerErrors}
       />
 
       <div className="rounded-md border bg-card">
