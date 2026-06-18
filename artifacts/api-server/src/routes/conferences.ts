@@ -2,6 +2,13 @@ import crypto from "crypto";
 import { Router, type Request, type Response } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
+import { ensureConferencesTable } from "../lib/ensureConferences";
+import {
+  SEED_SPEAKERS,
+  SEED_DOC_SESSIONS,
+  SEED_PARA_SESSIONS,
+  SEED_SPONSORS,
+} from "../data/uoa2026";
 
 const router = Router();
 
@@ -19,45 +26,113 @@ function isAdmin(req: Request): boolean {
   }
 }
 
-async function ensureConferencesTable() {
+async function ensureStructuralTables(): Promise<void> {
+  await ensureConferencesTable();
+
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS conferences (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      organization VARCHAR(255) NOT NULL,
-      dates VARCHAR(255),
-      location VARCHAR(255),
-      primary_color VARCHAR(20),
-      primary_dark_color VARCHAR(20),
-      secondary_color VARCHAR(20),
-      secondary_dark_color VARCHAR(20),
-      accent_color VARCHAR(20),
-      accent_foreground_color VARCHAR(20),
-      logo_url TEXT,
-      feature_voting BOOLEAN NOT NULL DEFAULT false,
-      feature_photos BOOLEAN NOT NULL DEFAULT false,
-      feature_exhibit_hall BOOLEAN NOT NULL DEFAULT false,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    CREATE TABLE IF NOT EXISTS conference_speakers (
+      id           SERIAL PRIMARY KEY,
+      conference_id INTEGER NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+      external_id  TEXT NOT NULL,
+      name         TEXT NOT NULL,
+      title        TEXT,
+      company      TEXT,
+      bio          TEXT,
+      photo_url    TEXT,
+      session_ids  TEXT[] NOT NULL DEFAULT '{}',
+      UNIQUE (conference_id, external_id)
     );
 
-    INSERT INTO conferences (id, name, organization, dates, location, primary_color, primary_dark_color, feature_voting, feature_photos, feature_exhibit_hall)
-    VALUES (
-      1,
-      '2026 UOA Annual Congress',
-      'Utah Optometric Association',
-      'June 4–7, 2026',
-      'Grand Hyatt Deer Valley, Park City, UT',
-      '#4f46e5',
-      '#818cf8',
-      true,
-      true,
-      true
-    )
-    ON CONFLICT (id) DO NOTHING;
+    CREATE TABLE IF NOT EXISTS conference_sessions (
+      id            SERIAL PRIMARY KEY,
+      conference_id INTEGER NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+      external_id   TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      description   TEXT,
+      start_time    TEXT,
+      end_time      TEXT,
+      day           TEXT,
+      room          TEXT,
+      track         TEXT,
+      speaker_ids   TEXT[] NOT NULL DEFAULT '{}',
+      tags          TEXT[] NOT NULL DEFAULT '{}',
+      is_para       BOOLEAN NOT NULL DEFAULT false,
+      UNIQUE (conference_id, external_id, is_para)
+    );
+
+    CREATE TABLE IF NOT EXISTS conference_sponsors (
+      id            SERIAL PRIMARY KEY,
+      conference_id INTEGER NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+      external_id   TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      tier          TEXT NOT NULL,
+      website       TEXT,
+      logo_url      TEXT,
+      description   TEXT,
+      UNIQUE (conference_id, external_id)
+    );
   `);
+
+  await seedConference1();
 }
 
-ensureConferencesTable().catch((err) => logger.error({ err }, "conferences ensureTable error"));
+async function seedConference1(): Promise<void> {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*) FROM conference_speakers WHERE conference_id = 1`
+  );
+  if (parseInt(rows[0].count, 10) > 0) return;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    for (const sp of SEED_SPEAKERS) {
+      await client.query(
+        `INSERT INTO conference_speakers
+           (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (conference_id, external_id) DO NOTHING`,
+        [1, sp.id, sp.name, sp.title, sp.company, sp.bio, sp.photoUrl, sp.sessionIds]
+      );
+    }
+
+    for (const s of [...SEED_DOC_SESSIONS, ...SEED_PARA_SESSIONS]) {
+      await client.query(
+        `INSERT INTO conference_sessions
+           (conference_id, external_id, title, description, start_time, end_time,
+            day, room, track, speaker_ids, tags, is_para)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         ON CONFLICT (conference_id, external_id, is_para) DO NOTHING`,
+        [
+          1, s.id, s.title, s.description, s.startTime, s.endTime,
+          s.day, s.room, s.track, s.speakerIds, s.tags, s.isPara,
+        ]
+      );
+    }
+
+    for (const sp of SEED_SPONSORS) {
+      await client.query(
+        `INSERT INTO conference_sponsors
+           (conference_id, external_id, name, tier, website, logo_url, description)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (conference_id, external_id) DO NOTHING`,
+        [1, sp.id, sp.name, sp.tier, sp.website, sp.logoUrl, sp.description]
+      );
+    }
+
+    await client.query("COMMIT");
+    logger.info("Conference 1 structural data seeded");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    logger.error({ err }, "Failed to seed conference 1 structural data");
+  } finally {
+    client.release();
+  }
+}
+
+ensureStructuralTables().catch((err) =>
+  logger.error({ err }, "conferences ensureStructuralTables error")
+);
 
 router.get("/conferences/:id/config", async (req: Request, res: Response) => {
   const id = parseInt(req.params["id"] as string, 10);
@@ -195,7 +270,10 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
   try {
     await client.query("BEGIN");
 
-    const srcRes = await client.query(`SELECT * FROM conferences WHERE id = $1`, [sourceId]);
+    const srcRes = await client.query(
+      `SELECT * FROM conferences WHERE id = $1`,
+      [sourceId]
+    );
     if (srcRes.rows.length === 0) {
       await client.query("ROLLBACK");
       res.status(404).json({ error: "Source conference not found" });
@@ -230,9 +308,9 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
     const newConf = newConfRes.rows[0];
     const newId = newConf.id;
 
+    // Clone booths with fresh secret tokens
     const boothsRes = await client.query(
-      `SELECT name, company, booth_number, description, secret_token
-       FROM congress_booths WHERE conference_id = $1`,
+      `SELECT name, company, booth_number, description FROM congress_booths WHERE conference_id = $1`,
       [sourceId]
     );
     for (const b of boothsRes.rows) {
@@ -244,18 +322,77 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
       );
     }
 
-    await client.query(
-      `INSERT INTO congress_voting_state (conference_id, is_open)
-       VALUES ($1, false) ON CONFLICT (conference_id) DO NOTHING`,
-      [newId]
+    // Clone speakers
+    const speakersRes = await client.query(
+      `SELECT external_id, name, title, company, bio, photo_url, session_ids
+       FROM conference_speakers WHERE conference_id = $1`,
+      [sourceId]
     );
+    for (const sp of speakersRes.rows) {
+      await client.query(
+        `INSERT INTO conference_speakers
+           (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [newId, sp.external_id, sp.name, sp.title, sp.company, sp.bio, sp.photo_url, sp.session_ids]
+      );
+    }
+
+    // Clone sessions (both doc and para)
+    const sessionsRes = await client.query(
+      `SELECT external_id, title, description, start_time, end_time,
+              day, room, track, speaker_ids, tags, is_para
+       FROM conference_sessions WHERE conference_id = $1`,
+      [sourceId]
+    );
+    for (const s of sessionsRes.rows) {
+      await client.query(
+        `INSERT INTO conference_sessions
+           (conference_id, external_id, title, description, start_time, end_time,
+            day, room, track, speaker_ids, tags, is_para)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [
+          newId, s.external_id, s.title, s.description, s.start_time, s.end_time,
+          s.day, s.room, s.track, s.speaker_ids, s.tags, s.is_para,
+        ]
+      );
+    }
+
+    // Clone sponsors
+    const sponsorsRes = await client.query(
+      `SELECT external_id, name, tier, website, logo_url, description
+       FROM conference_sponsors WHERE conference_id = $1`,
+      [sourceId]
+    );
+    for (const sp of sponsorsRes.rows) {
+      await client.query(
+        `INSERT INTO conference_sponsors
+           (conference_id, external_id, name, tier, website, logo_url, description)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [newId, sp.external_id, sp.name, sp.tier, sp.website, sp.logo_url, sp.description]
+      );
+    }
 
     await client.query("COMMIT");
 
-    logger.info({ sourceId, newId, name }, "conference cloned");
+    logger.info(
+      {
+        sourceId,
+        newId,
+        name,
+        boothsCopied: boothsRes.rows.length,
+        speakersCopied: speakersRes.rows.length,
+        sessionsCopied: sessionsRes.rows.length,
+        sponsorsCopied: sponsorsRes.rows.length,
+      },
+      "conference cloned"
+    );
+
     res.status(201).json({
       conference: newConf,
       boothsCopied: boothsRes.rows.length,
+      speakersCopied: speakersRes.rows.length,
+      sessionsCopied: sessionsRes.rows.length,
+      sponsorsCopied: sponsorsRes.rows.length,
     });
   } catch (err) {
     await client.query("ROLLBACK");

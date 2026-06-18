@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import { pool } from "../lib/db";
+import { ensureConferencesTable } from "../lib/ensureConferences";
 const router = Router();
 
 const MAX_REGISTRATIONS_PER_IP_PER_HOUR = 500;
@@ -25,17 +26,8 @@ function clientIp(req: Request): string {
 }
 
 async function ensureTables() {
-  // Ensure conferences table exists first so FK constraints can reference it
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS conferences (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      organization VARCHAR(255) NOT NULL DEFAULT ''
-    );
-    INSERT INTO conferences (id, name, organization)
-    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
-    ON CONFLICT (id) DO NOTHING;
-  `).catch(() => {});
+  // Ensure the full conferences table exists before adding FKs to it
+  await ensureConferencesTable().catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_booths (

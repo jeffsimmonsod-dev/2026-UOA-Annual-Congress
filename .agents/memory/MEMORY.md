@@ -1,0 +1,2 @@
+- [SERIAL sequence after manual ID seed](serial-sequence-seed.md) — after seeding any table with explicit id=1, advance the SERIAL sequence or clones/new rows conflict.
+- [Voting state single-row table pitfall](voting-state-multitenancy.md) — congress_voting_state was designed as single-row (id DEFAULT 1 CHECK id=1); multi-tenancy required a sequence migration + removing clone-time seed.

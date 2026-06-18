@@ -1,6 +1,7 @@
 import { Router, type Request } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
+import { ensureConferencesTable } from "../lib/ensureConferences";
 
 const router = Router();
 
@@ -31,17 +32,8 @@ function isValidExpoToken(token: string): boolean {
 }
 
 async function ensureTables() {
-  // Ensure conferences table exists first so FK constraints can reference it
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS conferences (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      organization VARCHAR(255) NOT NULL DEFAULT ''
-    );
-    INSERT INTO conferences (id, name, organization)
-    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
-    ON CONFLICT (id) DO NOTHING;
-  `).catch(() => {});
+  // Ensure the full conferences table exists before adding FKs to it
+  await ensureConferencesTable().catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_push_tokens (

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
+import { ensureConferencesTable } from "../lib/ensureConferences";
 
 const router = Router();
 
@@ -28,17 +29,8 @@ function isAdmin(req: { headers: Record<string, string | string[] | undefined> }
 }
 
 async function ensureTables() {
-  // Ensure conferences table exists first so FK constraints can reference it
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS conferences (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      organization VARCHAR(255) NOT NULL DEFAULT ''
-    );
-    INSERT INTO conferences (id, name, organization)
-    VALUES (1, '2026 UOA Annual Congress', 'Utah Optometric Association')
-    ON CONFLICT (id) DO NOTHING;
-  `).catch(() => {});
+  // Ensure the full conferences table exists before adding FKs to it
+  await ensureConferencesTable().catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS congress_voting_state (
@@ -125,6 +117,20 @@ async function ensureTables() {
       ALTER TABLE congress_votes
         ADD CONSTRAINT fk_votes_conf
         FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+
+  // Replace the hard-coded DEFAULT 1 on congress_voting_state.id with a proper sequence
+  // so multiple conference rows can exist (multi-tenancy).
+  await pool.query(`
+    DO $$ BEGIN
+      CREATE SEQUENCE IF NOT EXISTS congress_voting_state_id_seq;
+      ALTER TABLE congress_voting_state
+        ALTER COLUMN id SET DEFAULT nextval('congress_voting_state_id_seq');
+      PERFORM setval(
+        'congress_voting_state_id_seq',
+        GREATEST((SELECT MAX(id) FROM congress_voting_state), 1)
+      );
     EXCEPTION WHEN others THEN NULL; END $$;
   `).catch(() => {});
 }
