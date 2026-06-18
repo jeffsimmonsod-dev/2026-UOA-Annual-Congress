@@ -15,6 +15,46 @@ import {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const objectStorageService = new ObjectStorageService();
 
+const ALLOWED_IMAGE_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+  "image/heic",
+  "image/heif",
+];
+
+async function fetchAndStorePhoto(remoteUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(remoteUrl, {
+      signal: AbortSignal.timeout(10_000),
+      headers: { Accept: "image/*" },
+    });
+    if (!res.ok) return null;
+    const rawContentType = res.headers.get("content-type") || "";
+    const contentType = rawContentType.split(";")[0]?.trim() ?? "";
+    if (!ALLOWED_IMAGE_MIME.includes(contentType)) return null;
+    const arrayBuf = await res.arrayBuffer();
+    if (arrayBuf.byteLength > 10 * 1024 * 1024) return null;
+    const buffer = Buffer.from(arrayBuf);
+
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+    const gcsRes = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: buffer,
+    });
+    if (!gcsRes.ok) return null;
+
+    return `/api/storage${objectPath}`;
+  } catch {
+    return null;
+  }
+}
+
 const router = Router();
 
 function getAdminPin(): string {
@@ -293,10 +333,25 @@ router.post("/conferences/:id/speakers/bulk", async (req: Request, res: Response
     for (let i = 0; i < speakers.length; i++) {
       const sp = speakers[i]!;
       if (!sp.name?.trim()) {
-        errors.push({ row: i, message: "name is required" });
+        errors.push({ row: i + 1, message: "name is required" });
         continue;
       }
       const externalId = sp.externalId ?? `sp-${Date.now()}-${i}`;
+
+      let resolvedPhotoUrl: string | null = sp.photoUrl ?? null;
+      if (sp.photoUrl && /^https?:\/\//.test(sp.photoUrl)) {
+        const stored = await fetchAndStorePhoto(sp.photoUrl);
+        if (stored) {
+          resolvedPhotoUrl = stored;
+        } else {
+          errors.push({
+            row: i + 1,
+            message: `Photo could not be fetched/stored for "${sp.name}" — original URL kept`,
+          });
+          resolvedPhotoUrl = sp.photoUrl;
+        }
+      }
+
       try {
         await client.query(
           `INSERT INTO conference_speakers
@@ -304,11 +359,11 @@ router.post("/conferences/:id/speakers/bulk", async (req: Request, res: Response
            VALUES ($1,$2,$3,$4,$5,$6,$7)
            ON CONFLICT (conference_id, external_id)
            DO UPDATE SET name=$3, title=$4, company=$5, bio=$6, photo_url=$7`,
-          [id, externalId, sp.name.trim(), sp.title ?? null, sp.organization ?? null, sp.bio ?? null, sp.photoUrl ?? null]
+          [id, externalId, sp.name.trim(), sp.title ?? null, sp.organization ?? null, sp.bio ?? null, resolvedPhotoUrl]
         );
         imported++;
       } catch (rowErr) {
-        errors.push({ row: i, message: String(rowErr) });
+        errors.push({ row: i + 1, message: String(rowErr) });
       }
     }
     await client.query("COMMIT");
