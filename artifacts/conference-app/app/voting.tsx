@@ -16,7 +16,8 @@ import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { getDeviceId } from "@/services/deviceId";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+import conferenceConfig from "@/conference.config";
+const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 const OFFICER_SLATE = [
   { role: "President", name: "Dr. Jeff Simmons" },

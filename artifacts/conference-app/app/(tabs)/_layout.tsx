@@ -99,6 +99,7 @@ function ClassicTabLayout() {
         name="schedule"
         options={{
           title: conf.conferenceName,
+          tabBarLabel: "Schedule",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="calendar" tintColor={color} size={24} />
@@ -111,6 +112,7 @@ function ClassicTabLayout() {
         name="my-schedule"
         options={{
           title: conf.conferenceName,
+          tabBarLabel: "My Schedule",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="bookmark" tintColor={color} size={24} />
@@ -123,6 +125,7 @@ function ClassicTabLayout() {
         name="photos"
         options={{
           title: conf.conferenceName,
+          tabBarLabel: "Photos",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="photo.on.rectangle" tintColor={color} size={24} />

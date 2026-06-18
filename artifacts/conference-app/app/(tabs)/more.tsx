@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
@@ -85,7 +86,7 @@ const useMenuItems = (): MenuItem[] => {
     {
       label: "Business Meeting Voting",
       icon: "checkbox-outline" as keyof typeof Ionicons.glyphMap,
-      color: "#4f46e5",
+      color: conferenceConfig.primaryColor,
       route: "/voting",
       description: "Officer slate & board trustee vote",
     },

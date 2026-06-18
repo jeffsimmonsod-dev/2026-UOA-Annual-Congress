@@ -25,7 +25,8 @@ import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useProfile } from "@/context/ProfileContext";
 import ZoomableImage from "@/components/ZoomableImage";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+import conferenceConfig from "@/conference.config";
+const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 const PHOTO_TOKENS_KEY = "@photo_delete_tokens";
 const SESSION_TOKEN_KEY = "@photo_session_token";
 

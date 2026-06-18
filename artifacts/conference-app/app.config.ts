@@ -1,8 +1,8 @@
-import { CONFERENCE_META } from "./conference.meta";
+import conferenceConfig from "./conference.config";
 
 export default {
   expo: {
-    name: CONFERENCE_META.conferenceName,
+    name: conferenceConfig.conferenceName,
     slug: "conference-app",
     version: "2.0.1",
     orientation: "portrait",

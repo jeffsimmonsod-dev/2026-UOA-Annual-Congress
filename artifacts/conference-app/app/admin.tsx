@@ -21,7 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { sendPushNotification } from "@/services/pushNotifications";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+import conferenceConfig from "@/conference.config";
+const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type Step = "pin" | "dashboard";
 type AdminTab = "notifications" | "booths" | "analytics" | "photos" | "voting";

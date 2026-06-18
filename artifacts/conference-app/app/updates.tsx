@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { UPDATES } from "@/services/data";
@@ -19,7 +20,7 @@ const TYPE_CONFIG: Record<
 > = {
   announcement: {
     icon: "megaphone-outline",
-    color: "#4f46e5",
+    color: conferenceConfig.primaryColor,
     label: "Announcement",
   },
   schedule: {

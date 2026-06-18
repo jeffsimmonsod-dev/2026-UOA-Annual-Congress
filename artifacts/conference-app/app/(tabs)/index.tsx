@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
@@ -78,8 +79,8 @@ const QUICK_TILES = [
     label: "Exhibit Hall",
     subtitle: "Booth passport & raffle",
     icon: "storefront-outline" as const,
-    color: "#4f46e5",
-    bg: "rgba(79,70,229,0.10)",
+    color: conferenceConfig.primaryColor,
+    bg: `${conferenceConfig.primaryColor}1a`,
     route: "/exhibit-hall",
   },
   {
