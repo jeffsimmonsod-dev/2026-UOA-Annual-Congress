@@ -103,6 +103,7 @@ export const GetConferenceConfigResponse = zod.object({
   featureVoting: zod.boolean().optional(),
   featurePhotos: zod.boolean().optional(),
   featureExhibitHall: zod.boolean().optional(),
+  published: zod.boolean().optional(),
 });
 
 /**

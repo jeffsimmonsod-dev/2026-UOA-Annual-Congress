@@ -550,6 +550,7 @@ router.get("/conferences/:id/config", async (req: Request, res: Response) => {
       featureVoting: c.feature_voting ?? false,
       featurePhotos: c.feature_photos ?? false,
       featureExhibitHall: c.feature_exhibit_hall ?? false,
+      published: c.published ?? false,
       createdAt: c.created_at,
     });
   } catch (err) {
@@ -626,7 +627,7 @@ router.post("/conferences", async (req: Request, res: Response) => {
       ]
     );
     logger.info({ id: rows[0].id, name }, "conference created");
-    res.status(201).json({ conference: rows[0] });
+    res.status(201).json(rows[0]);
   } catch (err) {
     req.log.error({ err }, "conferences create error");
     res.status(500).json({ error: "Server error" });

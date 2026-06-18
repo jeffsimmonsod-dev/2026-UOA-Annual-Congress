@@ -1,4 +1,5 @@
 import { useParams, Link, useLocation } from "wouter";
+import { useAdmin } from "@/hooks/use-admin";
 import { useGetConferenceConfig, getGetConferenceConfigQueryKey } from "@workspace/api-client-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,13 @@ import { VotingTab } from "@/components/conference/voting-tab";
 export default function ConferenceDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
+  const { pin } = useAdmin();
   const conferenceId = Number(id);
+
+  if (!pin) {
+    setLocation("/");
+    return null;
+  }
 
   const { data: config, isLoading, error } = useGetConferenceConfig(conferenceId, {
     query: { enabled: !!conferenceId, queryKey: getGetConferenceConfigQueryKey(conferenceId) }

@@ -647,6 +647,8 @@ components:
           type: boolean
         featureExhibitHall:
           type: boolean
+        published:
+          type: boolean
 
     ConferenceInput:
       type: object

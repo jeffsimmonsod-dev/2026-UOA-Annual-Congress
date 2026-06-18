@@ -67,6 +67,7 @@ export interface ConferenceConfig {
   featureVoting?: boolean;
   featurePhotos?: boolean;
   featureExhibitHall?: boolean;
+  published?: boolean;
 }
 
 export interface ConferenceInput {
