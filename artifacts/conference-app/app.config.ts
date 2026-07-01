@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "2026 UOA Annual Congress",
     slug: "conference-app",
-    version: "2.0.1",
+    version: "2.0.2",
     orientation: "portrait",
     icon: "./assets/images/app-icon.png",
     scheme: "conference-app",
@@ -16,7 +16,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "org.utaheyedoc.congress2026",
-      buildNumber: "4",
+      buildNumber: "5",
       infoPlist: {
         NSCameraUsageDescription:
           "Used to scan booth QR codes in the exhibit hall",
@@ -25,7 +25,7 @@ export default {
     },
     android: {
       package: "org.utaheyedoc.congress2026",
-      versionCode: 5,
+      versionCode: 6,
       adaptiveIcon: {
         foregroundImage: "./assets/images/app-icon-adaptive.png",
         backgroundColor: "#ffffff",
