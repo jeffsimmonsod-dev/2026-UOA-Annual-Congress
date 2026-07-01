@@ -280,6 +280,7 @@ router.post("/push/send", async (req, res) => {
       message: result.sent === 0 ? "No registered devices" : `Sent to ${result.sent} device(s)`,
     });
   } catch (err) {
+    req.log.error({ err }, "push/send error");
     res.status(500).json({ error: "Failed to send notifications", details: String(err) });
   }
 });

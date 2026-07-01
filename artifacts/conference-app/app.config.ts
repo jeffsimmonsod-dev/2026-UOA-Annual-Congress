@@ -1,8 +1,6 @@
-import conferenceConfig from "./conference.config";
-
 export default {
   expo: {
-    name: conferenceConfig.conferenceName,
+    name: "2026 UOA Annual Congress",
     slug: "conference-app",
     version: "2.0.1",
     orientation: "portrait",
