@@ -270,12 +270,8 @@ router.patch("/conferences/:id", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/conferences/:id/speakers — list speakers
+// GET /api/conferences/:id/speakers — list speakers (public)
 router.get("/conferences/:id/speakers", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -377,12 +373,8 @@ router.post("/conferences/:id/speakers/bulk", async (req: Request, res: Response
   }
 });
 
-// GET /api/conferences/:id/sessions — list sessions
+// GET /api/conferences/:id/sessions — list sessions (public)
 router.get("/conferences/:id/sessions", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -482,12 +474,8 @@ router.post("/conferences/:id/sessions/bulk", async (req: Request, res: Response
   }
 });
 
-// GET /api/conferences/:id/sponsors — list sponsors
+// GET /api/conferences/:id/sponsors — list sponsors (public)
 router.get("/conferences/:id/sponsors", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });

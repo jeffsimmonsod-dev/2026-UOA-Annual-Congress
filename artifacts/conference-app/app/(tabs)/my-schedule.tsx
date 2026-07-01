@@ -12,15 +12,16 @@ import SessionCard from "@/components/SessionCard";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { SESSIONS, PARA_SESSIONS } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 
 export default function MyScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
+  const { docSessions, paraSessions } = useConferenceData();
 
-  const allSessions = [...SESSIONS, ...PARA_SESSIONS];
+  const allSessions = [...docSessions, ...paraSessions];
   const savedSessions = allSessions.filter((s) => savedIds.has(s.id));
 
   const byDay: Record<string, typeof savedSessions> = {};

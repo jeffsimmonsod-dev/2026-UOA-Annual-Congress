@@ -6,12 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SpeakerCard from "@/components/SpeakerCard";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { SPEAKERS } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 
 export default function SpeakersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
+  const { speakers } = useConferenceData();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -29,9 +30,9 @@ export default function SpeakersScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.count, { color: colors.mutedForeground }]}>
-          {SPEAKERS.length} speakers
+          {speakers.length} speakers
         </Text>
-        {SPEAKERS.map((speaker) => (
+        {speakers.map((speaker) => (
           <SpeakerCard key={speaker.id} speaker={speaker} />
         ))}
       </ScrollView>

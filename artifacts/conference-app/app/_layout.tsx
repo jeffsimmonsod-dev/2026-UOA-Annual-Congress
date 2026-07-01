@@ -18,6 +18,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import OnboardingModal from "@/components/OnboardingModal";
 import NotificationPromptModal from "@/components/NotificationPromptModal";
+import { ConferenceDataProvider } from "@/context/ConferenceDataContext";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { ScheduleProvider } from "@/context/ScheduleContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -75,6 +76,7 @@ export default function RootLayout() {
       <ThemeProvider>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
+            <ConferenceDataProvider>
             <ProfileProvider>
               <ScheduleProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
@@ -86,6 +88,7 @@ export default function RootLayout() {
                 </GestureHandlerRootView>
               </ScheduleProvider>
             </ProfileProvider>
+          </ConferenceDataProvider>
           </QueryClientProvider>
         </ErrorBoundary>
       </ThemeProvider>

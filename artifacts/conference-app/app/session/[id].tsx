@@ -19,7 +19,7 @@ import { useSchedule } from "@/context/ScheduleContext";
 import { useNote } from "@/hooks/useNotes";
 import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
-import { getSessionById, getSpeakersForSession } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import RoomMapModal from "@/components/RoomMapModal";
 
 const TRACK_COLORS: Record<string, string> = {
@@ -48,6 +48,7 @@ export default function SessionDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { isSaved, toggleSession } = useSchedule();
+  const { getSessionById, getSpeakersForSession } = useConferenceData();
   const session = getSessionById(id);
   const isWeb = Platform.OS === "web";
   const { note, saveNote, loaded } = useNote(id ?? "");

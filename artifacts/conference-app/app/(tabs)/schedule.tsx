@@ -12,7 +12,7 @@ import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { getSessionsByDay, getParaSessionsByDay } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import type { Session } from "@/types";
 
 const DOCTOR_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
@@ -74,6 +74,7 @@ export default function ScheduleScreen() {
   const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
+  const { getSessionsByDay, getParaSessionsByDay } = useConferenceData();
   const [activeTab, setActiveTab] = useState("Thu, June 4");
   const [activeTrack, setActiveTrack] = useState<string | null>(null);
   const doctorSessionsByDay = getSessionsByDay();

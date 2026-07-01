@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { SPONSORS } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import type { Sponsor } from "@/types";
 
 const TIER_CONFIG = {
@@ -28,11 +28,12 @@ export default function SponsorsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
+  const { sponsors } = useConferenceData();
   const isWeb = Platform.OS === "web";
   const [selected, setSelected] = useState<Sponsor | null>(null);
 
   const tiers = (["platinum", "gold", "silver", "bronze"] as const).filter(
-    (tier) => SPONSORS.some((s) => s.tier === tier)
+    (tier) => sponsors.some((s) => s.tier === tier)
   );
 
   return (
@@ -51,7 +52,7 @@ export default function SponsorsScreen() {
       >
         {tiers.map((tier) => {
           const tierConfig = TIER_CONFIG[tier];
-          const tierSponsors = SPONSORS.filter((s) => s.tier === tier);
+          const tierSponsors = sponsors.filter((s) => s.tier === tier);
           return (
             <View key={tier}>
               <View style={styles.tierHeader}>

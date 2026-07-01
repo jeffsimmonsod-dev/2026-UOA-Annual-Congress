@@ -11,15 +11,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
-import { SESSIONS } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 
 export default function MyScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { savedIds } = useSchedule();
+  const { docSessions } = useConferenceData();
   const isWeb = Platform.OS === "web";
 
-  const savedSessions = SESSIONS.filter((s) => savedIds.has(s.id));
+  const savedSessions = docSessions.filter((s) => savedIds.has(s.id));
 
   const byDay: Record<string, typeof savedSessions> = {};
   for (const session of savedSessions) {

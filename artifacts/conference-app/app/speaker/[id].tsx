@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { getSessionsForSpeaker, getSpeakerById } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import { getSpeakerImage } from "@/services/speakerImages";
 
 const TRACK_COLORS: Record<string, string> = {
@@ -40,6 +40,7 @@ export default function SpeakerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { getSpeakerById, getSessionsForSpeaker } = useConferenceData();
   const speaker = getSpeakerById(id);
   const isWeb = Platform.OS === "web";
 

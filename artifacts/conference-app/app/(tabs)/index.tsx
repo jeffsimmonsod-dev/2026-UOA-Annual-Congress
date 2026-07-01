@@ -18,7 +18,8 @@ import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useSchedule } from "@/context/ScheduleContext";
-import { SESSIONS, PARA_SESSIONS, SPONSORS, UPDATES } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
+import { UPDATES } from "@/services/data";
 import type { Session, Sponsor } from "@/types";
 
 function formatDate(iso: string): string {
@@ -115,8 +116,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
   const { savedIds } = useSchedule();
+  const { docSessions, paraSessions, sponsors } = useConferenceData();
 
-  const allSessions = [...SESSIONS, ...PARA_SESSIONS];
+  const allSessions = [...docSessions, ...paraSessions];
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
 
   const DAY_DATES: Record<string, string> = {
@@ -365,7 +367,7 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.sponsorsScroll}
       >
-        {SPONSORS.map((sponsor) => (
+        {sponsors.map((sponsor) => (
           <Pressable
             key={sponsor.id}
             onPress={() => setSelectedSponsor(sponsor)}

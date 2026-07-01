@@ -1,11 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { SESSIONS, PARA_SESSIONS } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import type { Session } from "@/types";
 
 const STORAGE_KEY = "@devsummit_my_schedule";
-
-const ALL_SESSIONS: Session[] = [...SESSIONS, ...PARA_SESSIONS];
 
 function parseMinutes(timeStr: string): number {
   const parts = timeStr.trim().split(" ");
@@ -42,6 +40,8 @@ const ScheduleContext = createContext<ScheduleContextType>({
 
 export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const { docSessions, paraSessions } = useConferenceData();
+  const allSessions: Session[] = [...docSessions, ...paraSessions];
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -76,16 +76,16 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
   const checkConflict = useCallback(
     (sessionId: string): Session | null => {
-      const incoming = ALL_SESSIONS.find((s) => s.id === sessionId);
+      const incoming = allSessions.find((s) => s.id === sessionId);
       if (!incoming) return null;
       for (const savedId of savedIds) {
         if (savedId === sessionId) continue;
-        const saved = ALL_SESSIONS.find((s) => s.id === savedId);
+        const saved = allSessions.find((s) => s.id === savedId);
         if (saved && sessionsOverlap(incoming, saved)) return saved;
       }
       return null;
     },
-    [savedIds]
+    [savedIds, allSessions]
   );
 
   const isSaved = useCallback(

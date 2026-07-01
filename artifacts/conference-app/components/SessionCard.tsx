@@ -4,10 +4,10 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSchedule } from "@/context/ScheduleContext";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
 import type { Session } from "@/types";
-import { getSpeakersForSession } from "@/services/data";
 
 interface Props {
   session: Session;
@@ -39,6 +39,7 @@ export default function SessionCard({ session, showDay = false }: Props) {
   "use no memo";
   const colors = useColors();
   const { isSaved, toggleSession, checkConflict } = useSchedule();
+  const { getSpeakersForSession } = useConferenceData();
   const [conflictSession, setConflictSession] = useState<Session | null>(null);
   if (!session) return null;
   const saved = isSaved(session.id);

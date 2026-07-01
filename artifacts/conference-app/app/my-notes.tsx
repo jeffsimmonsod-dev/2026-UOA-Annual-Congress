@@ -18,7 +18,7 @@ import { deleteNote, getAllNotes } from "@/hooks/useNotes";
 import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { getSessionById } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 
 interface NoteEntry {
   sessionId: string;
@@ -116,6 +116,7 @@ export default function MyNotesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
+  const { getSessionById } = useConferenceData();
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -141,7 +142,7 @@ export default function MyNotesScreen() {
     });
     setNotes(entries);
     setLoading(false);
-  }, []);
+  }, [getSessionById]);
 
   useFocusEffect(
     useCallback(() => {

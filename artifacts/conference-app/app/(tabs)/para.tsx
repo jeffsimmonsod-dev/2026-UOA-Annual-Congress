@@ -13,7 +13,7 @@ import SessionCard from "@/components/SessionCard";
 import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { getParaSessionsByDay } from "@/services/data";
+import { useConferenceData } from "@/context/ConferenceDataContext";
 
 const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 
@@ -22,6 +22,7 @@ export default function ParaScreen() {
   const conf = useConference();
   const insets = useSafeAreaInsets();
   const { contentStyle } = useTabletLayout();
+  const { getParaSessionsByDay } = useConferenceData();
   const [activeDay, setActiveDay] = useState("Thu, June 4");
   const sessionsByDay = getParaSessionsByDay();
   const sessions = sessionsByDay[activeDay] ?? [];

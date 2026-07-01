@@ -1,3 +1,8 @@
+// NOTE: conference name is hardcoded here (not imported from conference.config.ts)
+// because @expo/config evaluates app.config.ts via sucrase + require-from-string.
+// The resulting require() call uses Node.js standard resolution, which cannot
+// resolve .ts extensions without a TypeScript hook registered first.
+// The value here must match conferenceConfig.conferenceName in conference.config.ts.
 export default {
   expo: {
     name: "2026 UOA Annual Congress",
