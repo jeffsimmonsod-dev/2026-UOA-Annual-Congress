@@ -206,7 +206,7 @@ router.post("/attendees/register", async (req: Request, res: Response) => {
     `INSERT INTO congress_attendees (token, conference_id) VALUES ($1, $2) RETURNING id`,
     [token, req.conferenceId]
   );
-  res.json({ attendeeToken: token, attendeeId: rows[0].id });
+  return res.json({ attendeeToken: token, attendeeId: rows[0].id });
 });
 
 // PATCH /api/attendees/profile — update name/email/consent for an existing attendee token
@@ -224,7 +224,7 @@ router.patch("/attendees/profile", async (req: Request, res: Response) => {
     `UPDATE congress_attendees SET name = $2, email = $3, email_consent = $4 WHERE id = $1`,
     [attendee.id, name || null, email || null, emailConsent === true]
   );
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 // GET /api/booths?attendeeToken=xxx  — list all booths with visit status
@@ -255,6 +255,7 @@ router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) =
   if (!isAuthorized(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
+  if (typeof req.params.id !== "string") return res.status(400).json({ error: "Invalid booth ID" });
   const boothId = parseInt(req.params.id, 10);
   if (isNaN(boothId)) return res.status(400).json({ error: "Invalid booth ID" });
 
@@ -272,7 +273,7 @@ router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) =
     [code, boothId, expiresAt]
   );
 
-  res.json({ code, boothId, expiresAt, ttlSeconds: SCAN_CODE_TTL_SECONDS });
+  return res.json({ code, boothId, expiresAt, ttlSeconds: SCAN_CODE_TTL_SECONDS });
 });
 
 // POST /api/booths/checkin-nonce — issue a booth-scoped, single-use nonce tied to a server attendee ID
@@ -300,7 +301,7 @@ router.post("/booths/checkin-nonce", async (req: Request, res: Response) => {
     [nonce, attendee.id, boothId, expiresAt]
   );
 
-  res.json({ nonce });
+  return res.json({ nonce });
 });
 
 // POST /api/booths/checkin — record a booth visit by verifying the booth's static secret token
@@ -357,7 +358,7 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
     throw err;
   }
 
-  res.json({ success: true, alreadyVisited: false, booth: { id: booth.id, name: booth.name, company: booth.company } });
+  return res.json({ success: true, alreadyVisited: false, booth: { id: booth.id, name: booth.name, company: booth.company } });
 });
 
 // GET /api/booths/admin — admin view with tokens and visit counts
@@ -373,7 +374,7 @@ router.get("/booths/admin", async (req: Request, res: Response) => {
      ORDER BY b.booth_number ASC, b.name ASC`,
     [req.conferenceId]
   );
-  res.json({ booths: rows });
+  return res.json({ booths: rows });
 });
 
 // GET /api/booths/admin/analytics — per-booth visitor details for sponsor reporting
@@ -410,7 +411,7 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
   }));
   const totalVisits = visits.length;
   const uniqueAttendees = new Set(visits.map((v) => v.attendee_id)).size;
-  res.json({ booths: result, totalVisits, uniqueAttendees });
+  return res.json({ booths: result, totalVisits, uniqueAttendees });
 });
 
 // GET /api/booths/admin/entries — raffle entries (attendees that visited all booths)
@@ -438,7 +439,7 @@ router.get("/booths/admin/entries", async (req: Request, res: Response) => {
      ORDER BY last_visit ASC`,
     [req.conferenceId, total]
   );
-  res.json({ entries: rows, total, raffleCount: rows.length });
+  return res.json({ entries: rows, total, raffleCount: rows.length });
 });
 
 // POST /api/booths — create booth (admin)
@@ -461,7 +462,7 @@ router.post("/booths", async (req: Request, res: Response) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [name, company, boothNumber || null, description || null, secretToken, req.conferenceId]
   );
-  res.json({ booth: rows[0] });
+  return res.json({ booth: rows[0] });
 });
 
 // DELETE /api/booths/:id — delete booth (admin)
@@ -473,7 +474,7 @@ router.delete("/booths/:id", async (req: Request, res: Response) => {
     "DELETE FROM congress_booths WHERE id = $1 AND conference_id = $2",
     [req.params.id, req.conferenceId]
   );
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 export default router;

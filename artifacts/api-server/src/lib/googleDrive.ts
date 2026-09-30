@@ -1,6 +1,6 @@
 // Google Drive integration via Replit Connectors SDK
 // Uploads photos to a "UOA Congress 2026 Photos" folder in the connected Google Drive account
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import { ReplitConnectors, type ProxyOptions } from "@replit/connectors-sdk";
 
 const FOLDER_NAME = "UOA Congress 2026 Photos";
 
@@ -10,7 +10,7 @@ function getConnectors() {
   return new ReplitConnectors();
 }
 
-async function driveRequest(path: string, options: RequestInit = {}) {
+async function driveRequest(path: string, options: ProxyOptions = {}) {
   const connectors = getConnectors();
   const resp = await connectors.proxy("google-drive", path, options);
   return resp;

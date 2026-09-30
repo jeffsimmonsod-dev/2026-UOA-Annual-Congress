@@ -33,6 +33,8 @@ export * from "./sponsor";
 export * from "./sponsorBulkInput";
 export * from "./sponsorList";
 export * from "./sponsorRecord";
+export * from "./uploadUrlRequest";
+export * from "./uploadUrlResponse";
 export * from "./votingActionResult";
 export * from "./votingResults";
 export * from "./votingResultsSlateResults";

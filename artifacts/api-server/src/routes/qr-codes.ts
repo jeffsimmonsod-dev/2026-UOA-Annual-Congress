@@ -175,7 +175,7 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
 </html>`;
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(html);
+  return res.send(html);
 });
 
 // GET /api/booths/admin/qr-codes — API endpoint for admin mobile app (uses x-admin-pin header)
@@ -192,7 +192,7 @@ router.get("/booths/admin/qr-codes", async (req: Request, res: Response) => {
     [req.conferenceId]
   );
 
-  res.json({ booths: rows });
+  return res.json({ booths: rows });
 });
 
 // GET /api/booths/admin/:id/qr — returns QR data URL for a booth's static secret token (admin only)
@@ -201,6 +201,9 @@ router.get("/booths/admin/:id/qr", async (req: Request, res: Response) => {
     return res.status(403).json({ error: "Unauthorized" });
   }
 
+  if (typeof req.params.id !== "string") {
+    return res.status(400).json({ error: "Invalid booth ID" });
+  }
   const boothId = parseInt(req.params.id, 10);
   if (isNaN(boothId)) {
     return res.status(400).json({ error: "Invalid booth ID" });
@@ -223,7 +226,7 @@ router.get("/booths/admin/:id/qr", async (req: Request, res: Response) => {
     errorCorrectionLevel: "M",
   });
 
-  res.json({ dataUrl });
+  return res.json({ dataUrl });
 });
 
 function escHtml(s: string): string {
