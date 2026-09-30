@@ -8,6 +8,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -346,7 +347,37 @@ export function CommunitySections({
           )}
         />
         <Modal visible={scoreInfo} transparent animationType="fade" onRequestClose={() => setScoreInfo(false)}>
-          <View style={styles.centerOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setScoreInfo(false)} /><View style={[styles.infoCard, { backgroundColor: colors.card }]}><Text style={[styles.sheetTitle, { color: colors.foreground }]}>How points work</Text><Text style={[styles.bodyText, { color: colors.mutedForeground }]}>Community points recognize participation across conference community activities. Your total, rank, and the top contributors are shown here. The score cutoff indicates how current the leaderboard is.</Text><Pressable onPress={() => setScoreInfo(false)} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={styles.primaryButtonText}>Got it</Text></Pressable></View></View>
+          <View style={styles.centerOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setScoreInfo(false)} accessibilityLabel="Close scoring information" />
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+              <Text style={[styles.sheetTitle, { color: colors.primary }]}>How to earn points</Text>
+              <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.scoreRules} showsVerticalScrollIndicator>
+                {[
+                  { action: "Share a photo", points: "+5", limit: "First 2 photos per day · up to 10 points" },
+                  { action: "Start a discussion", points: "+5", limit: "First 2 discussions per day · up to 10 points" },
+                  { action: "Comment or reply", points: "+3", limit: "First 5 photo comments and discussion replies combined per day · up to 15 points" },
+                  { action: "Receive a photo like", points: "+1", limit: "One like per other attendee per day, across all your photos · up to 10 points" },
+                ].map(rule => (
+                  <View key={rule.action} style={[styles.scoreRule, { borderBottomColor: colors.border }]}>
+                    <View style={styles.scoreRuleHeading}>
+                      <Text style={[styles.author, { color: colors.foreground }]}>{rule.action}</Text>
+                      <Text style={[styles.scoreRulePoints, { color: colors.primary }]}>{rule.points}</Text>
+                    </View>
+                    <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>{rule.limit}</Text>
+                  </View>
+                ))}
+                <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+                  Giving likes earns no points, and liking your own photos does not count. You can earn up to 45 points per day. Daily limits reset at midnight UTC.
+                </Text>
+                <Text style={[styles.bodyText, { color: colors.mutedForeground }]}>
+                  Hidden or deleted content does not earn points. If organizers set a prize scoring cutoff, activity after that time earns no points, but you can still participate.
+                </Text>
+              </ScrollView>
+              <Pressable onPress={() => setScoreInfo(false)} style={[styles.primaryButton, { backgroundColor: colors.primary }]} accessibilityRole="button">
+                <Text style={styles.primaryButtonText}>Got it</Text>
+              </Pressable>
+            </View>
+          </View>
         </Modal>
       </View>
     );
@@ -451,7 +482,11 @@ const styles = StyleSheet.create({
   listTitle: { fontSize: 16, fontWeight: "700", marginTop: 18, marginBottom: 5 },
   leaderRow: { borderWidth: 1, borderRadius: 13, padding: 14, flexDirection: "row", alignItems: "center", gap: 13 },
   leaderRank: { fontSize: 17, fontWeight: "800", width: 30 },
-  infoCard: { width: "88%", maxWidth: 430, borderRadius: 18, padding: 22, gap: 16 },
+  infoCard: { width: "88%", maxWidth: 430, maxHeight: "80%", borderRadius: 18, padding: 22, gap: 16 },
+  scoreRules: { gap: 12 },
+  scoreRule: { gap: 4, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  scoreRuleHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  scoreRulePoints: { fontSize: 18, fontWeight: "800" },
   centerOverlay: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.45)" },
   discussionHeading: { flexDirection: "row", alignItems: "center", paddingTop: 3, paddingBottom: 8, gap: 12 },
   discussionHeadingText: { fontSize: 19, fontWeight: "700", marginTop: 4 },
