@@ -39,7 +39,7 @@ export default function MyScheduleScreen() {
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: insets.top + 16,
+          paddingTop: insets.top + 8,
           paddingBottom: insets.bottom + 100,
         },
         contentStyle,
@@ -94,7 +94,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 80,
     gap: 12,
     paddingHorizontal: 32,
   },

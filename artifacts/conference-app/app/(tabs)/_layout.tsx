@@ -111,7 +111,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="my-schedule"
         options={{
-          title: conf.conferenceName,
+          title: "My Schedule",
+          headerShown: false,
           tabBarLabel: "My Schedule",
           tabBarIcon: ({ color }) =>
             isIOS ? (
