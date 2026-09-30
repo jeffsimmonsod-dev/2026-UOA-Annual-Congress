@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -61,6 +61,7 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
   const queryClient = useQueryClient();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [logoDragActive, setLogoDragActive] = useState(false);
 
   const form = useForm<UpdateFormValues>({
     resolver: zodResolver(updateSchema),
@@ -92,7 +93,7 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
     );
   };
 
-  const handleLogoFileUpload = async (file: File) => {
+  const handleLogoFileUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast({ variant: "destructive", title: "Please select an image file" });
       return;
@@ -129,7 +130,42 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
     } finally {
       setLogoUploading(false);
     }
-  };
+  }, [conferenceId, form, pin, toast]);
+
+  useEffect(() => {
+    const isImageDrag = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.items ?? []).some(
+        (item) => item.kind === "file" && (item.type === "" || item.type.startsWith("image/"))
+      );
+
+    const onDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      const isImage = isImageDrag(event);
+      event.dataTransfer.dropEffect = isImage && !logoUploading ? "copy" : "none";
+      setLogoDragActive(isImage && !logoUploading);
+    };
+    const onDragLeave = (event: DragEvent) => {
+      if (!event.relatedTarget) setLogoDragActive(false);
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      setLogoDragActive(false);
+    };
+    const onDragEnd = () => setLogoDragActive(false);
+
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    window.addEventListener("dragend", onDragEnd);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragend", onDragEnd);
+    };
+  }, [logoUploading]);
 
   const primaryColor = form.watch("primaryColor") || "#4f46e5";
   const primaryDarkColor = form.watch("primaryDarkColor") || "#818cf8";
@@ -182,6 +218,33 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
                 <FormItem>
                   <FormLabel>Conference Logo</FormLabel>
                   <div className="space-y-2">
+                    {(!logoUrl || logoDragActive) && (
+                      <div
+                        data-testid="logo-drop-zone"
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = logoUploading ? "none" : "copy";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setLogoDragActive(false);
+                          const file = event.dataTransfer.files[0];
+                          if (file && !logoUploading) void handleLogoFileUpload(file);
+                        }}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                          logoDragActive
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-muted/30 text-muted-foreground"
+                        }`}
+                      >
+                        <ImageUp className="h-7 w-7" aria-hidden="true" />
+                        <p className="text-sm font-medium">
+                          {logoDragActive ? "Drop your logo to upload" : "Drag and drop your logo here"}
+                        </p>
+                        <p className="text-xs">JPEG, PNG, WebP, GIF, or SVG</p>
+                      </div>
+                    )}
                     <div className="flex gap-3 items-center">
                       {logoUrl && (
                         <img
@@ -222,7 +285,7 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handleLogoFileUpload(file);
+                            if (file && !logoUploading) void handleLogoFileUpload(file);
                             e.target.value = "";
                           }}
                         />
