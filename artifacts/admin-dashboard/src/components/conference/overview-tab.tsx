@@ -66,9 +66,11 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
     resolver: zodResolver(updateSchema),
     defaultValues: defaultsFromConfig(config),
   });
+  const { dirtyFields } = form.formState;
 
   useEffect(() => {
-    form.reset(defaultsFromConfig(config));
+    // Refresh saved fields without discarding edits to other conference settings.
+    form.reset(defaultsFromConfig(config), { keepDirtyValues: Object.keys(dirtyFields).length > 0 });
   }, [config]);
 
   const updateConf = useUpdateConference({
@@ -110,7 +112,18 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
       }
       const { logoUrl } = await res.json() as { logoUrl: string };
       form.setValue("logoUrl", logoUrl, { shouldDirty: true });
-      toast({ title: "Logo uploaded successfully" });
+      try {
+        await updateConf.mutateAsync({ id: conferenceId, data: { logoUrl } });
+        form.resetField("logoUrl", { defaultValue: logoUrl });
+        void queryClient.invalidateQueries({ queryKey: getGetConferenceConfigQueryKey(conferenceId) });
+        toast({ title: "Logo saved" });
+      } catch (err) {
+        toast({
+          variant: "destructive",
+          title: "Logo uploaded but could not be saved",
+          description: `Try Save Changes to retry. ${String(err)}`,
+        });
+      }
     } catch (err) {
       toast({ variant: "destructive", title: "Logo upload failed", description: String(err) });
     } finally {
@@ -397,7 +410,7 @@ export function OverviewTab({ conferenceId, config }: { conferenceId: number; co
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" data-testid="button-save-overview" disabled={updateConf.isPending}>
+            <Button type="submit" data-testid="button-save-overview" disabled={updateConf.isPending || logoUploading}>
               {updateConf.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
