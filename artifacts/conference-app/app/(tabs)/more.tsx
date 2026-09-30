@@ -63,7 +63,7 @@ const useMenuItems = (): MenuItem[] => {
       description: "Announcements & alerts",
     },
     {
-      label: "Venue & Hotel",
+      label: "Venue Info & Maps",
       icon: "location-outline",
       color: "#14b8a6",
       route: "/(tabs)/venue",

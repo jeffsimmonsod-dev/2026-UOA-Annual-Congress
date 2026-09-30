@@ -101,12 +101,12 @@ const QUICK_TILES = [
     route: "/(tabs)/venue",
   },
   {
-    label: "FAQ",
-    subtitle: "Frequently asked questions",
-    icon: "help-circle-outline" as const,
+    label: "Speakers",
+    subtitle: "Faculty & course presenters",
+    icon: "person-circle-outline" as const,
     color: "#0ea5e9",
     bg: "rgba(14,165,233,0.10)",
-    route: "/faq",
+    route: "/(tabs)/speakers",
   },
 ];
 
