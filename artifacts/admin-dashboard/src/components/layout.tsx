@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Layers, LogOut, Settings } from "lucide-react";
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { pin, logout } = useAdmin();
+  const { pin, operatorName, logout } = useAdmin();
   const [location] = useLocation();
 
   if (!pin) {
@@ -26,6 +26,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </Link>
         </nav>
         <div className="p-4 border-t">
+          <p className="mb-2 truncate px-3 text-sm" title={operatorName || undefined}>Operator: {operatorName}</p>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={logout}>
             <LogOut className="h-5 w-5 mr-3" />
             Sign out
@@ -36,7 +37,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <header className="h-16 flex items-center justify-between px-4 border-b bg-card md:hidden">
           <div className="flex items-center">
             <Layers className="h-6 w-6 text-primary mr-2" />
-            <span className="font-bold">UOA Congress</span>
+            <div><span className="font-bold">UOA Congress</span><p className="text-xs text-muted-foreground">{operatorName}</p></div>
           </div>
           <Button variant="ghost" size="icon" onClick={logout}>
             <LogOut className="h-5 w-5" />

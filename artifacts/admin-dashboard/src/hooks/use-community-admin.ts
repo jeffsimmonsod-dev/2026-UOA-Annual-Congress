@@ -53,16 +53,17 @@ interface ActionPage {
 
 const key = (conferenceId: number, pin: string) => ["community-admin", conferenceId, pin] as const;
 const actionsKey = (conferenceId: number, pin: string) => ["community-admin-actions", conferenceId, pin] as const;
-const headers = (conferenceId: number, pin: string) => ({
+const headers = (conferenceId: number, pin: string, operatorSession?: string) => ({
   "X-Conference-Id": String(conferenceId),
   "X-Admin-Pin": pin,
+  ...(operatorSession ? { "X-Operator-Session": operatorSession } : {}),
 });
 
-async function request<T>(path: string, conferenceId: number, pin: string, method = "GET", data?: unknown): Promise<T> {
+async function request<T>(path: string, conferenceId: number, pin: string, method = "GET", data?: unknown, operatorSession?: string): Promise<T> {
   const response = await fetch(path, {
     method,
     credentials: "include",
-    headers: { ...headers(conferenceId, pin), ...(data !== undefined ? { "Content-Type": "application/json" } : {}) },
+    headers: { ...headers(conferenceId, pin, operatorSession), ...(data !== undefined ? { "Content-Type": "application/json" } : {}) },
     ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
   });
   if (!response.ok) {
@@ -107,7 +108,7 @@ export async function getCommunityActionsCsv(conferenceId: number, pin: string):
   return response.blob();
 }
 
-export function useCommunityActions(conferenceId: number, pin: string) {
+export function useCommunityActions(conferenceId: number, pin: string, operatorSession: string) {
   const client = useQueryClient();
   const refresh = () => {
     void client.invalidateQueries({ queryKey: key(conferenceId, pin) });
@@ -115,22 +116,22 @@ export function useCommunityActions(conferenceId: number, pin: string) {
   };
   const content = useMutation({
     mutationFn: (data: { type: string; id: string | number; hidden: boolean; reason: string }) =>
-      request<unknown>("/api/community/admin/content", conferenceId, pin, "PATCH", data),
+      request<unknown>("/api/community/admin/content", conferenceId, pin, "PATCH", data, operatorSession),
     onSuccess: refresh,
   });
   const users = useMutation({
     mutationFn: (data: { sessionToken: string; restricted: boolean; reason: string }) =>
-      request<unknown>("/api/community/admin/users", conferenceId, pin, "PATCH", data),
+      request<unknown>("/api/community/admin/users", conferenceId, pin, "PATCH", data, operatorSession),
     onSuccess: refresh,
   });
   const reports = useMutation({
     mutationFn: (data: { id: string | number; status: "dismissed" | "resolved"; reason: string }) =>
-      request<unknown>(`/api/community/admin/reports/${encodeURIComponent(data.id)}`, conferenceId, pin, "PATCH", { status: data.status, reason: data.reason }),
+      request<unknown>(`/api/community/admin/reports/${encodeURIComponent(data.id)}`, conferenceId, pin, "PATCH", { status: data.status, reason: data.reason }, operatorSession),
     onSuccess: refresh,
   });
   const settings = useMutation({
     mutationFn: (data: { cutoffAt: string | null; reason: string }) =>
-      request<{ cutoffAt: string | null }>("/api/community/admin/settings", conferenceId, pin, "PATCH", data),
+      request<{ cutoffAt: string | null }>("/api/community/admin/settings", conferenceId, pin, "PATCH", data, operatorSession),
     onSuccess: (result) => {
       client.setQueryData<CommunityAdminData>(key(conferenceId, pin), old => old ? { ...old, cutoffAt: result.cutoffAt } : old);
       void client.invalidateQueries({ queryKey: actionsKey(conferenceId, pin) });

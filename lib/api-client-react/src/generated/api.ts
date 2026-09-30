@@ -366,7 +366,7 @@ export function useHealthCheck<
 }
 
 /**
- * @summary Verify admin PIN
+ * @summary Sign in an operator with the admin PIN
  */
 export const getVerifyAdminUrl = () => {
   return `/api/admin/verify`;
@@ -429,7 +429,7 @@ export type VerifyAdminMutationBody = BodyType<AdminPinInput>;
 export type VerifyAdminMutationError = ErrorType<void>;
 
 /**
- * @summary Verify admin PIN
+ * @summary Sign in an operator with the admin PIN
  */
 export const useVerifyAdmin = <
   TError = ErrorType<void>,

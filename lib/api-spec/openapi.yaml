@@ -105,7 +105,7 @@ paths:
     post:
       operationId: verifyAdmin
       tags: [admin]
-      summary: Verify admin PIN
+      summary: Sign in an operator with the admin PIN
       requestBody:
         required: true
         content:
@@ -976,6 +976,7 @@ paths:
       tags: [community]
       parameters:
         - $ref: "#/components/parameters/AdminPin"
+        - $ref: "#/components/parameters/OperatorSession"
       requestBody:
         required: true
         content:
@@ -995,6 +996,7 @@ paths:
       tags: [community]
       parameters:
         - $ref: "#/components/parameters/AdminPin"
+        - $ref: "#/components/parameters/OperatorSession"
       requestBody:
         required: true
         content:
@@ -1018,6 +1020,7 @@ paths:
           required: true
           schema: { type: integer }
         - $ref: "#/components/parameters/AdminPin"
+        - $ref: "#/components/parameters/OperatorSession"
       requestBody:
         required: true
         content:
@@ -1037,6 +1040,7 @@ paths:
       tags: [community]
       parameters:
         - $ref: "#/components/parameters/AdminPin"
+        - $ref: "#/components/parameters/OperatorSession"
       requestBody:
         required: true
         content:
@@ -1056,6 +1060,12 @@ paths:
 
 components:
   parameters:
+    OperatorSession:
+      name: X-Operator-Session
+      in: header
+      required: true
+      description: Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.
+      schema: { type: string }
     CommunitySessionToken:
       name: sessionToken
       in: query
@@ -1305,6 +1315,11 @@ components:
       properties:
         pin:
           type: string
+        name:
+          type: string
+          description: Required to obtain an attributable operator session. Legacy PIN verification without a name does not authorize community decisions.
+          minLength: 1
+          maxLength: 50
 
     AdminVerifyResult:
       type: object
@@ -1312,6 +1327,10 @@ components:
       properties:
         valid:
           type: boolean
+        operatorName:
+          type: string
+        operatorSession:
+          type: string
 
     ConferenceRow:
       type: object

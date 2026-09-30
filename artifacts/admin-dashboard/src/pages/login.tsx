@@ -13,27 +13,28 @@ import { Layers } from "lucide-react";
 
 const loginSchema = z.object({
   pin: z.string().min(4, "PIN must be at least 4 characters"),
+  name: z.string().trim().min(1, "Enter your name").max(50, "Use 50 characters or fewer"),
 });
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { setPin } = useAdmin();
+  const { signIn } = useAdmin();
   const { toast } = useToast();
   
   const verifyAdmin = useVerifyAdmin();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { pin: "" },
+    defaultValues: { pin: "", name: "" },
   });
 
   const onSubmit = (values: z.infer<typeof loginSchema>) => {
     verifyAdmin.mutate(
-      { data: { pin: values.pin } },
+      { data: { pin: values.pin, name: values.name } },
       {
         onSuccess: (data) => {
-          if (data.valid) {
-            setPin(values.pin);
+          if (data.valid && data.operatorSession && data.operatorName) {
+            signIn(values.pin, data.operatorName, data.operatorSession);
             setLocation("/conferences");
           } else {
             toast({
@@ -66,7 +67,7 @@ export default function Login() {
           Conference Admin
         </h2>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          Enter your operator PIN to access the dashboard
+          Enter your name and the admin PIN. Community decisions will be recorded under your name.
         </p>
       </div>
 
@@ -75,6 +76,18 @@ export default function Login() {
           <CardContent className="pt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Your name</FormLabel>
+                      <FormControl><Input autoComplete="name" maxLength={50} placeholder="Organizer name" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">Use your own name. Names are self-identified with the shared PIN, not verified individual accounts. Community decision sessions expire after 12 hours.</p>
                 <FormField
                   control={form.control}
                   name="pin"

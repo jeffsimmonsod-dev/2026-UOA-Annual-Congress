@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { pool } from "../lib/db";
 import type { PoolClient } from "pg";
+import { readOperatorSession, type OperatorSession } from "../lib/operator-session";
 
 const router: IRouter = Router();
 const validTypes = new Set(["photo", "comment", "discussion", "reply"]);
@@ -74,6 +75,7 @@ function csvCell(value: unknown): string {
 // repeated request with no state change is successful, but is not a decision.
 async function recordDecision(
   req: Request,
+  operator: OperatorSession,
   action: string,
   targetType: string,
   targetId: string,
@@ -87,9 +89,9 @@ async function recordDecision(
     if (decision && decision.previousValue !== decision.newValue) {
       await client.query(
         `INSERT INTO community_admin_actions
-         (conference_id, action, target_type, target_id, previous_value, new_value, reason, actor_label)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Admin (shared PIN)')`,
-        [req.conferenceId, action, targetType, targetId, decision.previousValue, decision.newValue, reason],
+         (conference_id, action, target_type, target_id, previous_value, new_value, reason, actor_label, actor_session_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [req.conferenceId, action, targetType, targetId, decision.previousValue, decision.newValue, reason, operator.name, operator.id],
       );
     }
     await client.query("COMMIT");
@@ -594,7 +596,8 @@ router.get("/community/admin", async (req: Request, res: Response): Promise<void
 });
 
 router.patch("/community/admin/content", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const operator = readOperatorSession(req);
+  if (!operator) { res.status(401).json({ error: "Sign in with an operator name to make community decisions" }); return; }
   const { type, id, hidden } = req.body ?? {};
   const reason = decisionReason(req.body?.reason);
   if (!validTypes.has(type) || (typeof id !== "string" && typeof id !== "number") || typeof hidden !== "boolean") {
@@ -608,7 +611,7 @@ router.patch("/community/admin/content", async (req: Request, res: Response): Pr
       photo: "congress_photos", comment: "community_photo_comments", discussion: "community_discussions", reply: "community_replies",
     };
     const result = await recordDecision(
-      req, hidden ? "hide" : "restore", type, String(normalizedId), reason,
+      req, operator, hidden ? "hide" : "restore", type, String(normalizedId), reason,
       async client => {
         const current = await client.query(
           `SELECT hidden FROM ${tableByType[type as CommunityType]} WHERE id = $1 AND conference_id = $2 FOR UPDATE`,
@@ -634,14 +637,15 @@ router.patch("/community/admin/content", async (req: Request, res: Response): Pr
 });
 
 router.patch("/community/admin/users", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const operator = readOperatorSession(req);
+  if (!operator) { res.status(401).json({ error: "Sign in with an operator name to make community decisions" }); return; }
   const { sessionToken, restricted } = req.body ?? {};
   const reason = decisionReason(req.body?.reason);
   if (typeof sessionToken !== "string" || !sessionToken || typeof restricted !== "boolean") { res.status(400).json({ error: "sessionToken and boolean restricted are required" }); return; }
   if (!reason) { res.status(400).json({ error: "A reason (1–500 characters) is required" }); return; }
   try {
     const result = await recordDecision(
-      req, restricted ? "restrict" : "unrestrict", "participant", sessionToken, reason,
+      req, operator, restricted ? "restrict" : "unrestrict", "participant", sessionToken, reason,
       async client => {
         // Older photo uploaders may predate community profiles but still appear
         // in the admin list. Materialize their profile before locking it so the
@@ -677,7 +681,8 @@ router.patch("/community/admin/users", async (req: Request, res: Response): Prom
 });
 
 router.patch("/community/admin/reports/:id", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const operator = readOperatorSession(req);
+  if (!operator) { res.status(401).json({ error: "Sign in with an operator name to make community decisions" }); return; }
   const { status } = req.body ?? {};
   if (status !== "dismissed" && status !== "resolved") { res.status(400).json({ error: "status must be dismissed or resolved" }); return; }
   const reason = decisionReason(req.body?.reason);
@@ -687,7 +692,7 @@ router.patch("/community/admin/reports/:id", async (req: Request, res: Response)
     const numericId = positiveIntegerId(id);
     if (numericId === null) { res.status(400).json({ error: "Report id must be a positive integer" }); return; }
     const result = await recordDecision(
-      req, status === "resolved" ? "resolve_report" : "dismiss_report", "report", String(numericId), reason,
+      req, operator, status === "resolved" ? "resolve_report" : "dismiss_report", "report", String(numericId), reason,
       async client => {
         const current = await client.query(
           "SELECT status FROM community_reports WHERE id = $1 AND conference_id = $2 FOR UPDATE",
@@ -709,7 +714,8 @@ router.patch("/community/admin/reports/:id", async (req: Request, res: Response)
 });
 
 router.patch("/community/admin/settings", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const operator = readOperatorSession(req);
+  if (!operator) { res.status(401).json({ error: "Sign in with an operator name to make community decisions" }); return; }
   const { cutoffAt } = req.body ?? {};
   if (cutoffAt !== null && (typeof cutoffAt !== "string" || !Number.isFinite(Date.parse(cutoffAt)))) {
     res.status(400).json({ error: "cutoffAt must be a valid timestamp or null" }); return;
@@ -719,7 +725,7 @@ router.patch("/community/admin/settings", async (req: Request, res: Response): P
   try {
     const normalized = cutoffAt === null ? null : new Date(cutoffAt).toISOString();
     const result = await recordDecision(
-      req, normalized === null ? "clear_cutoff" : "set_cutoff", "scoring_cutoff", String(req.conferenceId), reason,
+      req, operator, normalized === null ? "clear_cutoff" : "set_cutoff", "scoring_cutoff", String(req.conferenceId), reason,
       async client => {
         // The conference lock also serializes first-time settings inserts.
         await client.query("SELECT id FROM conferences WHERE id = $1 FOR UPDATE", [req.conferenceId]);

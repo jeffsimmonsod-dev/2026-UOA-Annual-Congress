@@ -58,14 +58,25 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * @summary Verify admin PIN
+ * @summary Sign in an operator with the admin PIN
  */
+export const verifyAdminBodyNameMax = 50;
 export const VerifyAdminBody = zod.object({
   pin: zod.string(),
+  name: zod
+    .string()
+    .min(1)
+    .max(verifyAdminBodyNameMax)
+    .optional()
+    .describe(
+      "Required to obtain an attributable operator session. Legacy PIN verification without a name does not authorize community decisions.",
+    ),
 });
 
 export const VerifyAdminResponse = zod.object({
   valid: zod.boolean(),
+  operatorName: zod.string().optional(),
+  operatorSession: zod.string().optional(),
 });
 
 /**
@@ -868,6 +879,11 @@ export const ExportCommunityAdminActionsHeader = zod.object({
 
 export const UpdateCommunityContentVisibilityHeader = zod.object({
   "X-Admin-Pin": zod.string(),
+  "X-Operator-Session": zod
+    .string()
+    .describe(
+      "Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.",
+    ),
 });
 
 export const updateCommunityContentVisibilityBodyReasonMax = 500;
@@ -888,6 +904,11 @@ export const UpdateCommunityContentVisibilityResponse = zod.object({
 
 export const UpdateCommunityUserRestrictionHeader = zod.object({
   "X-Admin-Pin": zod.string(),
+  "X-Operator-Session": zod
+    .string()
+    .describe(
+      "Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.",
+    ),
 });
 
 export const updateCommunityUserRestrictionBodyReasonMax = 500;
@@ -908,6 +929,11 @@ export const UpdateCommunityReportParams = zod.object({
 
 export const UpdateCommunityReportHeader = zod.object({
   "X-Admin-Pin": zod.string(),
+  "X-Operator-Session": zod
+    .string()
+    .describe(
+      "Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.",
+    ),
 });
 
 export const updateCommunityReportBodyReasonMax = 500;
@@ -923,6 +949,11 @@ export const UpdateCommunityReportResponse = zod.object({
 
 export const UpdateCommunitySettingsHeader = zod.object({
   "X-Admin-Pin": zod.string(),
+  "X-Operator-Session": zod
+    .string()
+    .describe(
+      "Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.",
+    ),
 });
 
 export const updateCommunitySettingsBodyReasonMax = 500;

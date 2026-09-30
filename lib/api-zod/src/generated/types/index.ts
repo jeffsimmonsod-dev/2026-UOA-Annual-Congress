@@ -62,6 +62,7 @@ export * from "./listCommunityDiscussions200";
 export * from "./listCommunityDiscussionsParams";
 export * from "./listPhotoComments200";
 export * from "./listPhotoCommentsParams";
+export * from "./operatorSessionParameter";
 export * from "./pushNotificationInput";
 export * from "./pushSendResult";
 export * from "./pushStats";

@@ -277,10 +277,18 @@ export interface HealthStatus {
 
 export interface AdminPinInput {
   pin: string;
+  /**
+   * Required to obtain an attributable operator session. Legacy PIN verification without a name does not authorize community decisions.
+   * @minLength 1
+   * @maxLength 50
+   */
+  name?: string;
 }
 
 export interface AdminVerifyResult {
   valid: boolean;
+  operatorName?: string;
+  operatorSession?: string;
 }
 
 export interface ConferenceRow {
@@ -577,6 +585,11 @@ export interface VotingActionResult {
   success: boolean;
   isOpen?: boolean;
 }
+
+/**
+ * Server-signed named operator session returned by admin sign-in; expires after 12 hours. A PIN alone cannot authorize community decisions.
+ */
+export type OperatorSessionParameter = string;
 
 export type CommunitySessionTokenParameter = string;
 

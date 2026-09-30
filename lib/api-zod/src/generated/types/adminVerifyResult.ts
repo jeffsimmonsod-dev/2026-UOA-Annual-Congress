@@ -8,4 +8,6 @@
 
 export interface AdminVerifyResult {
   valid: boolean;
+  operatorName?: string;
+  operatorSession?: string;
 }

@@ -71,12 +71,12 @@ function ContentPreview({ item, conferenceId, pin }: { item: CommunityContent; c
 }
 
 export function CommunityTab({ conferenceId }: { conferenceId: number }) {
-  const { pin } = useAdmin();
+  const { pin, operatorName, operatorSession } = useAdmin();
   const { toast } = useToast();
   const secret = pin || "";
   const { data, isLoading, isError, error, isFetching, refetch } = useCommunityAdmin(conferenceId, secret);
   const history = useCommunityAdminActions(conferenceId, secret);
-  const actions = useCommunityActions(conferenceId, secret);
+  const actions = useCommunityActions(conferenceId, secret, operatorSession || "");
   const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportingHistory, setExportingHistory] = useState(false);
@@ -242,7 +242,7 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
         <CardHeader><CardTitle>Reason for your next decision</CardTitle><CardDescription>Required for hiding or restoring content, posting access, reports, and scoring cutoff changes. The reason is saved with that decision, then cleared.</CardDescription></CardHeader>
         <CardContent>
           <Input value={reason} onChange={event => setReason(event.target.value)} maxLength={500} placeholder="Explain why you are making this change" aria-label="Reason for moderation decision" data-testid="input-community-action-reason" />
-          <p className="mt-2 text-xs text-muted-foreground">Up to 500 characters. Admins share a PIN, so the history identifies actions as “Admin (shared PIN)”, not by person.</p>
+           <p className="mt-2 text-xs text-muted-foreground">Up to 500 characters. New decisions are recorded as {operatorName || "your signed-in operator name"}. Earlier shared-PIN decisions remain labeled “Admin (shared PIN)”.</p>
         </CardContent>
       </Card>
 

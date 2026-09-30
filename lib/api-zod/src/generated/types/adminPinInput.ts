@@ -8,4 +8,10 @@
 
 export interface AdminPinInput {
   pin: string;
+  /**
+   * Required to obtain an attributable operator session. Legacy PIN verification without a name does not authorize community decisions.
+   * @minLength 1
+   * @maxLength 50
+   */
+  name?: string;
 }

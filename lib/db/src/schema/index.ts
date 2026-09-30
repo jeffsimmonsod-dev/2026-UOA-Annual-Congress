@@ -194,6 +194,7 @@ export const communityAdminActions = pgTable("community_admin_actions", {
   newValue: text("new_value"),
   reason: varchar("reason", { length: 500 }).notNull(),
   actorLabel: varchar("actor_label", { length: 50 }).notNull(),
+  actorSessionId: text("actor_session_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
