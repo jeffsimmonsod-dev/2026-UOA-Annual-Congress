@@ -81,6 +81,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       for (const savedId of savedIds) {
         if (savedId === sessionId) continue;
         const saved = allSessions.find((s) => s.id === savedId);
+        // Keep orphaned bookmarks, but they have no time slot to compare against.
         if (saved && sessionsOverlap(incoming, saved)) return saved;
       }
       return null;

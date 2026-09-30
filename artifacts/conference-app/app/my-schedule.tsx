@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SessionCard from "@/components/SessionCard";
+import MissingSessionCard from "@/components/MissingSessionCard";
 import { useSchedule } from "@/context/ScheduleContext";
 import { useColors } from "@/hooks/useColors";
 import { useConferenceData } from "@/context/ConferenceDataContext";
@@ -17,10 +18,13 @@ export default function MyScheduleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { savedIds } = useSchedule();
-  const { docSessions } = useConferenceData();
+  const { docSessions, paraSessions, isLoaded } = useConferenceData();
   const isWeb = Platform.OS === "web";
 
-  const savedSessions = docSessions.filter((s) => savedIds.has(s.id));
+  const allSessions = [...docSessions, ...paraSessions];
+  const savedSessions = allSessions.filter((s) => savedIds.has(s.id));
+  const activeIds = new Set(allSessions.map((s) => s.id));
+  const missingIds = isLoaded ? [...savedIds].filter((id) => !activeIds.has(id)) : [];
 
   const byDay: Record<string, typeof savedSessions> = {};
   for (const session of savedSessions) {
@@ -40,7 +44,7 @@ export default function MyScheduleScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      {savedSessions.length === 0 ? (
+      {savedIds.size === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons
             name="bookmark-outline"
@@ -57,8 +61,11 @@ export default function MyScheduleScreen() {
       ) : (
         <>
           <Text style={[styles.savedCount, { color: colors.mutedForeground }]}>
-            {savedSessions.length} session{savedSessions.length !== 1 ? "s" : ""} saved
+            {savedIds.size} session{savedIds.size !== 1 ? "s" : ""} saved
           </Text>
+          {!isLoaded && savedSessions.length === 0 && (
+            <Text style={{ color: colors.mutedForeground }}>Loading saved sessions…</Text>
+          )}
           {Object.entries(byDay).map(([day, sessions]) => (
             <View key={day}>
               <Text style={[styles.dayHeader, { color: colors.primary }]}>
@@ -69,6 +76,7 @@ export default function MyScheduleScreen() {
               ))}
             </View>
           ))}
+          {missingIds.map((id) => <MissingSessionCard key={id} sessionId={id} />)}
         </>
       )}
     </ScrollView>
