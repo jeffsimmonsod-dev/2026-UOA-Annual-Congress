@@ -52,7 +52,7 @@ const conferenceConfig: ConferenceConfig = {
   creditType: "COPE CE Credit",
   paraCreditType: "ABO/CPC Credit Available",
 
-  logoAsset: require("./assets/images/uoa-logo.png"),
+  logoAsset: require("./assets/images/uoa-logo-trimmed.png"),
 
   qrBoothPrefix: "uoa2026",
 
