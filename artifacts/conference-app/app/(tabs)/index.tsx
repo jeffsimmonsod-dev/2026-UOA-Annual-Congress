@@ -93,7 +93,7 @@ const QUICK_TILES = [
     route: "/my-notes",
   },
   {
-    label: "Venue & Hotel",
+    label: "Venue Info & Maps",
     subtitle: "Grand Hyatt Deer Valley",
     icon: "business-outline" as const,
     color: "#f59e0b",
