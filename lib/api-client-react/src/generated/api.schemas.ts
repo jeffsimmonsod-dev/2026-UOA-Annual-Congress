@@ -383,6 +383,16 @@ export interface SpeakerBulkInput {
   replaceAll?: boolean;
 }
 
+export interface SpeakerUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
+}
 export interface Session {
   id: number;
   conference_id: number;
@@ -428,6 +438,23 @@ export interface SessionBulkInput {
   replaceAll?: boolean;
 }
 
+export interface SessionUpdate {
+  /** @minLength 1 */
+  title?: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  day?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  room?: string | null;
+  /** @nullable */
+  track?: string | null;
+  speakerIds?: string[];
+}
 export interface Sponsor {
   id: number;
   conference_id: number;

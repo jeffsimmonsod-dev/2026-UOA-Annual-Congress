@@ -4,13 +4,17 @@ import {
   useListConferenceSessions,
   useBulkImportSessions,
   getListConferenceSessionsQueryKey,
+  useListConferenceSpeakers,
+  getListConferenceSpeakersQueryKey,
 } from "@workspace/api-client-react";
-import type { SessionRecord } from "@workspace/api-client-react";
+import type { Session, SessionRecord } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CsvImport } from "./csv-import";
 import type { CsvColumn, CsvServerError } from "./csv-import";
+import { Button } from "@/components/ui/button";
+import { EditSessionDialog } from "./edit-session-dialog";
 
 function splitList(val: string): string[] {
   if (!val || val.trim() === "") return [];
@@ -77,6 +81,7 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [csvServerErrors, setCsvServerErrors] = useState<CsvServerError[] | null>(null);
+  const [editing, setEditing] = useState<Session | null>(null);
 
   const { data: listData, isLoading } = useListConferenceSessions(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -84,6 +89,10 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
       enabled: !!pin && !!conferenceId,
       queryKey: getListConferenceSessionsQueryKey(conferenceId),
     },
+  });
+  const { data: speakerData } = useListConferenceSpeakers(conferenceId, {
+    request: { headers: { "X-Admin-Pin": pin || "" } },
+    query: { enabled: !!pin && !!conferenceId, queryKey: getListConferenceSpeakersQueryKey(conferenceId) },
   });
 
   const importSessions = useBulkImportSessions({
@@ -152,16 +161,17 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
               <TableHead>Time</TableHead>
               <TableHead>Room</TableHead>
               <TableHead>Track</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
+                <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
               </TableRow>
             ) : listData?.sessions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No sessions yet. Import a CSV to get started.
                 </TableCell>
               </TableRow>
@@ -178,12 +188,14 @@ export function SessionsTab({ conferenceId }: { conferenceId: number }) {
                       {s.is_para && <span className="ml-1 text-muted-foreground">(Para)</span>}
                     </span>
                   </TableCell>
+                  <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => setEditing(s)} aria-label={`Edit ${s.title}`}>Edit</Button></TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+      {editing && <EditSessionDialog key={editing.id} session={editing} speakers={speakerData?.speakers ?? []} conferenceId={conferenceId} onClose={() => setEditing(null)} />}
     </div>
   );
 }

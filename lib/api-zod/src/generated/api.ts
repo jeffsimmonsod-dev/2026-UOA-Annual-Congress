@@ -260,6 +260,13 @@ export const BulkImportSpeakersResponse = zod.object({
 });
 
 /**
+ * @summary Edit one speaker
+ */
+export const UpdateConferenceSpeakerParams = zod.object({
+  id: zod.coerce.number(),
+  speakerId: zod.coerce.number(),
+});
+/**
  * @summary List sessions for a conference
  */
 export const ListConferenceSessionsParams = zod.object({
@@ -330,6 +337,13 @@ export const BulkImportSessionsResponse = zod.object({
   ),
 });
 
+/**
+ * @summary Edit one session
+ */
+export const UpdateConferenceSessionParams = zod.object({
+  id: zod.coerce.number(),
+  sessionId: zod.coerce.number(),
+});
 /**
  * @summary List sponsors for a conference
  */
@@ -486,6 +500,10 @@ export const ResetVotingHeader = zod.object({
 export const ResetVotingResponse = zod.object({
   success: zod.boolean(),
   isOpen: zod.boolean().optional(),
+});
+
+export const UpdateConferenceSpeakerHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
 });
 
 export const saveCommunityProfileBodyNameMax = 50;
@@ -789,4 +807,54 @@ export const UpdateCommunitySettingsBody = zod.object({
 
 export const UpdateCommunitySettingsResponse = zod.object({
   cutoffAt: zod.coerce.date().nullable(),
+});
+
+export const UpdateConferenceSpeakerResponse = zod.object({
+  id: zod.number(),
+  conference_id: zod.number(),
+  external_id: zod.string(),
+  name: zod.string(),
+  title: zod.string().nullish(),
+  company: zod.string().nullish(),
+  bio: zod.string().nullish(),
+  photo_url: zod.string().nullish(),
+  session_ids: zod.array(zod.string()).optional(),
+});
+
+export const UpdateConferenceSessionHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateConferenceSessionBody = zod.object({
+  title: zod.string().min(1).optional(),
+  description: zod.string().nullish(),
+  day: zod.string().nullish(),
+  startTime: zod.string().nullish(),
+  endTime: zod.string().nullish(),
+  room: zod.string().nullish(),
+  track: zod.string().nullish(),
+  speakerIds: zod.array(zod.string()).optional(),
+});
+
+export const UpdateConferenceSpeakerBody = zod.object({
+  name: zod.string().min(1).optional(),
+  title: zod.string().nullish(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+});
+
+export const UpdateConferenceSessionResponse = zod.object({
+  id: zod.number(),
+  conference_id: zod.number(),
+  external_id: zod.string(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  start_time: zod.string().nullish(),
+  end_time: zod.string().nullish(),
+  day: zod.string().nullish(),
+  room: zod.string().nullish(),
+  track: zod.string().nullish(),
+  speaker_ids: zod.array(zod.string()).optional(),
+  tags: zod.array(zod.string()).optional(),
+  is_para: zod.boolean().optional(),
 });

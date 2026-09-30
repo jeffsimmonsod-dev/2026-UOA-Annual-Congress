@@ -71,6 +71,12 @@ function isAdmin(req: Request): boolean {
   }
 }
 
+function positiveId(value: string | undefined): number | null {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
 async function ensureStructuralTables(): Promise<void> {
   await ensureConferencesTable();
 
@@ -927,4 +933,88 @@ router.post("/conferences/:id/logo", upload.single("logo"), async (req: Request,
   }
 });
 
+router.patch("/conferences/:id/speakers/:speakerId", (req, res) =>
+  patchStructuralRow(req, res, "conference_speakers", "speakerId", {
+    name: "name", title: "title", bio: "bio", photoUrl: "photo_url",
+  }));
+
+router.patch("/conferences/:id/sessions/:sessionId", (req, res) =>
+  patchStructuralRow(req, res, "conference_sessions", "sessionId", {
+    title: "title", description: "description", day: "day",
+    startTime: "start_time", endTime: "end_time", room: "room",
+    track: "track", speakerIds: "speaker_ids",
+  }));
+
 export default router;
+
+async function patchStructuralRow(
+  req: Request,
+  res: Response,
+  table: "conference_speakers" | "conference_sessions",
+  rowParam: string,
+  columns: Record<string, string>,
+): Promise<void> {
+  if (!isAdmin(req)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const conferenceId = positiveId(req.params["id"] as string);
+  const rowId = positiveId(req.params[rowParam] as string);
+  if (!conferenceId || !rowId) {
+    res.status(400).json({ error: "Invalid conference or row id" });
+    return;
+  }
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    res.status(400).json({ error: "Expected an update object" });
+    return;
+  }
+  const keys = Object.keys(body);
+  if (!keys.length || keys.some((key) => !Object.hasOwn(columns, key))) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+  for (const key of keys) {
+    const value = body[key];
+    if (key === "speakerIds") {
+      if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
+        res.status(400).json({ error: "speakerIds must be an array of speaker IDs" });
+        return;
+      }
+    } else if (value !== null && typeof value !== "string") {
+      res.status(400).json({ error: `${key} must be text or null` });
+      return;
+    }
+  }
+  if ((keys.includes("title") && table === "conference_sessions" && !body.title?.trim()) ||
+      (keys.includes("name") && table === "conference_speakers" && !body.name?.trim())) {
+    res.status(400).json({ error: "Name or title cannot be empty" });
+    return;
+  }
+  if (table === "conference_sessions") {
+    for (const field of ["startTime", "endTime"]) {
+      if (body[field] && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(body[field])) {
+        res.status(400).json({ error: `${field} must be HH:MM` });
+        return;
+      }
+    }
+  }
+  const values = keys.map((key) => key === "speakerIds"
+    ? [...new Set((body[key] as string[]).map((s) => s.trim()))]
+    : typeof body[key] === "string" ? body[key].trim() || null : body[key]);
+  const assignments = keys.map((key, index) => `${columns[key]} = $${index + 1}`).join(", ");
+  try {
+    const { rows } = await pool.query(
+      `UPDATE ${table} SET ${assignments} WHERE conference_id = $${keys.length + 1} AND id = $${keys.length + 2} RETURNING *`,
+      [...values, conferenceId, rowId],
+    );
+    if (!rows.length) {
+      res.status(404).json({ error: "Record not found in this conference" });
+      return;
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    req.log.error({ err }, "structural row update error");
+    res.status(500).json({ error: "Server error" });
+  }
+}

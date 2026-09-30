@@ -5,12 +5,14 @@ import {
   useBulkImportSpeakers,
   getListConferenceSpeakersQueryKey,
 } from "@workspace/api-client-react";
-import type { SpeakerRecord } from "@workspace/api-client-react";
+import type { Speaker, SpeakerRecord } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CsvImport } from "./csv-import";
 import type { CsvColumn, CsvServerError } from "./csv-import";
+import { Button } from "@/components/ui/button";
+import { EditSpeakerDialog } from "./edit-speaker-dialog";
 
 const SPEAKER_COLUMNS: CsvColumn[] = [
   { key: "name", label: "name", required: true },
@@ -26,6 +28,7 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [csvServerErrors, setCsvServerErrors] = useState<CsvServerError[] | null>(null);
+  const [editing, setEditing] = useState<Speaker | null>(null);
 
   const { data: listData, isLoading } = useListConferenceSpeakers(conferenceId, {
     request: { headers: { "X-Admin-Pin": pin || "" } },
@@ -95,16 +98,17 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
               <TableHead>Title</TableHead>
               <TableHead>Organization</TableHead>
               <TableHead>Ext ID</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">Loading...</TableCell>
+                <TableCell colSpan={5} className="text-center py-8">Loading...</TableCell>
               </TableRow>
             ) : listData?.speakers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   No speakers yet. Import a CSV to get started.
                 </TableCell>
               </TableRow>
@@ -115,12 +119,14 @@ export function SpeakersTab({ conferenceId }: { conferenceId: number }) {
                   <TableCell>{s.title || "-"}</TableCell>
                   <TableCell>{s.company || "-"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground font-mono">{s.external_id}</TableCell>
+                  <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => setEditing(s)} aria-label={`Edit ${s.name}`}>Edit</Button></TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+      {editing && <EditSpeakerDialog key={editing.id} speaker={editing} conferenceId={conferenceId} onClose={() => setEditing(null)} />}
     </div>
   );
 }
