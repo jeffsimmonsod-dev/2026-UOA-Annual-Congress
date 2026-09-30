@@ -121,55 +121,81 @@ async function ensureStructuralTables(): Promise<void> {
   await seedConference1();
 }
 
-async function seedConference1(): Promise<void> {
-  const { rows } = await pool.query(
-    `SELECT COUNT(*) FROM conference_speakers WHERE conference_id = 1`
-  );
-  if (parseInt(rows[0].count, 10) > 0) return;
+// Fixed advisory lock key used exclusively for the conference-1 seed operation.
+// Using a session-level lock: the first instance to acquire it runs the seed;
+// any other concurrent instance skips (the first will have populated the rows).
+const SEED_ADVISORY_LOCK_KEY = 8_473_920_001n;
 
+async function seedConference1(): Promise<void> {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-
-    for (const sp of SEED_SPEAKERS) {
-      await client.query(
-        `INSERT INTO conference_speakers
-           (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-         ON CONFLICT (conference_id, external_id) DO NOTHING`,
-        [1, sp.id, sp.name, sp.title, sp.company, sp.bio, sp.photoUrl, sp.sessionIds]
-      );
+    // Try to acquire a session-level advisory lock.  If another instance
+    // already holds it we skip — they are responsible for seeding.
+    const { rows: lockRows } = await client.query(
+      `SELECT pg_try_advisory_lock($1) AS acquired`,
+      [SEED_ADVISORY_LOCK_KEY]
+    );
+    const acquired: boolean = lockRows[0]?.acquired === true;
+    if (!acquired) {
+      logger.info("Conference 1 seed skipped — another instance is seeding");
+      return;
     }
 
-    for (const s of [...SEED_DOC_SESSIONS, ...SEED_PARA_SESSIONS]) {
-      await client.query(
-        `INSERT INTO conference_sessions
-           (conference_id, external_id, title, description, start_time, end_time,
-            day, room, track, speaker_ids, tags, is_para)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         ON CONFLICT (conference_id, external_id, is_para) DO NOTHING`,
-        [
-          1, s.id, s.title, s.description, s.startTime, s.endTime,
-          s.day, s.room, s.track, s.speakerIds, s.tags, s.isPara,
-        ]
+    try {
+      // Re-check inside the lock so a restart after a successful seed is a no-op.
+      const { rows: countRows } = await client.query(
+        `SELECT COUNT(*) FROM conference_speakers WHERE conference_id = 1`
       );
-    }
+      if (parseInt(countRows[0].count, 10) > 0) {
+        logger.info("Conference 1 seed skipped — data already present");
+        return;
+      }
 
-    for (const sp of SEED_SPONSORS) {
-      await client.query(
-        `INSERT INTO conference_sponsors
-           (conference_id, external_id, name, tier, website, logo_url, description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (conference_id, external_id) DO NOTHING`,
-        [1, sp.id, sp.name, sp.tier, sp.website, sp.logoUrl, sp.description]
-      );
-    }
+      await client.query("BEGIN");
 
-    await client.query("COMMIT");
-    logger.info("Conference 1 structural data seeded");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    logger.error({ err }, "Failed to seed conference 1 structural data");
+      for (const sp of SEED_SPEAKERS) {
+        await client.query(
+          `INSERT INTO conference_speakers
+             (conference_id, external_id, name, title, company, bio, photo_url, session_ids)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           ON CONFLICT (conference_id, external_id) DO NOTHING`,
+          [1, sp.id, sp.name, sp.title, sp.company, sp.bio, sp.photoUrl, sp.sessionIds]
+        );
+      }
+
+      for (const s of [...SEED_DOC_SESSIONS, ...SEED_PARA_SESSIONS]) {
+        await client.query(
+          `INSERT INTO conference_sessions
+             (conference_id, external_id, title, description, start_time, end_time,
+              day, room, track, speaker_ids, tags, is_para)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT (conference_id, external_id, is_para) DO NOTHING`,
+          [
+            1, s.id, s.title, s.description, s.startTime, s.endTime,
+            s.day, s.room, s.track, s.speakerIds, s.tags, s.isPara,
+          ]
+        );
+      }
+
+      for (const sp of SEED_SPONSORS) {
+        await client.query(
+          `INSERT INTO conference_sponsors
+             (conference_id, external_id, name, tier, website, logo_url, description)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT (conference_id, external_id) DO NOTHING`,
+          [1, sp.id, sp.name, sp.tier, sp.website, sp.logoUrl, sp.description]
+        );
+      }
+
+      await client.query("COMMIT");
+      logger.info("Conference 1 structural data seeded");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      logger.error({ err }, "Failed to seed conference 1 structural data");
+    } finally {
+      // Release the advisory lock so the key is available on next startup if needed.
+      await client.query(`SELECT pg_advisory_unlock($1)`, [SEED_ADVISORY_LOCK_KEY]).catch(() => undefined);
+    }
   } finally {
     client.release();
   }

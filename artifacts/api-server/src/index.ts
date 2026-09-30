@@ -1,6 +1,14 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
+const adminPin = process.env["ADMIN_PIN"];
+if (!adminPin) {
+  logger.error(
+    "ADMIN_PIN environment variable is not set. " +
+    "All admin-protected routes will reject every request until this is configured."
+  );
+}
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
