@@ -342,7 +342,7 @@ export default function PhotosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.communityHeader, { paddingTop: isWeb ? 67 : insets.top + 8, backgroundColor: colors.background }]}>
+      <View style={[styles.communityHeader, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
         <Text style={[styles.communityTitle, { color: colors.foreground }]}>Community</Text>
         <Text numberOfLines={1} style={[styles.communityProfileName, { color: colors.mutedForeground }]}>
           {profile?.name?.trim() ? `Community name · ${profile.name.trim()}` : "Complete your attendee profile to participate"}

@@ -4,3 +4,4 @@
 - [Conference community policy](conference-community-policy.md) — keep participation low-friction, public standings competitive, and moderation reactive rather than preapproved.
 - [Schedule bookmark identity](schedule-bookmark-identity.md) — retain unmatched saved IDs visibly; do not guess old-to-new session mappings from titles or times.
 - [Community operator attribution](community-operator-attribution.md) — named shared-PIN sessions are self-identified, not verified accounts; legacy PIN verification cannot authorize new decisions.
+- [Phone preview safe areas](phone-preview-safe-areas.md) — the simulated Dynamic Island is outside the web viewport; keep preview spacing centralized without replacing native insets.

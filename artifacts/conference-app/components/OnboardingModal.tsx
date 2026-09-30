@@ -236,8 +236,8 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   logo: {
-    width: 220,
-    height: 120,
+    width: 250,
+    height: 144,
   },
   welcomeBlock: {
     alignItems: "center",

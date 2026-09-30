@@ -16,6 +16,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PreviewSafeArea } from "@/components/PreviewSafeArea";
 import OnboardingModal from "@/components/OnboardingModal";
 import NotificationPromptModal from "@/components/NotificationPromptModal";
 import { ConferenceDataProvider } from "@/context/ConferenceDataContext";
@@ -73,6 +74,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <PreviewSafeArea>
       <ThemeProvider>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
@@ -92,6 +94,7 @@ export default function RootLayout() {
           </QueryClientProvider>
         </ErrorBoundary>
       </ThemeProvider>
+      </PreviewSafeArea>
     </SafeAreaProvider>
   );
 }

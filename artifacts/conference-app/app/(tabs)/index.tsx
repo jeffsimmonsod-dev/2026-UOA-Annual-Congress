@@ -501,8 +501,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   logoSmall: {
-    width: 130,
-    height: 130,
+    width: 160,
+    height: 160,
   },
   heroText: {
     flex: 1,
