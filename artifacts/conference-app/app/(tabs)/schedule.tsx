@@ -235,6 +235,7 @@ export default function ScheduleScreen() {
 
       <ScrollView
         ref={scrollRef}
+        style={styles.sessionList}
         contentContainerStyle={[
           styles.list,
           { paddingBottom: isWeb ? insets.bottom + 100 : 100 },
@@ -319,6 +320,7 @@ const styles = StyleSheet.create({
   },
   filterStrip: {
     borderBottomWidth: StyleSheet.hairlineWidth,
+    flexGrow: 0,
     flexShrink: 0,
   },
   filterRow: {
@@ -344,6 +346,9 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 12,
+  },
+  sessionList: {
+    flex: 1,
   },
   list: {
     paddingHorizontal: 16,
