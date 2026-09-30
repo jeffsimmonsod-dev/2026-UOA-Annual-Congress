@@ -3,10 +3,13 @@ import { logger } from "./lib/logger";
 
 const adminPin = process.env["ADMIN_PIN"];
 if (!adminPin) {
-  logger.error(
+  const message =
     "ADMIN_PIN environment variable is not set. " +
-    "All admin-protected routes will reject every request until this is configured."
-  );
+    "All admin-protected routes will reject every request until this is configured.";
+  if (process.env["NODE_ENV"] === "production") {
+    throw new Error(message);
+  }
+  logger.warn(message);
 }
 
 const rawPort = process.env["PORT"];
