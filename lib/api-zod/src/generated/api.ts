@@ -487,3 +487,306 @@ export const ResetVotingResponse = zod.object({
   success: zod.boolean(),
   isOpen: zod.boolean().optional(),
 });
+
+export const saveCommunityProfileBodyNameMax = 50;
+
+export const SaveCommunityProfileBody = zod.object({
+  sessionToken: zod.string(),
+  name: zod.string().min(1).max(saveCommunityProfileBodyNameMax),
+});
+
+export const SaveCommunityProfileResponse = zod.object({
+  name: zod.string(),
+  restricted: zod.boolean(),
+});
+
+export const listCommunityDiscussionsQueryLimitMax = 100;
+
+export const listCommunityDiscussionsQueryOffsetMin = 0;
+
+export const ListCommunityDiscussionsQueryParams = zod.object({
+  sessionToken: zod.coerce.string(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listCommunityDiscussionsQueryLimitMax)
+    .optional(),
+  offset: zod.coerce
+    .number()
+    .min(listCommunityDiscussionsQueryOffsetMin)
+    .optional(),
+});
+
+export const ListCommunityDiscussionsResponse = zod.object({
+  discussions: zod.array(
+    zod.object({
+      id: zod.number(),
+      title: zod.string(),
+      body: zod.string(),
+      authorName: zod.string(),
+      replyCount: zod.number(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+export const createCommunityDiscussionBodyOneNameMax = 50;
+
+export const createCommunityDiscussionBodyOneBodyMax = 3000;
+
+export const createCommunityDiscussionBodyTwoTitleMax = 120;
+
+export const CreateCommunityDiscussionBody = zod
+  .object({
+    sessionToken: zod.string(),
+    name: zod.string().min(1).max(createCommunityDiscussionBodyOneNameMax),
+    body: zod.string().min(1).max(createCommunityDiscussionBodyOneBodyMax),
+  })
+  .and(
+    zod.object({
+      title: zod.string().min(1).max(createCommunityDiscussionBodyTwoTitleMax),
+    }),
+  );
+
+export const GetCommunityDiscussionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCommunityDiscussionQueryParams = zod.object({
+  sessionToken: zod.coerce.string(),
+});
+
+export const GetCommunityDiscussionResponse = zod.object({
+  discussion: zod
+    .object({
+      id: zod.number(),
+      title: zod.string(),
+      body: zod.string(),
+      authorName: zod.string(),
+      replyCount: zod.number(),
+      createdAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        replies: zod.array(
+          zod.object({
+            id: zod.number(),
+            body: zod.string(),
+            authorName: zod.string(),
+            createdAt: zod.coerce.date(),
+            canDelete: zod.boolean(),
+          }),
+        ),
+      }),
+    ),
+});
+
+export const CreateCommunityReplyParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const createCommunityReplyBodyNameMax = 50;
+
+export const createCommunityReplyBodyBodyMax = 3000;
+
+export const CreateCommunityReplyBody = zod.object({
+  sessionToken: zod.string(),
+  name: zod.string().min(1).max(createCommunityReplyBodyNameMax),
+  body: zod.string().min(1).max(createCommunityReplyBodyBodyMax),
+});
+
+export const ListPhotoCommentsParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const listPhotoCommentsQueryLimitMax = 100;
+
+export const listPhotoCommentsQueryOffsetMin = 0;
+
+export const ListPhotoCommentsQueryParams = zod.object({
+  sessionToken: zod.coerce.string(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listPhotoCommentsQueryLimitMax)
+    .optional(),
+  offset: zod.coerce.number().min(listPhotoCommentsQueryOffsetMin).optional(),
+});
+
+export const ListPhotoCommentsResponse = zod.object({
+  comments: zod.array(
+    zod.object({
+      id: zod.number(),
+      body: zod.string(),
+      authorName: zod.string(),
+      createdAt: zod.coerce.date(),
+      canDelete: zod.boolean(),
+    }),
+  ),
+});
+
+export const CreatePhotoCommentParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const createPhotoCommentBodyNameMax = 50;
+
+export const createPhotoCommentBodyBodyMax = 3000;
+
+export const CreatePhotoCommentBody = zod.object({
+  sessionToken: zod.string(),
+  name: zod.string().min(1).max(createPhotoCommentBodyNameMax),
+  body: zod.string().min(1).max(createPhotoCommentBodyBodyMax),
+});
+
+export const DeleteCommunityContentParams = zod.object({
+  type: zod.enum(["comment", "reply", "discussion"]),
+  id: zod.coerce.string(),
+});
+
+export const DeleteCommunityContentBody = zod.object({
+  sessionToken: zod.string(),
+});
+
+export const DeleteCommunityContentResponse = zod.object({
+  success: zod.boolean(),
+});
+
+export const reportCommunityContentBodyReasonMax = 500;
+
+export const ReportCommunityContentBody = zod.object({
+  sessionToken: zod.string(),
+  type: zod.enum(["photo", "comment", "discussion", "reply"]),
+  id: zod.string(),
+  reason: zod.string().min(1).max(reportCommunityContentBodyReasonMax),
+});
+
+export const GetCommunityLeaderboardQueryParams = zod.object({
+  sessionToken: zod.coerce.string(),
+});
+
+export const GetCommunityLeaderboardResponse = zod.object({
+  leaders: zod.array(
+    zod.object({
+      name: zod.string(),
+      points: zod.number(),
+      rank: zod.number(),
+    }),
+  ),
+  me: zod.union([
+    zod.null(),
+    zod.object({
+      name: zod.string(),
+      points: zod.number(),
+      rank: zod.number(),
+    }),
+  ]),
+  cutoffAt: zod.coerce.date().nullable(),
+});
+
+export const GetCommunityAdminDataHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const GetCommunityAdminDataResponse = zod.object({
+  reports: zod.array(
+    zod.object({
+      id: zod.number(),
+      type: zod.enum(["photo", "comment", "discussion", "reply"]),
+      targetId: zod.string(),
+      reason: zod.string(),
+      reporterName: zod.string(),
+      createdAt: zod.coerce.date(),
+      status: zod.enum(["pending", "dismissed", "resolved"]),
+    }),
+  ),
+  content: zod.array(
+    zod.object({
+      type: zod.enum(["photo", "comment", "discussion", "reply"]),
+      id: zod.union([zod.string(), zod.number()]),
+      body: zod.string(),
+      authorName: zod.string(),
+      sessionToken: zod.string(),
+      hidden: zod.boolean(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  users: zod.array(
+    zod.object({
+      sessionToken: zod.string(),
+      name: zod.string(),
+      restricted: zod.boolean(),
+    }),
+  ),
+  cutoffAt: zod.coerce.date().nullable(),
+});
+
+export const ExportCommunityLeaderboardHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ExportCommunityLeaderboardResponse = zod.object({
+  leaders: zod.array(
+    zod.object({
+      name: zod.string(),
+      points: zod.number(),
+      rank: zod.number(),
+    }),
+  ),
+  cutoffAt: zod.coerce.date().nullable(),
+});
+
+export const UpdateCommunityContentVisibilityHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateCommunityContentVisibilityBody = zod.object({
+  type: zod.enum(["photo", "comment", "discussion", "reply"]),
+  id: zod.union([zod.string(), zod.number()]),
+  hidden: zod.boolean(),
+});
+
+export const UpdateCommunityContentVisibilityResponse = zod.object({
+  success: zod.boolean(),
+});
+
+export const UpdateCommunityUserRestrictionHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateCommunityUserRestrictionBody = zod.object({
+  sessionToken: zod.string(),
+  restricted: zod.boolean(),
+});
+
+export const UpdateCommunityUserRestrictionResponse = zod.object({
+  success: zod.boolean(),
+});
+
+export const UpdateCommunityReportParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateCommunityReportHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateCommunityReportBody = zod.object({
+  status: zod.enum(["dismissed", "resolved"]),
+});
+
+export const UpdateCommunityReportResponse = zod.object({
+  success: zod.boolean(),
+});
+
+export const UpdateCommunitySettingsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateCommunitySettingsBody = zod.object({
+  cutoffAt: zod.coerce.date().nullable(),
+});
+
+export const UpdateCommunitySettingsResponse = zod.object({
+  cutoffAt: zod.coerce.date().nullable(),
+});

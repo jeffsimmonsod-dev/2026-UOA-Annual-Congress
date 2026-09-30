@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -23,26 +24,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useProfile } from "@/context/ProfileContext";
-import ZoomableImage from "@/components/ZoomableImage";
-
 import conferenceConfig from "@/conference.config";
+import ZoomableImage from "@/components/ZoomableImage";
 import { apiFetch } from "@/services/apiFetch";
-const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+import { CommunitySections, PhotoComments, ReportDialog } from "@/components/CommunityFeatures";
+import { API_BASE, communityRequest, getOrCreatePhotoSessionToken } from "@/services/community";
 const PHOTO_TOKENS_KEY = "@photo_delete_tokens";
-const SESSION_TOKEN_KEY = "@photo_session_token";
-
-async function getOrCreateSessionToken(): Promise<string> {
-  const stored = await AsyncStorage.getItem(SESSION_TOKEN_KEY);
-  if (stored) return stored;
-  const res = await apiFetch(`${API_BASE}/api/photos/session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error("Failed to create session");
-  const { sessionToken } = await res.json();
-  await AsyncStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
-  return sessionToken;
-}
 
 interface PhotoItem {
   id: string;
@@ -72,7 +59,9 @@ export default function PhotosScreen() {
   const { profile } = useProfile();
 
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState("");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [photosError, setPhotosError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,7 +69,10 @@ export default function PhotosScreen() {
 
   useEffect(() => {
     Promise.all([
-      getOrCreateSessionToken().catch(() => null),
+      getOrCreatePhotoSessionToken().catch((error) => {
+        setSessionError(error instanceof Error ? error.message : "Could not start your photo session.");
+        return null;
+      }),
       AsyncStorage.getItem(PHOTO_TOKENS_KEY),
     ]).then(([token, tokensVal]) => {
       if (token) setSessionToken(token);
@@ -95,15 +87,39 @@ export default function PhotosScreen() {
   const [caption, setCaption] = useState("");
 
   const [fullscreenPhoto, setFullscreenPhoto] = useState<PhotoItem | null>(null);
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [photoReportVisible, setPhotoReportVisible] = useState(false);
+  const [section, setSection] = useState<"photos" | "discussion" | "leaderboard">("photos");
+
+  const retrySession = async () => {
+    try {
+      const token = await getOrCreatePhotoSessionToken();
+      setSessionToken(token);
+      setSessionError("");
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Could not start your photo session.");
+    }
+  };
+
+  const submitPhotoReport = async (reason: string) => {
+    if (!sessionToken || !fullscreenPhoto) throw new Error("Your photo session is not ready.");
+    await communityRequest("/api/community/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionToken, type: "photo", id: fullscreenPhoto.id, reason }),
+    });
+  };
 
   const fetchPhotos = useCallback(async () => {
     try {
+      setPhotosError("");
       const tokenParam = sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : "";
       const res = await apiFetch(`${API_BASE}/api/photos${tokenParam}`);
+      if (!res.ok) throw new Error(`Could not load photos (${res.status}).`);
       const data = await res.json();
       setPhotos(data.photos ?? []);
-    } catch {
-      // silently fail — show empty state
+    } catch (error) {
+      setPhotosError(error instanceof Error ? error.message : "Could not load photos. Please try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,39 +127,45 @@ export default function PhotosScreen() {
   }, [sessionToken]);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+  useFocusEffect(useCallback(() => {
+    if (section === "photos") fetchPhotos();
+  }, [fetchPhotos, section]));
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchPhotos();
   };
 
-  const handleDelete = async (photo: PhotoItem) => {
+  const handleDelete = (photo: PhotoItem) => {
     const deleteToken = myPhotoTokens[photo.id];
     if (!deleteToken) return;
-    Alert.alert(
-      "Remove Photo",
-      "Are you sure you want to remove this photo? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
-            if (fullscreenPhoto?.id === photo.id) setFullscreenPhoto(null);
-            try {
-              await apiFetch(`${API_BASE}/api/photos/${photo.id}`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ deleteToken }),
-              });
-            } catch {
-              fetchPhotos();
-            }
-          },
-        },
-      ]
-    );
+    const remove = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/api/photos/${encodeURIComponent(photo.id)}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deleteToken }),
+        });
+        if (!response.ok) throw new Error(`Could not remove photo (${response.status}).`);
+        if (fullscreenPhoto?.id === photo.id) setFullscreenPhoto(null);
+        await fetchPhotos();
+      } catch (error) {
+        await fetchPhotos();
+        const message = error instanceof Error ? error.message : "Could not remove photo.";
+        if (Platform.OS === "web" && typeof window !== "undefined") window.alert(message);
+        else Alert.alert("Remove failed", message);
+      }
+    };
+    const confirm = () => { void remove(); };
+    const message = "Are you sure you want to remove this photo? This cannot be undone.";
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`Remove Photo\n\n${message}`)) confirm();
+      return;
+    }
+    Alert.alert("Remove Photo", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: confirm },
+    ]);
   };
 
   const handleLike = async (photo: PhotoItem) => {
@@ -231,6 +253,7 @@ export default function PhotosScreen() {
             fieldName: "photo",
             httpMethod: "POST",
             uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            headers: { "X-Conference-Id": String(conferenceConfig.conferenceId) },
             parameters: {
               uploaderName,
               caption: caption.trim(),
@@ -262,7 +285,7 @@ export default function PhotosScreen() {
   };
 
   const getImageUrl = (objectPath: string) =>
-    `${API_BASE}/api/storage${objectPath}`;
+    `${API_BASE}/api/storage${objectPath}${objectPath.includes("?") ? "&" : "?"}conferenceId=${encodeURIComponent(String(conferenceConfig.conferenceId))}`;
 
   const renderPhoto = ({ item }: { item: PhotoItem }) => {
     const isMyPhoto = item.id in myPhotoTokens;
@@ -319,6 +342,28 @@ export default function PhotosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={[styles.communityHeader, { paddingTop: isWeb ? 67 : insets.top + 8, backgroundColor: colors.background }]}>
+        <Text style={[styles.communityTitle, { color: colors.foreground }]}>Community</Text>
+        <Text numberOfLines={1} style={[styles.communityProfileName, { color: colors.mutedForeground }]}>
+          {profile?.name?.trim() ? `Community name · ${profile.name.trim()}` : "Complete your attendee profile to participate"}
+        </Text>
+        <View style={[styles.sectionSwitch, { backgroundColor: colors.muted }]}>
+          {(["photos", "discussion", "leaderboard"] as const).map((item) => {
+            const label = item === "photos" ? "Photos" : item === "discussion" ? "Discussion" : "Leaderboard";
+            const selected = section === item;
+            return (
+              <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected }} onPress={() => setSection(item)} style={[styles.sectionTab, selected && { backgroundColor: colors.card, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 }]}>
+                <Text style={[styles.sectionTabText, { color: selected ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {!!sessionError && <View style={styles.sessionErrorRow}><Text style={[styles.sessionError, { color: colors.destructive }]}>{sessionError}</Text><Pressable onPress={retrySession}><Text style={[styles.retrySessionText, { color: colors.primary }]}>Retry</Text></Pressable></View>}
+        {!!photosError && section === "photos" && <Text style={[styles.sessionError, { color: colors.destructive }]}>{photosError}</Text>}
+      </View>
+      {section !== "photos" ? (
+        <CommunitySections section={section} sessionToken={sessionToken} name={profile?.name ?? ""} />
+      ) : <>
       <FlatList
         key={numPhotoColumns}
         data={photos}
@@ -329,7 +374,7 @@ export default function PhotosScreen() {
         contentContainerStyle={[
           styles.list,
           {
-            paddingTop: insets.top + 16,
+            paddingTop: 12,
             paddingBottom: insets.bottom + 100,
           },
           contentStyle,
@@ -341,6 +386,14 @@ export default function PhotosScreen() {
           loading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : photosError ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="cloud-offline-outline" size={42} color={colors.mutedForeground} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Photos unavailable</Text>
+              <Pressable onPress={handleRefresh} style={[styles.retryButton, { backgroundColor: colors.primary }]}>
+                <Text style={styles.retryButtonText}>Try again</Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.emptyState}>
@@ -364,6 +417,7 @@ export default function PhotosScreen() {
         <Ionicons name="camera" size={24} color="#fff" />
         <Text style={styles.fabText}>Add Photo</Text>
       </Pressable>
+      </>}
 
       <Modal visible={uploadModal} animationType="slide" transparent>
         <KeyboardAvoidingView
@@ -432,6 +486,16 @@ export default function PhotosScreen() {
                   <Text style={styles.fsCaption}>{fullscreenPhoto.caption}</Text>
                 ) : null}
                 <Text style={styles.fsHint}>Pinch to zoom · Double-tap to reset</Text>
+                <View style={styles.fsActions}>
+                  <Pressable accessibilityLabel="Open photo comments" style={styles.fsAction} onPress={() => setCommentsVisible(true)}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" />
+                    <Text style={styles.fsCommentsText}>Comments</Text>
+                  </Pressable>
+                  <Pressable accessibilityLabel="Report photo" style={styles.fsAction} onPress={() => setPhotoReportVisible(true)}>
+                    <Ionicons name="flag-outline" size={18} color="#fff" />
+                    <Text style={styles.fsCommentsText}>Report</Text>
+                  </Pressable>
+                </View>
               </View>
               <Pressable style={styles.fsClose} onPress={() => setFullscreenPhoto(null)}>
                 <Ionicons name="close-circle" size={36} color="rgba(255,255,255,0.85)" />
@@ -440,6 +504,10 @@ export default function PhotosScreen() {
           )}
         </GestureHandlerRootView>
       </Modal>
+      {fullscreenPhoto && sessionToken && (
+        <PhotoComments photoId={fullscreenPhoto.id} sessionToken={sessionToken} name={profile?.name ?? ""} visible={commentsVisible} onClose={() => setCommentsVisible(false)} />
+      )}
+      <ReportDialog visible={photoReportVisible} onClose={() => setPhotoReportVisible(false)} onSubmit={submitPhotoReport} />
     </View>
   );
 }
@@ -650,5 +718,87 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 52,
     right: 16,
+  },
+  communityHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    zIndex: 1,
+  },
+  communityTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    marginBottom: 12,
+  },
+  communityProfileName: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -7,
+    marginBottom: 12,
+  },
+  sectionSwitch: {
+    flexDirection: "row",
+    borderRadius: 13,
+    padding: 4,
+    gap: 2,
+  },
+  sectionTab: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+  },
+  sectionTabText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  sessionError: {
+    marginTop: 8,
+    fontSize: 12,
+  },
+  sessionErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  retrySessionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  retryButton: {
+    marginTop: 5,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  fsActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 9,
+  },
+  fsAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.38)",
+  },
+  fsCommentsText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

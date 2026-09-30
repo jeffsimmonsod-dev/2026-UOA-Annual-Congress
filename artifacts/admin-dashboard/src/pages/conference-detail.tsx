@@ -10,6 +10,7 @@ import { SessionsTab } from "@/components/conference/sessions-tab";
 import { SponsorsTab } from "@/components/conference/sponsors-tab";
 import { PushTab } from "@/components/conference/push-tab";
 import { VotingTab } from "@/components/conference/voting-tab";
+import { CommunityTab } from "@/components/conference/community-tab";
 
 export default function ConferenceDetail() {
   const { id } = useParams();
@@ -60,7 +61,7 @@ export default function ConferenceDetail() {
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="mb-6 flex w-full justify-start overflow-x-auto bg-transparent h-auto p-0 border-b rounded-none">
-          {['overview', 'speakers', 'sessions', 'sponsors', 'push', 'voting'].map(tab => (
+          {['overview', 'speakers', 'sessions', 'sponsors', 'push', 'voting', 'community'].map(tab => (
             <TabsTrigger 
               key={tab} 
               value={tab} 
@@ -88,6 +89,9 @@ export default function ConferenceDetail() {
         </TabsContent>
         <TabsContent value="voting" className="mt-0">
           <VotingTab conferenceId={conferenceId} />
+        </TabsContent>
+        <TabsContent value="community" className="mt-0">
+          <CommunityTab conferenceId={conferenceId} />
         </TabsContent>
       </Tabs>
     </div>

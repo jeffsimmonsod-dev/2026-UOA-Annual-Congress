@@ -26,6 +26,8 @@ tags:
     description: Admin operations
   - name: storage
     description: Object storage operations
+  - name: community
+    description: Conference-scoped community features
 
 paths:
   /storage/uploads/request-url:
@@ -50,6 +52,41 @@ paths:
           description: Missing or invalid required fields
         "500":
           description: Failed to generate upload URL
+
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getConferencePhotoObject
+      tags: [storage]
+      summary: Fetch a conference photo object
+      description: The conference must be provided by X-Conference-Id or the conferenceId query parameter. Admins may include X-Admin-Pin to inspect hidden photos.
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          description: Object path below /objects/ (may contain slash-separated path segments)
+          schema: { type: string }
+        - name: conferenceId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: X-Conference-Id
+          in: header
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: X-Admin-Pin
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Photo image
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "400":
+          description: Conference ID missing or invalid
+        "404":
+          description: Object is unavailable
 
   /healthz:
     get:
@@ -566,8 +603,534 @@ paths:
         "401":
           description: Unauthorized
 
+  /community/profile:
+    post:
+      operationId: saveCommunityProfile
+      tags: [community]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunityProfileInput"
+      responses:
+        "200":
+          description: Saved community profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, restricted]
+                properties:
+                  name: { type: string }
+                  restricted: { type: boolean }
+
+  /community/discussions:
+    get:
+      operationId: listCommunityDiscussions
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/CommunitySessionToken"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Discussions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [discussions]
+                properties:
+                  discussions:
+                    type: array
+                    items: { $ref: "#/components/schemas/CommunityDiscussion" }
+    post:
+      operationId: createCommunityDiscussion
+      tags: [community]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommunityDiscussionInput" }
+      responses:
+        "201":
+          description: Created discussion
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [discussion]
+                properties:
+                  discussion: { $ref: "#/components/schemas/CommunityDiscussion" }
+
+  /community/discussions/{id}:
+    get:
+      operationId: getCommunityDiscussion
+      tags: [community]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/CommunitySessionToken"
+      responses:
+        "200":
+          description: Discussion with replies
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [discussion]
+                properties:
+                  discussion:
+                    allOf:
+                      - $ref: "#/components/schemas/CommunityDiscussion"
+                      - type: object
+                        required: [canDelete, replies]
+                        properties:
+                          canDelete: { type: boolean }
+                          replies:
+                            type: array
+                            items: { $ref: "#/components/schemas/CommunityComment" }
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+
+  /community/discussions/{id}/replies:
+    post:
+      operationId: createCommunityReply
+      tags: [community]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommunityTextInput" }
+      responses:
+        "201":
+          description: Created reply
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reply]
+                properties:
+                  reply: { $ref: "#/components/schemas/CommunityComment" }
+
+  /community/photos/{id}/comments:
+    get:
+      operationId: listPhotoComments
+      tags: [community]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/CommunitySessionToken"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Photo comments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comments]
+                properties:
+                  comments:
+                    type: array
+                    items: { $ref: "#/components/schemas/CommunityComment" }
+    post:
+      operationId: createPhotoComment
+      tags: [community]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommunityTextInput" }
+      responses:
+        "201":
+          description: Created photo comment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comment]
+                properties:
+                  comment: { $ref: "#/components/schemas/CommunityComment" }
+
+  /community/{type}/{id}:
+    delete:
+      operationId: deleteCommunityContent
+      tags: [community]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string, enum: [comment, reply, discussion] }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunityDeleteInput"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunitySuccess" }
+
+  /community/reports:
+    post:
+      operationId: reportCommunityContent
+      tags: [community]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommunityReportInput" }
+      responses:
+        "201":
+          description: Report submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunitySuccess" }
+
+  /community/leaderboard:
+    get:
+      operationId: getCommunityLeaderboard
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/CommunitySessionToken"
+      responses:
+        "200":
+          description: Conference leaderboard
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunityLeaderboard" }
+
+  /community/admin:
+    get:
+      operationId: getCommunityAdminData
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      responses:
+        "200":
+          description: Community moderation data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunityAdminData" }
+
+  /community/admin/leaderboard:
+    get:
+      operationId: exportCommunityLeaderboard
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      responses:
+        "200":
+          description: Full conference leaderboard export
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunityLeaderboardExport" }
+
+  /community/admin/content:
+    patch:
+      operationId: updateCommunityContentVisibility
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunityVisibilityInput"
+      responses:
+        "200":
+          description: Updated visibility
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunitySuccess" }
+
+  /community/admin/users:
+    patch:
+      operationId: updateCommunityUserRestriction
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunityRestrictionInput"
+      responses:
+        "200":
+          description: Updated restriction
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunitySuccess" }
+
+  /community/admin/reports/{id}:
+    patch:
+      operationId: updateCommunityReport
+      tags: [community]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/AdminPin"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunityReportStatusInput"
+      responses:
+        "200":
+          description: Updated report status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunitySuccess" }
+
+  /community/admin/settings:
+    patch:
+      operationId: updateCommunitySettings
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommunitySettingsInput"
+      responses:
+        "200":
+          description: Updated leaderboard cutoff
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cutoffAt]
+                properties:
+                  cutoffAt: { type: [string, "null"], format: date-time }
+
 components:
+  parameters:
+    CommunitySessionToken:
+      name: sessionToken
+      in: query
+      required: true
+      schema: { type: string }
+    AdminPin:
+      name: X-Admin-Pin
+      in: header
+      required: true
+      schema: { type: string }
   schemas:
+    CommunityProfileInput:
+      type: object
+      required: [sessionToken, name]
+      properties:
+        sessionToken: { type: string }
+        name: { type: string, minLength: 1, maxLength: 50 }
+
+    CommunityTextInput:
+      type: object
+      required: [sessionToken, name, body]
+      properties:
+        sessionToken: { type: string }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        body: { type: string, minLength: 1, maxLength: 3000 }
+
+    CommunityDiscussionInput:
+      allOf:
+        - $ref: "#/components/schemas/CommunityTextInput"
+        - type: object
+          required: [title]
+          properties:
+            title: { type: string, minLength: 1, maxLength: 120 }
+
+    CommunityDiscussion:
+      type: object
+      required: [id, title, body, authorName, replyCount, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        authorName: { type: string }
+        replyCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    CommunityComment:
+      type: object
+      required: [id, body, authorName, createdAt, canDelete]
+      properties:
+        id: { type: integer }
+        body: { type: string }
+        authorName: { type: string }
+        createdAt: { type: string, format: date-time }
+        canDelete: { type: boolean }
+
+    CommunityReportInput:
+      type: object
+      required: [sessionToken, type, id, reason]
+      properties:
+        sessionToken: { type: string }
+        type: { type: string, enum: [photo, comment, discussion, reply] }
+        id: { type: string }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    CommunitySuccess:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+
+    CommunityDeleteInput:
+      type: object
+      required: [sessionToken]
+      properties:
+        sessionToken: { type: string }
+
+    CommunityVisibilityInput:
+      type: object
+      required: [type, id, hidden]
+      properties:
+        type: { type: string, enum: [photo, comment, discussion, reply] }
+        id: { type: [string, integer] }
+        hidden: { type: boolean }
+
+    CommunityRestrictionInput:
+      type: object
+      required: [sessionToken, restricted]
+      properties:
+        sessionToken: { type: string }
+        restricted: { type: boolean }
+
+    CommunityReportStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [dismissed, resolved] }
+
+    CommunitySettingsInput:
+      type: object
+      required: [cutoffAt]
+      properties:
+        cutoffAt: { type: [string, "null"], format: date-time }
+
+    CommunityLeaderboard:
+      type: object
+      required: [leaders, me, cutoffAt]
+      properties:
+        leaders:
+          type: array
+          items:
+            type: object
+            required: [name, points, rank]
+            properties:
+              name: { type: string }
+              points: { type: integer }
+              rank: { type: integer }
+        me:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [name, points, rank]
+              properties:
+                name: { type: string }
+                points: { type: integer }
+                rank: { type: integer }
+        cutoffAt: { type: [string, "null"], format: date-time }
+
+    CommunityLeaderboardExport:
+      type: object
+      required: [leaders, cutoffAt]
+      properties:
+        leaders:
+          type: array
+          items:
+            type: object
+            required: [sessionToken, name, points, rank]
+            properties:
+              sessionToken: { type: string }
+              name: { type: string }
+              points: { type: integer }
+              rank: { type: integer }
+        cutoffAt: { type: [string, "null"], format: date-time }
+
+    CommunityAdminData:
+      type: object
+      required: [reports, content, users, cutoffAt]
+      properties:
+        reports:
+          type: array
+          items:
+            type: object
+            required: [id, type, targetId, reason, reporterName, createdAt, status]
+            properties:
+              id: { type: integer }
+              type: { type: string, enum: [photo, comment, discussion, reply] }
+              targetId: { type: string }
+              reason: { type: string }
+              reporterName: { type: string }
+              createdAt: { type: string, format: date-time }
+              status: { type: string, enum: [pending, dismissed, resolved] }
+        content:
+          type: array
+          items:
+            type: object
+            required: [type, id, body, authorName, sessionToken, hidden, createdAt]
+            properties:
+              type: { type: string, enum: [photo, comment, discussion, reply] }
+              id: { type: [string, integer] }
+              body: { type: string }
+              objectPath: { type: string }
+              authorName: { type: string }
+              sessionToken: { type: string }
+              hidden: { type: boolean }
+              createdAt: { type: string, format: date-time }
+        users:
+          type: array
+          items:
+            type: object
+            required: [sessionToken, name, restricted]
+            properties:
+              sessionToken: { type: string }
+              name: { type: string }
+              restricted: { type: boolean }
+        cutoffAt: { type: [string, "null"], format: date-time }
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

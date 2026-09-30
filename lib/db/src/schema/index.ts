@@ -108,6 +108,7 @@ export const congressPhotos = pgTable("congress_photos", {
   uploaderName: text("uploader_name").notNull(),
   uploaderDeviceId: text("uploader_device_id").notNull(),
   caption: text("caption").notNull().default(""),
+  hidden: boolean("hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -122,6 +123,66 @@ export const congressPhotoLikes = pgTable(
   },
   (table) => [primaryKey({ columns: [table.photoId, table.deviceId] })]
 );
+
+export const communityProfiles = pgTable(
+  "community_profiles",
+  {
+    conferenceId: integer("conference_id").notNull(),
+    sessionToken: text("session_token").notNull(),
+    name: varchar("name", { length: 50 }).notNull(),
+    restricted: boolean("restricted").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.conferenceId, table.sessionToken] })]
+);
+
+export const communityDiscussions = pgTable("community_discussions", {
+  id: serial("id").primaryKey(),
+  conferenceId: integer("conference_id").notNull(),
+  sessionToken: text("session_token").notNull(),
+  title: varchar("title", { length: 120 }).notNull(),
+  body: text("body").notNull(),
+  hidden: boolean("hidden").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communityReplies = pgTable("community_replies", {
+  id: serial("id").primaryKey(),
+  conferenceId: integer("conference_id").notNull(),
+  discussionId: integer("discussion_id").notNull().references(() => communityDiscussions.id, { onDelete: "cascade" }),
+  sessionToken: text("session_token").notNull(),
+  body: text("body").notNull(),
+  hidden: boolean("hidden").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communityPhotoComments = pgTable("community_photo_comments", {
+  id: serial("id").primaryKey(),
+  conferenceId: integer("conference_id").notNull(),
+  photoId: text("photo_id").notNull().references(() => congressPhotos.id, { onDelete: "cascade" }),
+  sessionToken: text("session_token").notNull(),
+  body: text("body").notNull(),
+  hidden: boolean("hidden").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communityReports = pgTable("community_reports", {
+  id: serial("id").primaryKey(),
+  conferenceId: integer("conference_id").notNull(),
+  type: varchar("type", { length: 16 }).notNull(),
+  targetId: text("target_id").notNull(),
+  reason: varchar("reason", { length: 500 }).notNull(),
+  reporterToken: text("reporter_token").notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const communitySettings = pgTable("community_settings", {
+  conferenceId: integer("conference_id").primaryKey(),
+  cutoffAt: timestamp("cutoff_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const congressPushTokens = pgTable("congress_push_tokens", {
   token: text("token").primaryKey(),

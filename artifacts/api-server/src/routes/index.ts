@@ -8,6 +8,7 @@ import mapCalibrateRouter from "./map-calibrate";
 import adminRouter from "./admin";
 import votingRouter from "./voting";
 import conferencesRouter from "./conferences";
+import communityRouter from "./community";
 
 const router: IRouter = Router();
 
@@ -15,6 +16,7 @@ router.use(healthRouter);
 router.use(conferencesRouter);
 router.use(pushRouter);
 router.use(photosRouter);
+router.use(communityRouter);
 router.use(boothsRouter);
 router.use(qrCodesRouter);
 router.use(mapCalibrateRouter);

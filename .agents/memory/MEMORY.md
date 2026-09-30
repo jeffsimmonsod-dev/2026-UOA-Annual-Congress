@@ -1,4 +1,5 @@
 - [SERIAL sequence after manual ID seed](serial-sequence-seed.md) — after seeding any table with explicit id=1, advance the SERIAL sequence or clones/new rows conflict.
 - [Voting state single-row table pitfall](voting-state-multitenancy.md) — congress_voting_state was designed as single-row (id DEFAULT 1 CHECK id=1); multi-tenancy required a sequence migration + removing clone-time seed.
 - [Partial Drizzle schema and merges](partial-drizzle-schema.md) — do not automate Drizzle push while API-owned tables and columns are absent from its schema; it proposes data loss.
+- [Conference community policy](conference-community-policy.md) — keep participation low-friction, public standings competitive, and moderation reactive rather than preapproved.
 - [Schedule bookmark identity](schedule-bookmark-identity.md) — retain unmatched saved IDs visibly; do not guess old-to-new session mappings from titles or times.

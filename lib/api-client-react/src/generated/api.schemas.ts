@@ -5,6 +5,215 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface CommunityProfileInput {
+  sessionToken: string;
+  /**
+   * @minLength 1
+   * @maxLength 50
+   */
+  name: string;
+}
+
+export interface CommunityTextInput {
+  sessionToken: string;
+  /**
+   * @minLength 1
+   * @maxLength 50
+   */
+  name: string;
+  /**
+   * @minLength 1
+   * @maxLength 3000
+   */
+  body: string;
+}
+
+export type CommunityDiscussionInput = CommunityTextInput & {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  title: string;
+};
+
+export interface CommunityDiscussion {
+  id: number;
+  title: string;
+  body: string;
+  authorName: string;
+  replyCount: number;
+  createdAt: string;
+}
+
+export interface CommunityComment {
+  id: number;
+  body: string;
+  authorName: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+export type CommunityReportInputType =
+  (typeof CommunityReportInputType)[keyof typeof CommunityReportInputType];
+
+export const CommunityReportInputType = {
+  photo: "photo",
+  comment: "comment",
+  discussion: "discussion",
+  reply: "reply",
+} as const;
+
+export interface CommunityReportInput {
+  sessionToken: string;
+  type: CommunityReportInputType;
+  id: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
+}
+
+export interface CommunitySuccess {
+  success: boolean;
+}
+
+export interface CommunityDeleteInput {
+  sessionToken: string;
+}
+
+export type CommunityVisibilityInputType =
+  (typeof CommunityVisibilityInputType)[keyof typeof CommunityVisibilityInputType];
+
+export const CommunityVisibilityInputType = {
+  photo: "photo",
+  comment: "comment",
+  discussion: "discussion",
+  reply: "reply",
+} as const;
+
+export interface CommunityVisibilityInput {
+  type: CommunityVisibilityInputType;
+  id: string | number;
+  hidden: boolean;
+}
+
+export interface CommunityRestrictionInput {
+  sessionToken: string;
+  restricted: boolean;
+}
+
+export type CommunityReportStatusInputStatus =
+  (typeof CommunityReportStatusInputStatus)[keyof typeof CommunityReportStatusInputStatus];
+
+export const CommunityReportStatusInputStatus = {
+  dismissed: "dismissed",
+  resolved: "resolved",
+} as const;
+
+export interface CommunityReportStatusInput {
+  status: CommunityReportStatusInputStatus;
+}
+
+export interface CommunitySettingsInput {
+  /** @nullable */
+  cutoffAt: string | null;
+}
+
+export type CommunityLeaderboardLeadersItem = {
+  name: string;
+  points: number;
+  rank: number;
+};
+
+export type CommunityLeaderboardMe = null | {
+  name: string;
+  points: number;
+  rank: number;
+};
+
+export interface CommunityLeaderboard {
+  leaders: CommunityLeaderboardLeadersItem[];
+  me: CommunityLeaderboardMe;
+  /** @nullable */
+  cutoffAt: string | null;
+}
+
+export type CommunityLeaderboardExportLeadersItem = {
+  name: string;
+  points: number;
+  rank: number;
+};
+
+export interface CommunityLeaderboardExport {
+  leaders: CommunityLeaderboardExportLeadersItem[];
+  /** @nullable */
+  cutoffAt: string | null;
+}
+
+export type CommunityAdminDataReportsItemType =
+  (typeof CommunityAdminDataReportsItemType)[keyof typeof CommunityAdminDataReportsItemType];
+
+export const CommunityAdminDataReportsItemType = {
+  photo: "photo",
+  comment: "comment",
+  discussion: "discussion",
+  reply: "reply",
+} as const;
+
+export type CommunityAdminDataReportsItemStatus =
+  (typeof CommunityAdminDataReportsItemStatus)[keyof typeof CommunityAdminDataReportsItemStatus];
+
+export const CommunityAdminDataReportsItemStatus = {
+  pending: "pending",
+  dismissed: "dismissed",
+  resolved: "resolved",
+} as const;
+
+export type CommunityAdminDataReportsItem = {
+  id: number;
+  type: CommunityAdminDataReportsItemType;
+  targetId: string;
+  reason: string;
+  reporterName: string;
+  createdAt: string;
+  status: CommunityAdminDataReportsItemStatus;
+};
+
+export type CommunityAdminDataContentItemType =
+  (typeof CommunityAdminDataContentItemType)[keyof typeof CommunityAdminDataContentItemType];
+
+export const CommunityAdminDataContentItemType = {
+  photo: "photo",
+  comment: "comment",
+  discussion: "discussion",
+  reply: "reply",
+} as const;
+
+export type CommunityAdminDataContentItem = {
+  type: CommunityAdminDataContentItemType;
+  id: string | number;
+  body: string;
+  authorName: string;
+  sessionToken: string;
+  hidden: boolean;
+  createdAt: string;
+};
+
+export type CommunityAdminDataUsersItem = {
+  sessionToken: string;
+  name: string;
+  restricted: boolean;
+};
+
+export interface CommunityAdminData {
+  reports: CommunityAdminDataReportsItem[];
+  content: CommunityAdminDataContentItem[];
+  users: CommunityAdminDataUsersItem[];
+  /** @nullable */
+  cutoffAt: string | null;
+}
+
 export interface UploadUrlRequest {
   /** @minLength 1 */
   name: string;
@@ -297,3 +506,79 @@ export interface VotingActionResult {
   success: boolean;
   isOpen?: boolean;
 }
+
+export type CommunitySessionTokenParameter = string;
+
+export type AdminPinParameter = string;
+
+export type SaveCommunityProfile200 = {
+  name: string;
+  restricted: boolean;
+};
+
+export type ListCommunityDiscussionsParams = {
+  sessionToken: CommunitySessionTokenParameter;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+};
+
+export type ListCommunityDiscussions200 = {
+  discussions: CommunityDiscussion[];
+};
+
+export type CreateCommunityDiscussion201 = {
+  discussion: CommunityDiscussion;
+};
+
+export type GetCommunityDiscussionParams = {
+  sessionToken: CommunitySessionTokenParameter;
+};
+
+export type GetCommunityDiscussion200Discussion = CommunityDiscussion & {
+  replies: CommunityComment[];
+};
+
+export type GetCommunityDiscussion200 = {
+  discussion: GetCommunityDiscussion200Discussion;
+};
+
+export type CreateCommunityReply201 = {
+  reply: CommunityComment;
+};
+
+export type ListPhotoCommentsParams = {
+  sessionToken: CommunitySessionTokenParameter;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * @minimum 0
+   */
+  offset?: number;
+};
+
+export type ListPhotoComments200 = {
+  comments: CommunityComment[];
+};
+
+export type CreatePhotoComment201 = {
+  comment: CommunityComment;
+};
+
+export type GetCommunityLeaderboardParams = {
+  sessionToken: CommunitySessionTokenParameter;
+};
+
+export type UpdateCommunitySettings200 = {
+  /** @nullable */
+  cutoffAt: string | null;
+};

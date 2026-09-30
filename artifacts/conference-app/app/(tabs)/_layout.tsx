@@ -27,7 +27,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="photos">
         <Icon sf={{ default: "photo.on.rectangle", selected: "photo.on.rectangle.angled" }} />
-        <Label>Photos</Label>
+        <Label>Community</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <Icon sf={{ default: "ellipsis", selected: "ellipsis" }} />
@@ -125,7 +125,7 @@ function ClassicTabLayout() {
         name="photos"
         options={{
           title: conf.conferenceName,
-          tabBarLabel: "Photos",
+          tabBarLabel: "Community",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="photo.on.rectangle" tintColor={color} size={24} />

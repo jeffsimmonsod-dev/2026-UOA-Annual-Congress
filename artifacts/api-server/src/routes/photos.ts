@@ -117,6 +117,7 @@ function photoToJSON(row: any, deviceId?: string) {
     objectPath: row.object_path,
     uploaderName: row.uploader_name,
     caption: row.caption,
+    hidden: row.hidden === true,
     likes: parseInt(row.likes ?? "0", 10),
     likedByMe: deviceId ? (row.liked_by_me === true || row.liked_by_me === "true") : false,
     createdAt: row.created_at,
@@ -201,6 +202,11 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     res.status(400).json({ error: "photo file, uploaderName, and sessionToken are required", missing: { file: !req.file, uploaderName: !uploaderName, sessionToken: !sessionToken } });
     return;
   }
+  const cleanName = uploaderName.trim().slice(0, 50);
+  if (!cleanName) {
+    res.status(400).json({ error: "uploaderName must contain at least one non-space character" });
+    return;
+  }
 
   // Verify the session token was issued by this server for this conference
   const sessionCheck = await pool.query(
@@ -209,6 +215,18 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
   );
   if (sessionCheck.rows.length === 0) {
     res.status(403).json({ error: "Invalid session token" });
+    return;
+  }
+  const profileCheck = await pool.query(
+    `SELECT restricted FROM community_profiles WHERE conference_id = $1 AND session_token = $2`,
+    [req.conferenceId, sessionToken],
+  );
+  if (profileCheck.rows[0]?.restricted) {
+    res.status(403).json({ error: "Community posting is restricted" });
+    return;
+  }
+  if (isRateLimited(`photo-upload:${sessionToken}`, 10, 10 * 60_000)) {
+    res.status(429).json({ error: "Too many photo uploads. Please try again later." });
     return;
   }
 
@@ -245,8 +263,13 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
 
     const id = Date.now().toString() + Math.random().toString(36).slice(2, 7);
     const deleteToken = randomUUID();
-    const cleanName = (uploaderName as string).trim().slice(0, 50);
     const cleanCaption = (caption ?? "").trim().slice(0, 200);
+    await pool.query(
+      `INSERT INTO community_profiles (conference_id, session_token, name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (conference_id, session_token) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()`,
+      [req.conferenceId, sessionToken, cleanName],
+    );
 
     const extMap: Record<string, string> = {
       "image/png": "png", "image/gif": "gif", "image/webp": "webp",
@@ -315,7 +338,7 @@ router.get("/photos", async (req: Request, res: Response) => {
          ) AS liked_by_me
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
-       WHERE p.conference_id = $2
+       WHERE p.conference_id = $2 AND p.hidden = false
        GROUP BY p.id
        ORDER BY p.created_at DESC`,
       [validatedToken ?? "", req.conferenceId]
@@ -350,9 +373,17 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
       res.status(403).json({ error: "Invalid session token" });
       return;
     }
+    const profileCheck = await pool.query(
+      `SELECT restricted FROM community_profiles WHERE conference_id = $1 AND session_token = $2`,
+      [req.conferenceId, sessionToken],
+    );
+    if (profileCheck.rows[0]?.restricted) {
+      res.status(403).json({ error: "Community posting is restricted" });
+      return;
+    }
     // Verify the photo belongs to this conference before mutating likes
     const photoCheck = await pool.query(
-      `SELECT 1 FROM congress_photos WHERE id = $1 AND conference_id = $2`,
+      `SELECT 1 FROM congress_photos p WHERE p.id = $1 AND p.conference_id = $2 AND p.hidden = false`,
       [req.params.id, req.conferenceId]
     );
     if (photoCheck.rows.length === 0) {
@@ -379,7 +410,8 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
          EXISTS(SELECT 1 FROM congress_photo_likes WHERE photo_id = p.id AND device_id = $1) AS liked_by_me
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
-       WHERE p.id = $2 AND p.conference_id = $3 GROUP BY p.id`,
+       WHERE p.id = $2 AND p.conference_id = $3 AND p.hidden = false
+       GROUP BY p.id`,
       [sessionToken, req.params.id, req.conferenceId]
     );
     if (result.rows.length === 0) { res.status(404).json({ error: "Photo not found" }); return; }
@@ -450,7 +482,7 @@ router.get("/photos/admin", async (req: Request, res: Response) => {
   }
   try {
     const result = await pool.query(
-      `SELECT p.id, p.object_path, p.uploader_name, p.caption, p.created_at,
+      `SELECT p.id, p.object_path, p.uploader_name, p.caption, p.hidden, p.created_at,
               COUNT(l.photo_id)::int AS likes
        FROM congress_photos p
        LEFT JOIN congress_photo_likes l ON l.photo_id = p.id
@@ -470,11 +502,15 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
+    const adminPin = req.headers["x-admin-pin"];
+    const isAdmin = typeof adminPin === "string" && !!process.env.ADMIN_PIN && adminPin === process.env.ADMIN_PIN;
 
-    // Verify that this object path belongs to an existing (non-deleted) photo in this conference
+    // Public access is limited to visible photos; moderators may inspect hidden photos.
     const dbCheck = await pool.query(
-      `SELECT id FROM congress_photos WHERE object_path = $1 AND conference_id = $2 LIMIT 1`,
-      [objectPath, req.conferenceId]
+      `SELECT p.id FROM congress_photos p WHERE p.object_path = $1 AND p.conference_id = $2
+       AND ($3::boolean OR p.hidden = false)
+       LIMIT 1`,
+      [objectPath, req.conferenceId, isAdmin]
     );
     if (dbCheck.rows.length === 0) {
       res.status(404).json({ error: "Object not found" });
