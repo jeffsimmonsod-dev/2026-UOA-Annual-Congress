@@ -98,7 +98,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="schedule"
         options={{
-          title: conf.conferenceName,
+          title: "Schedule",
+          headerShown: false,
           tabBarLabel: "Schedule",
           tabBarIcon: ({ color }) =>
             isIOS ? (
@@ -125,7 +126,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="photos"
         options={{
-          title: conf.conferenceName,
+          title: "Community",
+          headerShown: false,
           tabBarLabel: "Community",
           tabBarIcon: ({ color }) =>
             isIOS ? (

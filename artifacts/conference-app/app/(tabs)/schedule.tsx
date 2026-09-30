@@ -100,7 +100,7 @@ export default function ScheduleScreen() {
     : doctorSessions;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       <View
         style={[
           styles.headerBanner,
