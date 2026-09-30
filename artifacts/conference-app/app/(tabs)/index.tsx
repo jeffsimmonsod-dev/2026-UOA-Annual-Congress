@@ -192,7 +192,7 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.heroText}>
-            <Text style={[styles.heroTitle, { color: colors.foreground }]}>
+            <Text style={[styles.heroTitle, { color: colors.primary }]}>
               {conf.conferenceName.replace(/\bUOA\s+/, "")}
             </Text>
             <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
