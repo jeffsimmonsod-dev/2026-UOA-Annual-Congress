@@ -107,7 +107,6 @@ export default function ScheduleScreen() {
           {
             backgroundColor: colors.primary + "12",
             borderBottomColor: colors.primary + "30",
-            paddingTop: insets.top + 12,
           },
         ]}
       >
@@ -287,7 +286,7 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   headerBanner: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     gap: 2,
   },
