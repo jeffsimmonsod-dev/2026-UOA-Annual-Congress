@@ -184,7 +184,7 @@ export default function HomeScreen() {
       {/* ── Compact Hero ── */}
       <Pressable onPress={handleLogoTap} hitSlop={8}>
         <View style={styles.heroRow}>
-          <View style={[styles.logoSmallWrap, { backgroundColor: "#ffffff", shadowColor: colors.foreground }]}>
+          <View style={[styles.logoSmallWrap, { backgroundColor: "#ffffff" }]}>
             <Image
               source={conf.logoAsset}
               style={styles.logoSmall}
@@ -192,16 +192,15 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.heroText}>
-            <Text style={[styles.heroBadge, { color: colors.primary }]}>
-              {conf.conferenceName.toUpperCase()}
-            </Text>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>
-              {conf.organizationName}
+              {conf.conferenceName.replace(/\bUOA\s+/, "")}
+            </Text>
+            <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
+              {conf.dates}
             </Text>
             <View style={styles.heroMeta}>
-              <Ionicons name="location-outline" size={11} color={colors.mutedForeground} />
               <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
-                {conf.dates} · {conf.location}
+                {conf.location}
               </Text>
             </View>
           </View>
@@ -482,42 +481,36 @@ const styles = StyleSheet.create({
 
   /* ── Compact Hero ── */
   heroRow: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 4,
+    gap: 8,
+    paddingBottom: 8,
   },
   logoSmallWrap: {
-    width: 140,
-    height: 140,
-    borderRadius: 20,
+    width: "100%",
+    maxWidth: 300,
+    aspectRatio: 2530 / 1135,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     flexShrink: 0,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
   },
   logoSmall: {
     width: "100%",
     height: "100%",
   },
   heroText: {
-    flex: 1,
-    gap: 2,
-  },
-  heroBadge: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
+    width: "100%",
+    alignItems: "center",
+    gap: 4,
   },
   heroTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     letterSpacing: -0.3,
-    lineHeight: 27,
+    lineHeight: 24,
+    textAlign: "center",
   },
   heroMeta: {
     flexDirection: "row",
@@ -525,8 +518,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   heroMetaText: {
-    fontSize: 11,
-    flex: 1,
+    fontSize: 12,
+    textAlign: "center",
   },
 
   /* ── Announcement ── */
