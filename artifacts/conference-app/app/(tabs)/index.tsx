@@ -491,6 +491,7 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     aspectRatio: 2530 / 1135,
     borderRadius: 12,
+    padding: 8,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
