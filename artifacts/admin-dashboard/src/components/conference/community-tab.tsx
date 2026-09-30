@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { useAdmin } from "@/hooks/use-admin";
 import { AdminPhotoPreview } from "@/components/conference/admin-photo-preview";
 import { useToast } from "@/hooks/use-toast";
-import { getCommunityLeaderboard, useCommunityActions, useCommunityAdmin, useCommunityAdminActions } from "@/hooks/use-community-admin";
+import { getCommunityActionsCsv, getCommunityLeaderboard, useCommunityActions, useCommunityAdmin, useCommunityAdminActions } from "@/hooks/use-community-admin";
 import type { CommunityAdminAction, CommunityContent, CommunityReport } from "@/hooks/use-community-admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,7 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
   const actions = useCommunityActions(conferenceId, secret);
   const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [exportingHistory, setExportingHistory] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const form = useForm<{ cutoffAt: string }>({ defaultValues: { cutoffAt: "" } });
 
@@ -174,6 +175,23 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
       toast({ title: `Exported ${response.leaders.length} leaderboard entries` });
     } catch (failure) { notifyError("Could not export leaderboard", failure); }
     finally { setExporting(false); }
+  }
+
+  async function exportHistory() {
+    setExportingHistory(true);
+    try {
+      const blob = await getCommunityActionsCsv(conferenceId, secret);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `community-decisions-${conferenceId}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast({ title: "Decision history exported" });
+    } catch (failure) { notifyError("Could not export decision history", failure); }
+    finally { setExportingHistory(false); }
   }
 
   if (isLoading) return (
@@ -292,7 +310,10 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
         </div>
       </div>
       <Card data-testid="card-community-action-history">
-        <CardHeader><CardTitle>Decision history</CardTitle><CardDescription>Newest first. Only changes to this conference are shown. Earlier decisions made before history was enabled are not available.</CardDescription></CardHeader>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+          <div><CardTitle>Decision history</CardTitle><CardDescription>Newest first. Only changes to this conference are shown. Earlier decisions made before history was enabled are not available.</CardDescription></div>
+          <Button variant="outline" onClick={() => void exportHistory()} disabled={exportingHistory} data-testid="button-export-community-actions"><Download className="mr-2 h-4 w-4" />{exportingHistory ? "Exporting…" : "Export decisions CSV"}</Button>
+        </CardHeader>
         <CardContent className="space-y-3">
           {history.isPending ? <Skeleton className="h-20 w-full" /> : history.isError
             ? <div className="text-sm text-destructive">Could not load decision history. <Button size="sm" variant="outline" onClick={() => void history.refetch()}>Retry</Button></div>

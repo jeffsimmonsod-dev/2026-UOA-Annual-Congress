@@ -954,6 +954,22 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CommunityAdminActionPage" }
 
+  /community/admin/actions/export:
+    get:
+      operationId: exportCommunityAdminActions
+      tags: [community]
+      summary: Export all recorded community decisions for this conference
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+      responses:
+        "200":
+          description: CSV decision history with action time, target, states, reason, and actor label
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "403":
+          description: Invalid admin PIN
+
   /community/admin/content:
     patch:
       operationId: updateCommunityContentVisibility

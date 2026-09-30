@@ -3298,6 +3298,83 @@ export function useListCommunityAdminActions<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
+/**
+ * @summary Export all recorded community decisions for this conference
+ */
+export const getExportCommunityAdminActionsUrl = () => {
+  return `/api/community/admin/actions/export`;
+};
+
+export const exportCommunityAdminActions = async (
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getExportCommunityAdminActionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportCommunityAdminActionsQueryKey = () => {
+  return [`/api/community/admin/actions/export`] as const;
+};
+
+export const getExportCommunityAdminActionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportCommunityAdminActions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof exportCommunityAdminActions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportCommunityAdminActionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportCommunityAdminActions>>
+  > = ({ signal }) =>
+    exportCommunityAdminActions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportCommunityAdminActions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportCommunityAdminActionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportCommunityAdminActions>>
+>;
+export type ExportCommunityAdminActionsQueryError = ErrorType<void>;
+
+/**
+ * @summary Export all recorded community decisions for this conference
+ */
+
+export function useExportCommunityAdminActions<
+  TData = Awaited<ReturnType<typeof exportCommunityAdminActions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof exportCommunityAdminActions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportCommunityAdminActionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
 export const getUpdateCommunityContentVisibilityUrl = () => {
   return `/api/community/admin/content`;
 };

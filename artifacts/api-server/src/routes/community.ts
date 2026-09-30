@@ -63,6 +63,13 @@ function decisionReason(value: unknown): string | null {
   return cleanString(value, 500);
 }
 
+function csvCell(value: unknown): string {
+  let text = value == null ? "" : String(value);
+  // A quoted CSV field can still be interpreted as a spreadsheet formula.
+  if (/^\s*[=+\-@]/u.test(text) || /^[\t\r\n]/u.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 // The state change and its audit row either both commit or neither does. A
 // repeated request with no state change is successful, but is not a decision.
 async function recordDecision(
@@ -509,6 +516,44 @@ router.get("/community/admin/actions", async (req: Request, res: Response): Prom
   } catch (err) {
     req.log.error({ err }, "community action history fetch failed");
     res.status(500).json({ error: "Failed to fetch community action history" });
+  }
+});
+
+router.get("/community/admin/actions/export", async (req: Request, res: Response): Promise<void> => {
+  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const result = await pool.query<{
+      id: number;
+      created_at: Date;
+      action: string;
+      target_type: string;
+      target_id: string;
+      previous_value: string | null;
+      new_value: string | null;
+      reason: string;
+      actor_label: string;
+    }>(
+      `SELECT id, created_at, action, target_type, target_id,
+              previous_value, new_value, reason, actor_label
+       FROM community_admin_actions
+       WHERE conference_id = $1
+       ORDER BY id ASC`,
+      [req.conferenceId],
+    );
+    const rows = [
+      ["actionTime", "action", "targetType", "targetId", "previousState", "newState", "reason", "actorLabel"],
+      ...result.rows.map(row => [
+        row.created_at.toISOString(), row.action, row.target_type, row.target_id,
+        row.previous_value, row.new_value, row.reason, row.actor_label,
+      ]),
+    ];
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="community-decisions-${req.conferenceId}.csv"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.send("\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n") + "\r\n");
+  } catch (err) {
+    req.log.error({ err }, "community action history export failed");
+    res.status(500).json({ error: "Failed to export community action history" });
   }
 });
 

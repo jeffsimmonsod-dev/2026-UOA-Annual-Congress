@@ -859,6 +859,13 @@ export const ListCommunityAdminActionsResponse = zod.object({
   nextBefore: zod.number().nullable(),
 });
 
+/**
+ * @summary Export all recorded community decisions for this conference
+ */
+export const ExportCommunityAdminActionsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
 export const UpdateCommunityContentVisibilityHeader = zod.object({
   "X-Admin-Pin": zod.string(),
 });

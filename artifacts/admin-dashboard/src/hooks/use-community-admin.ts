@@ -95,6 +95,18 @@ export function useCommunityAdminActions(conferenceId: number, pin: string) {
   });
 }
 
+export async function getCommunityActionsCsv(conferenceId: number, pin: string): Promise<Blob> {
+  const response = await fetch("/api/community/admin/actions/export", {
+    credentials: "include",
+    headers: headers(conferenceId, pin),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(detail?.error || `Export failed (${response.status})`);
+  }
+  return response.blob();
+}
+
 export function useCommunityActions(conferenceId: number, pin: string) {
   const client = useQueryClient();
   const refresh = () => {
