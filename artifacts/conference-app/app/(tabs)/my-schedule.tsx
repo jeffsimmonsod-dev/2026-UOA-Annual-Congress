@@ -46,6 +46,9 @@ export default function MyScheduleScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <Text style={[styles.pageTitle, { color: colors.primary }]}>
+        My Schedule
+      </Text>
       {savedIds.size === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons
@@ -89,6 +92,12 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     flexGrow: 1,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    marginBottom: 12,
   },
   emptyState: {
     flex: 1,
