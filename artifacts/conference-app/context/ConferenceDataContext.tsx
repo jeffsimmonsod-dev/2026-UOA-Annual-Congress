@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { AppState } from "react-native";
 import { apiFetch } from "@/services/apiFetch";
 import conferenceConfig from "@/conference.config";
 import {
@@ -103,6 +104,12 @@ function mapSponsor(row: Record<string, unknown>): Sponsor {
   };
 }
 
+// Preserve array references when a poll returns the same content, so consumers do not
+// re-render merely because a new response arrived.
+function keepIfUnchanged<T>(previous: T[], next: T[]): T[] {
+  return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+}
+
 export function ConferenceDataProvider({ children }: { children: React.ReactNode }) {
   const [speakers, setSpeakers] = useState<Speaker[]>(SEED_SPEAKERS);
   const [docSessions, setDocSessions] = useState<Session[]>(SEED_SESSIONS);
@@ -113,43 +120,82 @@ export function ConferenceDataProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     const base = conferenceConfig.apiBaseUrl;
     const confId = conferenceConfig.conferenceId;
+    let mounted = true;
+    let inFlight = false;
+    let firstLoad = true;
+    let previousAppState = AppState.currentState;
+    const controller = new AbortController();
 
-    async function fetchAll() {
+    async function fetchRows(key: "speakers" | "sessions" | "sponsors"): Promise<Record<string, unknown>[] | null> {
       try {
-        const [spRes, sessRes, spnRes] = await Promise.all([
-          apiFetch(`${base}/api/conferences/${confId}/speakers`),
-          apiFetch(`${base}/api/conferences/${confId}/sessions`),
-          apiFetch(`${base}/api/conferences/${confId}/sponsors`),
-        ]);
-
-        if (spRes.ok) {
-          const data = await spRes.json() as { speakers: Record<string, unknown>[] };
-          if (Array.isArray(data.speakers)) {
-            setSpeakers(data.speakers.map(mapSpeaker));
-          }
-        }
-
-        if (sessRes.ok) {
-          const data = await sessRes.json() as { sessions: Record<string, unknown>[] };
-          if (Array.isArray(data.sessions)) {
-            setDocSessions(data.sessions.filter((r) => !r["is_para"]).map(mapSession));
-            setParaSessions(data.sessions.filter((r) => !!r["is_para"]).map(mapSession));
-          }
-        }
-
-        if (spnRes.ok) {
-          const data = await spnRes.json() as { sponsors: Record<string, unknown>[] };
-          if (Array.isArray(data.sponsors)) {
-            setSponsors(data.sponsors.map(mapSponsor));
-          }
-        }
-      } catch {
-      } finally {
-        setIsLoaded(true);
+        const response = await apiFetch(`${base}/api/conferences/${confId}/${key}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json() as Record<string, unknown>;
+        if (!Array.isArray(data[key])) throw new Error(`Invalid ${key} response`);
+        return data[key] as Record<string, unknown>[];
+      } catch (error) {
+        if (!controller.signal.aborted) console.warn(`Could not refresh ${key}`, error);
+        return null;
       }
     }
 
-    fetchAll();
+    async function fetchAll() {
+      if (inFlight || !mounted) return;
+      inFlight = true;
+      try {
+        const [speakerRows, sessionRows, sponsorRows] = await Promise.all([
+          fetchRows("speakers"),
+          fetchRows("sessions"),
+          fetchRows("sponsors"),
+        ]);
+        if (!mounted) return;
+        if (speakerRows) {
+          setSpeakers((previous) => keepIfUnchanged(previous, speakerRows.map(mapSpeaker)));
+        }
+        if (sessionRows) {
+          setDocSessions((previous) =>
+            keepIfUnchanged(previous, sessionRows.filter((row) => !row["is_para"]).map(mapSession))
+          );
+          setParaSessions((previous) =>
+            keepIfUnchanged(previous, sessionRows.filter((row) => !!row["is_para"]).map(mapSession))
+          );
+        }
+        if (sponsorRows) {
+          setSponsors((previous) => keepIfUnchanged(previous, sponsorRows.map(mapSponsor)));
+        }
+      } finally {
+        inFlight = false;
+        if (mounted && firstLoad) {
+          firstLoad = false;
+          setIsLoaded(true);
+        }
+      }
+    }
+
+    void fetchAll();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        nextState === "active" &&
+        (previousAppState === "background" || previousAppState === "inactive")
+      ) {
+        void fetchAll();
+      }
+      previousAppState = nextState;
+    });
+    const interval = conferenceConfig.dataRefreshIntervalMs > 0
+      ? setInterval(() => {
+          if (AppState.currentState === "active") void fetchAll();
+        }, conferenceConfig.dataRefreshIntervalMs)
+      : undefined;
+
+    return () => {
+      mounted = false;
+      controller.abort();
+      subscription.remove();
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const getSessionById = useCallback(
@@ -180,23 +226,25 @@ export function ConferenceDataProvider({ children }: { children: React.ReactNode
 
   const getSessionsByDay = useCallback(() => groupByDay(docSessions), [docSessions]);
   const getParaSessionsByDay = useCallback(() => groupByDay(paraSessions), [paraSessions]);
+  const value = useMemo(() => ({
+    speakers,
+    docSessions,
+    paraSessions,
+    sponsors,
+    getSessionById,
+    getSpeakerById,
+    getSpeakersForSession,
+    getSessionsForSpeaker,
+    getSessionsByDay,
+    getParaSessionsByDay,
+    isLoaded,
+  }), [
+    speakers, docSessions, paraSessions, sponsors, getSessionById, getSpeakerById,
+    getSpeakersForSession, getSessionsForSpeaker, getSessionsByDay, getParaSessionsByDay, isLoaded,
+  ]);
 
   return (
-    <ConferenceDataContext.Provider
-      value={{
-        speakers,
-        docSessions,
-        paraSessions,
-        sponsors,
-        getSessionById,
-        getSpeakerById,
-        getSpeakersForSession,
-        getSessionsForSpeaker,
-        getSessionsByDay,
-        getParaSessionsByDay,
-        isLoaded,
-      }}
-    >
+    <ConferenceDataContext.Provider value={value}>
       {children}
     </ConferenceDataContext.Provider>
   );

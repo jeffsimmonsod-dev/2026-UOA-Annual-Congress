@@ -30,6 +30,7 @@ export interface ConferenceConfig {
   tagDarkColor: string;
   tagDarkForegroundColor: string;
   apiBaseUrl: string;
+  dataRefreshIntervalMs: number;
 }
 
 const conferenceConfig: ConferenceConfig = {
@@ -71,6 +72,7 @@ const conferenceConfig: ConferenceConfig = {
   apiBaseUrl: process.env.EXPO_PUBLIC_DOMAIN
     ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
     : "",
+  dataRefreshIntervalMs: 5 * 60 * 1000,
 };
 
 export default conferenceConfig;
