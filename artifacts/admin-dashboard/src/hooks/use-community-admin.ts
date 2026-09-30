@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface CommunityReport {
   id: string | number;
@@ -34,7 +34,25 @@ export interface CommunityAdminData {
   cutoffAt: string | null;
 }
 
+export interface CommunityAdminAction {
+  id: number;
+  action: string;
+  targetType: string;
+  targetId: string;
+  previousValue: string | null;
+  newValue: string | null;
+  reason: string;
+  actorLabel: string;
+  createdAt: string;
+}
+
+interface ActionPage {
+  actions: CommunityAdminAction[];
+  nextBefore: number | null;
+}
+
 const key = (conferenceId: number, pin: string) => ["community-admin", conferenceId, pin] as const;
+const actionsKey = (conferenceId: number, pin: string) => ["community-admin-actions", conferenceId, pin] as const;
 const headers = (conferenceId: number, pin: string) => ({
   "X-Conference-Id": String(conferenceId),
   "X-Admin-Pin": pin,
@@ -64,29 +82,46 @@ export function useCommunityAdmin(conferenceId: number, pin: string) {
   });
 }
 
+export function useCommunityAdminActions(conferenceId: number, pin: string) {
+  return useInfiniteQuery({
+    queryKey: actionsKey(conferenceId, pin),
+    queryFn: ({ pageParam }) => request<ActionPage>(
+      `/api/community/admin/actions${pageParam === null ? "" : `?before=${pageParam}`}`, conferenceId, pin,
+    ),
+    initialPageParam: null as number | null,
+    getNextPageParam: page => page.nextBefore ?? undefined,
+    enabled: !!conferenceId && !!pin,
+    refetchInterval: 30000,
+  });
+}
+
 export function useCommunityActions(conferenceId: number, pin: string) {
   const client = useQueryClient();
-  const refresh = () => client.invalidateQueries({ queryKey: key(conferenceId, pin) });
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: key(conferenceId, pin) });
+    void client.invalidateQueries({ queryKey: actionsKey(conferenceId, pin) });
+  };
   const content = useMutation({
-    mutationFn: (data: { type: string; id: string | number; hidden: boolean }) =>
+    mutationFn: (data: { type: string; id: string | number; hidden: boolean; reason: string }) =>
       request<unknown>("/api/community/admin/content", conferenceId, pin, "PATCH", data),
     onSuccess: refresh,
   });
   const users = useMutation({
-    mutationFn: (data: { sessionToken: string; restricted: boolean }) =>
+    mutationFn: (data: { sessionToken: string; restricted: boolean; reason: string }) =>
       request<unknown>("/api/community/admin/users", conferenceId, pin, "PATCH", data),
     onSuccess: refresh,
   });
   const reports = useMutation({
-    mutationFn: (data: { id: string | number; status: "dismissed" | "resolved" }) =>
-      request<unknown>(`/api/community/admin/reports/${encodeURIComponent(data.id)}`, conferenceId, pin, "PATCH", { status: data.status }),
+    mutationFn: (data: { id: string | number; status: "dismissed" | "resolved"; reason: string }) =>
+      request<unknown>(`/api/community/admin/reports/${encodeURIComponent(data.id)}`, conferenceId, pin, "PATCH", { status: data.status, reason: data.reason }),
     onSuccess: refresh,
   });
   const settings = useMutation({
-    mutationFn: (data: { cutoffAt: string | null }) =>
+    mutationFn: (data: { cutoffAt: string | null; reason: string }) =>
       request<{ cutoffAt: string | null }>("/api/community/admin/settings", conferenceId, pin, "PATCH", data),
     onSuccess: (result) => {
       client.setQueryData<CommunityAdminData>(key(conferenceId, pin), old => old ? { ...old, cutoffAt: result.cutoffAt } : old);
+      void client.invalidateQueries({ queryKey: actionsKey(conferenceId, pin) });
     },
   });
   return { content, users, reports, settings };

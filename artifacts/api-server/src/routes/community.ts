@@ -1,5 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { pool } from "../lib/db";
+import type { PoolClient } from "pg";
 
 const router: IRouter = Router();
 const validTypes = new Set(["photo", "comment", "discussion", "reply"]);
@@ -54,6 +55,44 @@ function writeLimited(req: Request, token: string): boolean {
 function adminAllowed(req: Request): boolean {
   const pin = req.headers["x-admin-pin"];
   return typeof pin === "string" && !!process.env.ADMIN_PIN && pin === process.env.ADMIN_PIN;
+}
+
+type Decision = { previousValue: string | null; newValue: string | null };
+
+function decisionReason(value: unknown): string | null {
+  return cleanString(value, 500);
+}
+
+// The state change and its audit row either both commit or neither does. A
+// repeated request with no state change is successful, but is not a decision.
+async function recordDecision(
+  req: Request,
+  action: string,
+  targetType: string,
+  targetId: string,
+  reason: string,
+  change: (client: PoolClient) => Promise<Decision | null>,
+): Promise<Decision | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const decision = await change(client);
+    if (decision && decision.previousValue !== decision.newValue) {
+      await client.query(
+        `INSERT INTO community_admin_actions
+         (conference_id, action, target_type, target_id, previous_value, new_value, reason, actor_label)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Admin (shared PIN)')`,
+        [req.conferenceId, action, targetType, targetId, decision.previousValue, decision.newValue, reason],
+      );
+    }
+    await client.query("COMMIT");
+    return decision;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 function pageSize(value: unknown, fallback = 50): number {
@@ -450,6 +489,29 @@ router.get("/community/admin/leaderboard", async (req: Request, res: Response): 
   }
 });
 
+router.get("/community/admin/actions", async (req: Request, res: Response): Promise<void> => {
+  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const rawBefore = req.query.before;
+  const before = rawBefore === undefined ? null : positiveIntegerId(rawBefore);
+  if (rawBefore !== undefined && before === null) { res.status(400).json({ error: "before must be a positive action id" }); return; }
+  try {
+    const result = await pool.query(
+      `SELECT id, action, target_type AS "targetType", target_id AS "targetId",
+              previous_value AS "previousValue", new_value AS "newValue",
+              reason, actor_label AS "actorLabel", created_at AS "createdAt"
+       FROM community_admin_actions
+       WHERE conference_id = $1 AND ($2::integer IS NULL OR id < $2)
+       ORDER BY id DESC LIMIT 51`,
+      [req.conferenceId, before],
+    );
+    const actions = result.rows.slice(0, 50);
+    res.json({ actions, nextBefore: result.rows.length > 50 ? actions[actions.length - 1].id : null });
+  } catch (err) {
+    req.log.error({ err }, "community action history fetch failed");
+    res.status(500).json({ error: "Failed to fetch community action history" });
+  }
+});
+
 router.get("/community/admin", async (req: Request, res: Response): Promise<void> => {
   if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
@@ -489,20 +551,36 @@ router.get("/community/admin", async (req: Request, res: Response): Promise<void
 router.patch("/community/admin/content", async (req: Request, res: Response): Promise<void> => {
   if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const { type, id, hidden } = req.body ?? {};
+  const reason = decisionReason(req.body?.reason);
   if (!validTypes.has(type) || (typeof id !== "string" && typeof id !== "number") || typeof hidden !== "boolean") {
     res.status(400).json({ error: "type, id, and boolean hidden are required" }); return;
   }
+  if (!reason) { res.status(400).json({ error: "A reason (1–500 characters) is required" }); return; }
   const normalizedId = type === "photo" ? String(id) : positiveIntegerId(id);
   if (normalizedId === null || normalizedId === "") { res.status(400).json({ error: "id must be a valid content id" }); return; }
   try {
     const tableByType: Record<CommunityType, string> = {
       photo: "congress_photos", comment: "community_photo_comments", discussion: "community_discussions", reply: "community_replies",
     };
-    const result = await pool.query(
-      `UPDATE ${tableByType[type as CommunityType]} SET hidden = $1 WHERE id = $2 AND conference_id = $3 RETURNING id`,
-      [hidden, String(normalizedId), req.conferenceId],
+    const result = await recordDecision(
+      req, hidden ? "hide" : "restore", type, String(normalizedId), reason,
+      async client => {
+        const current = await client.query(
+          `SELECT hidden FROM ${tableByType[type as CommunityType]} WHERE id = $1 AND conference_id = $2 FOR UPDATE`,
+          [String(normalizedId), req.conferenceId],
+        );
+        if (!current.rowCount) return null;
+        const previousValue = String(current.rows[0].hidden);
+        if (current.rows[0].hidden !== hidden) {
+          await client.query(
+            `UPDATE ${tableByType[type as CommunityType]} SET hidden = $1 WHERE id = $2 AND conference_id = $3`,
+            [hidden, String(normalizedId), req.conferenceId],
+          );
+        }
+        return { previousValue, newValue: String(hidden) };
+      },
     );
-    if (!result.rowCount) { res.status(404).json({ error: "Content not found" }); return; }
+    if (!result) { res.status(404).json({ error: "Content not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "community admin content update failed");
@@ -513,13 +591,39 @@ router.patch("/community/admin/content", async (req: Request, res: Response): Pr
 router.patch("/community/admin/users", async (req: Request, res: Response): Promise<void> => {
   if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const { sessionToken, restricted } = req.body ?? {};
-  if (typeof sessionToken !== "string" || typeof restricted !== "boolean") { res.status(400).json({ error: "sessionToken and boolean restricted are required" }); return; }
+  const reason = decisionReason(req.body?.reason);
+  if (typeof sessionToken !== "string" || !sessionToken || typeof restricted !== "boolean") { res.status(400).json({ error: "sessionToken and boolean restricted are required" }); return; }
+  if (!reason) { res.status(400).json({ error: "A reason (1–500 characters) is required" }); return; }
   try {
-    const result = await pool.query(
-      "UPDATE community_profiles SET restricted = $1, updated_at = NOW() WHERE conference_id = $2 AND session_token = $3 RETURNING session_token",
-      [restricted, req.conferenceId, sessionToken],
+    const result = await recordDecision(
+      req, restricted ? "restrict" : "unrestrict", "participant", sessionToken, reason,
+      async client => {
+        // Older photo uploaders may predate community profiles but still appear
+        // in the admin list. Materialize their profile before locking it so the
+        // restriction is enforced by the photo upload and community routes.
+        await client.query(
+          `INSERT INTO community_profiles (conference_id, session_token, name)
+           SELECT $1, $2, p.uploader_name FROM congress_photos p
+           WHERE p.conference_id = $1 AND p.uploader_device_id = $2
+           ORDER BY p.created_at DESC LIMIT 1
+           ON CONFLICT (conference_id, session_token) DO NOTHING`,
+          [req.conferenceId, sessionToken],
+        );
+        const current = await client.query(
+          "SELECT restricted FROM community_profiles WHERE conference_id = $1 AND session_token = $2 FOR UPDATE",
+          [req.conferenceId, sessionToken],
+        );
+        if (!current.rowCount) return null;
+        if (current.rows[0].restricted !== restricted) {
+          await client.query(
+            "UPDATE community_profiles SET restricted = $1, updated_at = NOW() WHERE conference_id = $2 AND session_token = $3",
+            [restricted, req.conferenceId, sessionToken],
+          );
+        }
+        return { previousValue: String(current.rows[0].restricted), newValue: String(restricted) };
+      },
     );
-    if (!result.rowCount) { res.status(404).json({ error: "Community profile not found" }); return; }
+    if (!result) { res.status(404).json({ error: "Community profile not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "community admin user update failed");
@@ -531,15 +635,27 @@ router.patch("/community/admin/reports/:id", async (req: Request, res: Response)
   if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const { status } = req.body ?? {};
   if (status !== "dismissed" && status !== "resolved") { res.status(400).json({ error: "status must be dismissed or resolved" }); return; }
+  const reason = decisionReason(req.body?.reason);
+  if (!reason) { res.status(400).json({ error: "A reason (1–500 characters) is required" }); return; }
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const numericId = positiveIntegerId(id);
     if (numericId === null) { res.status(400).json({ error: "Report id must be a positive integer" }); return; }
-    const result = await pool.query(
-      "UPDATE community_reports SET status = $1 WHERE id = $2 AND conference_id = $3 RETURNING id",
-      [status, numericId, req.conferenceId],
+    const result = await recordDecision(
+      req, status === "resolved" ? "resolve_report" : "dismiss_report", "report", String(numericId), reason,
+      async client => {
+        const current = await client.query(
+          "SELECT status FROM community_reports WHERE id = $1 AND conference_id = $2 FOR UPDATE",
+          [numericId, req.conferenceId],
+        );
+        if (!current.rowCount) return null;
+        if (current.rows[0].status !== status) {
+          await client.query("UPDATE community_reports SET status = $1 WHERE id = $2 AND conference_id = $3", [status, numericId, req.conferenceId]);
+        }
+        return { previousValue: current.rows[0].status, newValue: status };
+      },
     );
-    if (!result.rowCount) { res.status(404).json({ error: "Report not found" }); return; }
+    if (!result) { res.status(404).json({ error: "Report not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "community report status update failed");
@@ -553,14 +669,30 @@ router.patch("/community/admin/settings", async (req: Request, res: Response): P
   if (cutoffAt !== null && (typeof cutoffAt !== "string" || !Number.isFinite(Date.parse(cutoffAt)))) {
     res.status(400).json({ error: "cutoffAt must be a valid timestamp or null" }); return;
   }
+  const reason = decisionReason(req.body?.reason);
+  if (!reason) { res.status(400).json({ error: "A reason (1–500 characters) is required" }); return; }
   try {
-    const result = await pool.query(
-      `INSERT INTO community_settings (conference_id, cutoff_at) VALUES ($1, $2)
-       ON CONFLICT (conference_id) DO UPDATE SET cutoff_at = EXCLUDED.cutoff_at, updated_at = NOW()
-       RETURNING cutoff_at AS "cutoffAt"`,
-      [req.conferenceId, cutoffAt],
+    const normalized = cutoffAt === null ? null : new Date(cutoffAt).toISOString();
+    const result = await recordDecision(
+      req, normalized === null ? "clear_cutoff" : "set_cutoff", "scoring_cutoff", String(req.conferenceId), reason,
+      async client => {
+        // The conference lock also serializes first-time settings inserts.
+        await client.query("SELECT id FROM conferences WHERE id = $1 FOR UPDATE", [req.conferenceId]);
+        const current = await client.query(
+          "SELECT cutoff_at FROM community_settings WHERE conference_id = $1 FOR UPDATE", [req.conferenceId],
+        );
+        const previousValue = current.rows[0]?.cutoff_at?.toISOString() ?? null;
+        if (previousValue !== normalized) {
+          await client.query(
+            `INSERT INTO community_settings (conference_id, cutoff_at) VALUES ($1, $2)
+             ON CONFLICT (conference_id) DO UPDATE SET cutoff_at = EXCLUDED.cutoff_at, updated_at = NOW()`,
+            [req.conferenceId, normalized],
+          );
+        }
+        return { previousValue, newValue: normalized };
+      },
     );
-    res.json(result.rows[0]);
+    res.json({ cutoffAt: result?.newValue ?? null });
   } catch (err) {
     req.log.error({ err }, "community settings update failed");
     res.status(500).json({ error: "Failed to update community settings" });

@@ -11,4 +11,9 @@ export interface CommunityVisibilityInput {
   type: CommunityVisibilityInputType;
   id: string | number;
   hidden: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }

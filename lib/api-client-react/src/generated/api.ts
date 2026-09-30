@@ -20,6 +20,7 @@ import type {
   AdminPinInput,
   AdminVerifyResult,
   BulkImportResult,
+  CommunityAdminActionPage,
   CommunityAdminData,
   CommunityDeleteInput,
   CommunityDiscussionInput,
@@ -46,7 +47,9 @@ import type {
   GetCommunityDiscussion200,
   GetCommunityDiscussionParams,
   GetCommunityLeaderboardParams,
+  GetConferencePhotoObjectParams,
   HealthStatus,
+  ListCommunityAdminActionsParams,
   ListCommunityDiscussions200,
   ListCommunityDiscussionsParams,
   ListPhotoComments200,
@@ -55,10 +58,14 @@ import type {
   PushSendResult,
   PushStats,
   SaveCommunityProfile200,
+  Session,
   SessionBulkInput,
   SessionList,
+  SessionUpdate,
+  Speaker,
   SpeakerBulkInput,
   SpeakerList,
+  SpeakerUpdate,
   SponsorBulkInput,
   SponsorList,
   UpdateCommunitySettings200,
@@ -163,6 +170,125 @@ export const useRequestUploadUrl = <
 > => {
   return useMutation(getRequestUploadUrlMutationOptions(options));
 };
+
+/**
+ * The conference must be provided by X-Conference-Id or the conferenceId query parameter. Admins may include X-Admin-Pin to inspect hidden photos.
+ * @summary Fetch a conference photo object
+ */
+export const getGetConferencePhotoObjectUrl = (
+  objectPath: string,
+  params?: GetConferencePhotoObjectParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/storage/objects/${objectPath}?${stringifiedParams}`
+    : `/api/storage/objects/${objectPath}`;
+};
+
+export const getConferencePhotoObject = async (
+  objectPath: string,
+  params?: GetConferencePhotoObjectParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetConferencePhotoObjectUrl(objectPath, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetConferencePhotoObjectQueryKey = (
+  objectPath: string,
+  params?: GetConferencePhotoObjectParams,
+) => {
+  return [
+    `/api/storage/objects/${objectPath}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetConferencePhotoObjectQueryOptions = <
+  TData = Awaited<ReturnType<typeof getConferencePhotoObject>>,
+  TError = ErrorType<void>,
+>(
+  objectPath: string,
+  params?: GetConferencePhotoObjectParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConferencePhotoObject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetConferencePhotoObjectQueryKey(objectPath, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getConferencePhotoObject>>
+  > = ({ signal }) =>
+    getConferencePhotoObject(objectPath, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!objectPath,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getConferencePhotoObject>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetConferencePhotoObjectQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getConferencePhotoObject>>
+>;
+export type GetConferencePhotoObjectQueryError = ErrorType<void>;
+
+/**
+ * @summary Fetch a conference photo object
+ */
+
+export function useGetConferencePhotoObject<
+  TData = Awaited<ReturnType<typeof getConferencePhotoObject>>,
+  TError = ErrorType<void>,
+>(
+  objectPath: string,
+  params?: GetConferencePhotoObjectParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getConferencePhotoObject>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetConferencePhotoObjectQueryOptions(
+    objectPath,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Health check
@@ -923,6 +1049,97 @@ export const useBulkImportSpeakers = <
 };
 
 /**
+ * @summary Edit one speaker
+ */
+export const getUpdateConferenceSpeakerUrl = (
+  id: number,
+  speakerId: number,
+) => {
+  return `/api/conferences/${id}/speakers/${speakerId}`;
+};
+
+export const updateConferenceSpeaker = async (
+  id: number,
+  speakerId: number,
+  speakerUpdate: SpeakerUpdate,
+  options?: RequestInit,
+): Promise<Speaker> => {
+  return customFetch<Speaker>(getUpdateConferenceSpeakerUrl(id, speakerId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(speakerUpdate),
+  });
+};
+
+export const getUpdateConferenceSpeakerMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConferenceSpeaker>>,
+    TError,
+    { id: number; speakerId: number; data: BodyType<SpeakerUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateConferenceSpeaker>>,
+  TError,
+  { id: number; speakerId: number; data: BodyType<SpeakerUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateConferenceSpeaker"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateConferenceSpeaker>>,
+    { id: number; speakerId: number; data: BodyType<SpeakerUpdate> }
+  > = (props) => {
+    const { id, speakerId, data } = props ?? {};
+
+    return updateConferenceSpeaker(id, speakerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateConferenceSpeakerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateConferenceSpeaker>>
+>;
+export type UpdateConferenceSpeakerMutationBody = BodyType<SpeakerUpdate>;
+export type UpdateConferenceSpeakerMutationError = ErrorType<void>;
+
+/**
+ * @summary Edit one speaker
+ */
+export const useUpdateConferenceSpeaker = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConferenceSpeaker>>,
+    TError,
+    { id: number; speakerId: number; data: BodyType<SpeakerUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateConferenceSpeaker>>,
+  TError,
+  { id: number; speakerId: number; data: BodyType<SpeakerUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateConferenceSpeakerMutationOptions(options));
+};
+
+/**
  * @summary List sessions for a conference
  */
 export const getListConferenceSessionsUrl = (id: number) => {
@@ -1095,6 +1312,97 @@ export const useBulkImportSessions = <
   TContext
 > => {
   return useMutation(getBulkImportSessionsMutationOptions(options));
+};
+
+/**
+ * @summary Edit one session
+ */
+export const getUpdateConferenceSessionUrl = (
+  id: number,
+  sessionId: number,
+) => {
+  return `/api/conferences/${id}/sessions/${sessionId}`;
+};
+
+export const updateConferenceSession = async (
+  id: number,
+  sessionId: number,
+  sessionUpdate: SessionUpdate,
+  options?: RequestInit,
+): Promise<Session> => {
+  return customFetch<Session>(getUpdateConferenceSessionUrl(id, sessionId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sessionUpdate),
+  });
+};
+
+export const getUpdateConferenceSessionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConferenceSession>>,
+    TError,
+    { id: number; sessionId: number; data: BodyType<SessionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateConferenceSession>>,
+  TError,
+  { id: number; sessionId: number; data: BodyType<SessionUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateConferenceSession"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateConferenceSession>>,
+    { id: number; sessionId: number; data: BodyType<SessionUpdate> }
+  > = (props) => {
+    const { id, sessionId, data } = props ?? {};
+
+    return updateConferenceSession(id, sessionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateConferenceSessionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateConferenceSession>>
+>;
+export type UpdateConferenceSessionMutationBody = BodyType<SessionUpdate>;
+export type UpdateConferenceSessionMutationError = ErrorType<void>;
+
+/**
+ * @summary Edit one session
+ */
+export const useUpdateConferenceSession = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateConferenceSession>>,
+    TError,
+    { id: number; sessionId: number; data: BodyType<SessionUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateConferenceSession>>,
+  TError,
+  { id: number; sessionId: number; data: BodyType<SessionUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateConferenceSessionMutationOptions(options));
 };
 
 /**
@@ -2883,6 +3191,105 @@ export function useExportCommunityLeaderboard<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getExportCommunityLeaderboardQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getListCommunityAdminActionsUrl = (
+  params?: ListCommunityAdminActionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/community/admin/actions?${stringifiedParams}`
+    : `/api/community/admin/actions`;
+};
+
+export const listCommunityAdminActions = async (
+  params?: ListCommunityAdminActionsParams,
+  options?: RequestInit,
+): Promise<CommunityAdminActionPage> => {
+  return customFetch<CommunityAdminActionPage>(
+    getListCommunityAdminActionsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListCommunityAdminActionsQueryKey = (
+  params?: ListCommunityAdminActionsParams,
+) => {
+  return [`/api/community/admin/actions`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCommunityAdminActionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCommunityAdminActions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCommunityAdminActionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCommunityAdminActions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCommunityAdminActionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listCommunityAdminActions>>
+  > = ({ signal }) =>
+    listCommunityAdminActions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCommunityAdminActions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCommunityAdminActionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCommunityAdminActions>>
+>;
+export type ListCommunityAdminActionsQueryError = ErrorType<unknown>;
+
+export function useListCommunityAdminActions<
+  TData = Awaited<ReturnType<typeof listCommunityAdminActions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListCommunityAdminActionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCommunityAdminActions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCommunityAdminActionsQueryOptions(
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

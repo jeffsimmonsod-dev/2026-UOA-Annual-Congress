@@ -9,4 +9,9 @@
 export interface CommunitySettingsInput {
   /** @nullable */
   cutoffAt: Date | null;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }

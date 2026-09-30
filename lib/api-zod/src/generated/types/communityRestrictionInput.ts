@@ -9,4 +9,9 @@
 export interface CommunityRestrictionInput {
   sessionToken: string;
   restricted: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }

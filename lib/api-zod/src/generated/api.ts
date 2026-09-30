@@ -30,6 +30,27 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
+ * The conference must be provided by X-Conference-Id or the conferenceId query parameter. Admins may include X-Admin-Pin to inspect hidden photos.
+ * @summary Fetch a conference photo object
+ */
+export const GetConferencePhotoObjectParams = zod.object({
+  objectPath: zod.coerce
+    .string()
+    .describe(
+      "Object path below \/objects\/ (may contain slash-separated path segments)",
+    ),
+});
+
+export const GetConferencePhotoObjectQueryParams = zod.object({
+  conferenceId: zod.coerce.number().min(1).optional(),
+});
+
+export const GetConferencePhotoObjectHeader = zod.object({
+  "X-Conference-Id": zod.number().min(1).optional(),
+  "X-Admin-Pin": zod.string().optional(),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -266,6 +287,30 @@ export const UpdateConferenceSpeakerParams = zod.object({
   id: zod.coerce.number(),
   speakerId: zod.coerce.number(),
 });
+
+export const UpdateConferenceSpeakerHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateConferenceSpeakerBody = zod.object({
+  name: zod.string().min(1).optional(),
+  title: zod.string().nullish(),
+  bio: zod.string().nullish(),
+  photoUrl: zod.string().nullish(),
+});
+
+export const UpdateConferenceSpeakerResponse = zod.object({
+  id: zod.number(),
+  conference_id: zod.number(),
+  external_id: zod.string(),
+  name: zod.string(),
+  title: zod.string().nullish(),
+  company: zod.string().nullish(),
+  bio: zod.string().nullish(),
+  photo_url: zod.string().nullish(),
+  session_ids: zod.array(zod.string()).optional(),
+});
+
 /**
  * @summary List sessions for a conference
  */
@@ -344,6 +389,38 @@ export const UpdateConferenceSessionParams = zod.object({
   id: zod.coerce.number(),
   sessionId: zod.coerce.number(),
 });
+
+export const UpdateConferenceSessionHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const UpdateConferenceSessionBody = zod.object({
+  title: zod.string().min(1).optional(),
+  description: zod.string().nullish(),
+  day: zod.string().nullish(),
+  startTime: zod.string().nullish(),
+  endTime: zod.string().nullish(),
+  room: zod.string().nullish(),
+  track: zod.string().nullish(),
+  speakerIds: zod.array(zod.string()).optional(),
+});
+
+export const UpdateConferenceSessionResponse = zod.object({
+  id: zod.number(),
+  conference_id: zod.number(),
+  external_id: zod.string(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  start_time: zod.string().nullish(),
+  end_time: zod.string().nullish(),
+  day: zod.string().nullish(),
+  room: zod.string().nullish(),
+  track: zod.string().nullish(),
+  speaker_ids: zod.array(zod.string()).optional(),
+  tags: zod.array(zod.string()).optional(),
+  is_para: zod.boolean().optional(),
+});
+
 /**
  * @summary List sponsors for a conference
  */
@@ -502,10 +579,6 @@ export const ResetVotingResponse = zod.object({
   isOpen: zod.boolean().optional(),
 });
 
-export const UpdateConferenceSpeakerHeader = zod.object({
-  "X-Admin-Pin": zod.string(),
-});
-
 export const saveCommunityProfileBodyNameMax = 50;
 
 export const SaveCommunityProfileBody = zod.object({
@@ -586,6 +659,7 @@ export const GetCommunityDiscussionResponse = zod.object({
     })
     .and(
       zod.object({
+        canDelete: zod.boolean(),
         replies: zod.array(
           zod.object({
             id: zod.number(),
@@ -723,6 +797,7 @@ export const GetCommunityAdminDataResponse = zod.object({
       type: zod.enum(["photo", "comment", "discussion", "reply"]),
       id: zod.union([zod.string(), zod.number()]),
       body: zod.string(),
+      objectPath: zod.string().optional(),
       authorName: zod.string(),
       sessionToken: zod.string(),
       hidden: zod.boolean(),
@@ -746,6 +821,7 @@ export const ExportCommunityLeaderboardHeader = zod.object({
 export const ExportCommunityLeaderboardResponse = zod.object({
   leaders: zod.array(
     zod.object({
+      sessionToken: zod.string(),
       name: zod.string(),
       points: zod.number(),
       rank: zod.number(),
@@ -754,14 +830,49 @@ export const ExportCommunityLeaderboardResponse = zod.object({
   cutoffAt: zod.coerce.date().nullable(),
 });
 
+export const ListCommunityAdminActionsQueryParams = zod.object({
+  before: zod.coerce
+    .number()
+    .min(1)
+    .optional()
+    .describe("Load decisions older than this action ID"),
+});
+
+export const ListCommunityAdminActionsHeader = zod.object({
+  "X-Admin-Pin": zod.string(),
+});
+
+export const ListCommunityAdminActionsResponse = zod.object({
+  actions: zod.array(
+    zod.object({
+      id: zod.number(),
+      action: zod.string(),
+      targetType: zod.string(),
+      targetId: zod.string(),
+      previousValue: zod.string().nullable(),
+      newValue: zod.string().nullable(),
+      reason: zod.string(),
+      actorLabel: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  nextBefore: zod.number().nullable(),
+});
+
 export const UpdateCommunityContentVisibilityHeader = zod.object({
   "X-Admin-Pin": zod.string(),
 });
+
+export const updateCommunityContentVisibilityBodyReasonMax = 500;
 
 export const UpdateCommunityContentVisibilityBody = zod.object({
   type: zod.enum(["photo", "comment", "discussion", "reply"]),
   id: zod.union([zod.string(), zod.number()]),
   hidden: zod.boolean(),
+  reason: zod
+    .string()
+    .min(1)
+    .max(updateCommunityContentVisibilityBodyReasonMax),
 });
 
 export const UpdateCommunityContentVisibilityResponse = zod.object({
@@ -772,9 +883,12 @@ export const UpdateCommunityUserRestrictionHeader = zod.object({
   "X-Admin-Pin": zod.string(),
 });
 
+export const updateCommunityUserRestrictionBodyReasonMax = 500;
+
 export const UpdateCommunityUserRestrictionBody = zod.object({
   sessionToken: zod.string(),
   restricted: zod.boolean(),
+  reason: zod.string().min(1).max(updateCommunityUserRestrictionBodyReasonMax),
 });
 
 export const UpdateCommunityUserRestrictionResponse = zod.object({
@@ -789,8 +903,11 @@ export const UpdateCommunityReportHeader = zod.object({
   "X-Admin-Pin": zod.string(),
 });
 
+export const updateCommunityReportBodyReasonMax = 500;
+
 export const UpdateCommunityReportBody = zod.object({
   status: zod.enum(["dismissed", "resolved"]),
+  reason: zod.string().min(1).max(updateCommunityReportBodyReasonMax),
 });
 
 export const UpdateCommunityReportResponse = zod.object({
@@ -801,60 +918,13 @@ export const UpdateCommunitySettingsHeader = zod.object({
   "X-Admin-Pin": zod.string(),
 });
 
+export const updateCommunitySettingsBodyReasonMax = 500;
+
 export const UpdateCommunitySettingsBody = zod.object({
   cutoffAt: zod.coerce.date().nullable(),
+  reason: zod.string().min(1).max(updateCommunitySettingsBodyReasonMax),
 });
 
 export const UpdateCommunitySettingsResponse = zod.object({
   cutoffAt: zod.coerce.date().nullable(),
-});
-
-export const UpdateConferenceSpeakerResponse = zod.object({
-  id: zod.number(),
-  conference_id: zod.number(),
-  external_id: zod.string(),
-  name: zod.string(),
-  title: zod.string().nullish(),
-  company: zod.string().nullish(),
-  bio: zod.string().nullish(),
-  photo_url: zod.string().nullish(),
-  session_ids: zod.array(zod.string()).optional(),
-});
-
-export const UpdateConferenceSessionHeader = zod.object({
-  "X-Admin-Pin": zod.string(),
-});
-
-export const UpdateConferenceSessionBody = zod.object({
-  title: zod.string().min(1).optional(),
-  description: zod.string().nullish(),
-  day: zod.string().nullish(),
-  startTime: zod.string().nullish(),
-  endTime: zod.string().nullish(),
-  room: zod.string().nullish(),
-  track: zod.string().nullish(),
-  speakerIds: zod.array(zod.string()).optional(),
-});
-
-export const UpdateConferenceSpeakerBody = zod.object({
-  name: zod.string().min(1).optional(),
-  title: zod.string().nullish(),
-  bio: zod.string().nullish(),
-  photoUrl: zod.string().nullish(),
-});
-
-export const UpdateConferenceSessionResponse = zod.object({
-  id: zod.number(),
-  conference_id: zod.number(),
-  external_id: zod.string(),
-  title: zod.string(),
-  description: zod.string().nullish(),
-  start_time: zod.string().nullish(),
-  end_time: zod.string().nullish(),
-  day: zod.string().nullish(),
-  room: zod.string().nullish(),
-  track: zod.string().nullish(),
-  speaker_ids: zod.array(zod.string()).optional(),
-  tags: zod.array(zod.string()).optional(),
-  is_para: zod.boolean().optional(),
 });

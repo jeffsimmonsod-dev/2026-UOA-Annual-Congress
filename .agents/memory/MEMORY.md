@@ -3,4 +3,3 @@
 - [Partial Drizzle schema and merges](partial-drizzle-schema.md) — do not automate Drizzle push while API-owned tables and columns are absent from its schema; it proposes data loss.
 - [Conference community policy](conference-community-policy.md) — keep participation low-friction, public standings competitive, and moderation reactive rather than preapproved.
 - [Schedule bookmark identity](schedule-bookmark-identity.md) — retain unmatched saved IDs visibly; do not guess old-to-new session mappings from titles or times.
-- [Patch anchoring in route files](patch-anchoring.md) — broad patch contexts can match repeated route bodies and silently corrupt unrelated handlers; review the diff against the base.

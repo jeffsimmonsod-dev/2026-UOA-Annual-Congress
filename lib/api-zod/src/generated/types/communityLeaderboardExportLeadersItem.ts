@@ -7,6 +7,7 @@
  */
 
 export type CommunityLeaderboardExportLeadersItem = {
+  sessionToken: string;
   name: string;
   points: number;
   rank: number;

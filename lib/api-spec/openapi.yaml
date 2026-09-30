@@ -937,6 +937,23 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CommunityLeaderboardExport" }
 
+  /community/admin/actions:
+    get:
+      operationId: listCommunityAdminActions
+      tags: [community]
+      parameters:
+        - $ref: "#/components/parameters/AdminPin"
+        - name: before
+          in: query
+          schema: { type: integer, minimum: 1 }
+          description: Load decisions older than this action ID
+      responses:
+        "200":
+          description: Most recent 50 decisions for this conference
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommunityAdminActionPage" }
+
   /community/admin/content:
     patch:
       operationId: updateCommunityContentVisibility
@@ -1101,30 +1118,34 @@ components:
 
     CommunityVisibilityInput:
       type: object
-      required: [type, id, hidden]
+      required: [type, id, hidden, reason]
       properties:
         type: { type: string, enum: [photo, comment, discussion, reply] }
         id: { type: [string, integer] }
         hidden: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     CommunityRestrictionInput:
       type: object
-      required: [sessionToken, restricted]
+      required: [sessionToken, restricted, reason]
       properties:
         sessionToken: { type: string }
         restricted: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     CommunityReportStatusInput:
       type: object
-      required: [status]
+      required: [status, reason]
       properties:
         status: { type: string, enum: [dismissed, resolved] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     CommunitySettingsInput:
       type: object
-      required: [cutoffAt]
+      required: [cutoffAt, reason]
       properties:
         cutoffAt: { type: [string, "null"], format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     CommunityLeaderboard:
       type: object
@@ -1207,6 +1228,27 @@ components:
               name: { type: string }
               restricted: { type: boolean }
         cutoffAt: { type: [string, "null"], format: date-time }
+    CommunityAdminAction:
+      type: object
+      required: [id, action, targetType, targetId, previousValue, newValue, reason, actorLabel, createdAt]
+      properties:
+        id: { type: integer }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        previousValue: { type: [string, "null"] }
+        newValue: { type: [string, "null"] }
+        reason: { type: string }
+        actorLabel: { type: string }
+        createdAt: { type: string, format: date-time }
+    CommunityAdminActionPage:
+      type: object
+      required: [actions, nextBefore]
+      properties:
+        actions:
+          type: array
+          items: { $ref: "#/components/schemas/CommunityAdminAction" }
+        nextBefore: { type: [integer, "null"] }
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

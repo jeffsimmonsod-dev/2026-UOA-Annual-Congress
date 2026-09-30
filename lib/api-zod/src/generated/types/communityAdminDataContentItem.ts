@@ -11,6 +11,7 @@ export type CommunityAdminDataContentItem = {
   type: CommunityAdminDataContentItemType;
   id: string | number;
   body: string;
+  objectPath?: string;
   authorName: string;
   sessionToken: string;
   hidden: boolean;

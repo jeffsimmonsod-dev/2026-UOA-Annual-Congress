@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { useAdmin } from "@/hooks/use-admin";
 import { AdminPhotoPreview } from "@/components/conference/admin-photo-preview";
 import { useToast } from "@/hooks/use-toast";
-import { getCommunityLeaderboard, useCommunityActions, useCommunityAdmin } from "@/hooks/use-community-admin";
-import type { CommunityContent, CommunityReport } from "@/hooks/use-community-admin";
+import { getCommunityLeaderboard, useCommunityActions, useCommunityAdmin, useCommunityAdminActions } from "@/hooks/use-community-admin";
+import type { CommunityAdminAction, CommunityContent, CommunityReport } from "@/hooks/use-community-admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,25 @@ function contentKey(item: CommunityContent) {
   return `${item.type}:${item.id}`;
 }
 
+function actionSummary(item: CommunityAdminAction) {
+  const labels: Record<string, string> = {
+    hide: "Hid", restore: "Restored", restrict: "Restricted posting for",
+    unrestrict: "Restored posting for", resolve_report: "Resolved",
+    dismiss_report: "Dismissed", set_cutoff: "Set", clear_cutoff: "Cleared",
+  };
+  const target = item.targetType === "scoring_cutoff" ? "prize scoring cutoff"
+    : item.targetType === "participant" ? `participant ${item.targetId}`
+    : `${item.targetType} ${item.targetId}`;
+  return `${labels[item.action] || item.action} ${target}`;
+}
+
+function actionValue(item: CommunityAdminAction, value: string | null) {
+  if (item.targetType === "scoring_cutoff") return value ? dateLabel(value) : "None";
+  if (value === "true") return item.targetType === "participant" ? "Restricted" : "Hidden";
+  if (value === "false") return item.targetType === "participant" ? "Can post" : "Visible";
+  return value || "None";
+}
+
 function ContentPreview({ item, conferenceId, pin }: { item: CommunityContent; conferenceId: number; pin: string }) {
   return (
     <div className="rounded-lg border border-border bg-muted/35 p-3 text-sm">
@@ -56,7 +75,9 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
   const { toast } = useToast();
   const secret = pin || "";
   const { data, isLoading, isError, error, isFetching, refetch } = useCommunityAdmin(conferenceId, secret);
+  const history = useCommunityAdminActions(conferenceId, secret);
   const actions = useCommunityActions(conferenceId, secret);
+  const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const form = useForm<{ cutoffAt: string }>({ defaultValues: { cutoffAt: "" } });
@@ -68,44 +89,65 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
   const notifyError = (message: string, failure: unknown) =>
     toast({ variant: "destructive", title: message, description: failure instanceof Error ? failure.message : "Please try again." });
 
+  function requiredReason() {
+    const value = reason.trim();
+    if (!value) toast({ variant: "destructive", title: "Enter a reason before making a decision" });
+    return value;
+  }
+
   async function changeContent(item: CommunityContent) {
+    const explanation = requiredReason();
+    if (!explanation) return;
     try {
-      await actions.content.mutateAsync({ type: item.type, id: item.id, hidden: !item.hidden });
+      await actions.content.mutateAsync({ type: item.type, id: item.id, hidden: !item.hidden, reason: explanation });
+      setReason("");
       toast({ title: item.hidden ? "Content restored" : "Content hidden" });
     } catch (failure) { notifyError("Could not update content", failure); }
   }
 
   async function changeUser(sessionToken: string, restricted: boolean) {
+    const explanation = requiredReason();
+    if (!explanation) return;
     try {
-      await actions.users.mutateAsync({ sessionToken, restricted });
+      await actions.users.mutateAsync({ sessionToken, restricted, reason: explanation });
+      setReason("");
       toast({ title: restricted ? "Posting restricted" : "Posting restored" });
     } catch (failure) { notifyError("Could not update posting access", failure); }
   }
 
   async function changeReport(report: CommunityReport, status: "dismissed" | "resolved") {
+    const explanation = requiredReason();
+    if (!explanation) return;
     try {
-      await actions.reports.mutateAsync({ id: report.id, status });
+      await actions.reports.mutateAsync({ id: report.id, status, reason: explanation });
+      setReason("");
       toast({ title: status === "resolved" ? "Report resolved" : "Report dismissed" });
     } catch (failure) { notifyError("Could not update report", failure); }
   }
 
   async function saveCutoff(values: { cutoffAt: string }) {
+    const explanation = requiredReason();
+    if (!explanation) return;
     const date = new Date(values.cutoffAt);
     if (!values.cutoffAt || Number.isNaN(date.getTime())) {
       form.setError("cutoffAt", { message: "Choose a valid local date and time." });
       return;
     }
     try {
-      const result = await actions.settings.mutateAsync({ cutoffAt: date.toISOString() });
+      const result = await actions.settings.mutateAsync({ cutoffAt: date.toISOString(), reason: explanation });
       form.reset({ cutoffAt: localDateTime(result.cutoffAt) });
+      setReason("");
       toast({ title: "Prize scoring cutoff saved" });
     } catch (failure) { notifyError("Could not save cutoff", failure); }
   }
 
   async function clearCutoff() {
+    const explanation = requiredReason();
+    if (!explanation) return;
     try {
-      await actions.settings.mutateAsync({ cutoffAt: null });
+      await actions.settings.mutateAsync({ cutoffAt: null, reason: explanation });
       form.reset({ cutoffAt: "" });
+      setReason("");
       toast({ title: "Prize scoring cutoff cleared" });
     } catch (failure) { notifyError("Could not clear cutoff", failure); }
   }
@@ -178,6 +220,14 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
         <div className="rounded-xl border border-border bg-card p-4"><LockKeyhole className="mb-3 h-4 w-4 text-primary" /><div className="text-2xl font-bold" data-testid="text-restricted-users">{restrictedCount}</div><div className="text-xs text-muted-foreground">Restricted attendees</div></div>
       </div>
 
+      <Card>
+        <CardHeader><CardTitle>Reason for your next decision</CardTitle><CardDescription>Required for hiding or restoring content, posting access, reports, and scoring cutoff changes. The reason is saved with that decision, then cleared.</CardDescription></CardHeader>
+        <CardContent>
+          <Input value={reason} onChange={event => setReason(event.target.value)} maxLength={500} placeholder="Explain why you are making this change" aria-label="Reason for moderation decision" data-testid="input-community-action-reason" />
+          <p className="mt-2 text-xs text-muted-foreground">Up to 500 characters. Admins share a PIN, so the history identifies actions as “Admin (shared PIN)”, not by person.</p>
+        </CardContent>
+      </Card>
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,1fr)]">
         <div className="space-y-6 min-w-0">
           <Card>
@@ -241,6 +291,26 @@ export function CommunityTab({ conferenceId }: { conferenceId: number }) {
           </Card>
         </div>
       </div>
+      <Card data-testid="card-community-action-history">
+        <CardHeader><CardTitle>Decision history</CardTitle><CardDescription>Newest first. Only changes to this conference are shown. Earlier decisions made before history was enabled are not available.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          {history.isPending ? <Skeleton className="h-20 w-full" /> : history.isError
+            ? <div className="text-sm text-destructive">Could not load decision history. <Button size="sm" variant="outline" onClick={() => void history.refetch()}>Retry</Button></div>
+            : !history.data?.pages[0]?.actions.length
+              ? <p className="text-sm text-muted-foreground" data-testid="status-action-history-empty">No decisions recorded yet.</p>
+              : history.data.pages.flatMap(page => page.actions).map(item => (
+                <div key={item.id} className="rounded-lg border border-border p-3 text-sm" data-testid={`row-community-action-${item.id}`}>
+                  <div className="flex flex-wrap justify-between gap-1">
+                    <strong className="break-all">{actionSummary(item)}</strong>
+                    <span className="text-xs text-muted-foreground">{dateLabel(item.createdAt)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{actionValue(item, item.previousValue)} → {actionValue(item, item.newValue)} · {item.actorLabel}</p>
+                  <p className="mt-2 whitespace-pre-wrap break-words">{item.reason}</p>
+                </div>
+              ))}
+          {history.hasNextPage && <Button variant="outline" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()} data-testid="button-more-community-actions">{history.isFetchingNextPage ? "Loading…" : "Load older decisions"}</Button>}
+        </CardContent>
+      </Card>
     </div>
   );
 }

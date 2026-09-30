@@ -96,11 +96,21 @@ export interface CommunityVisibilityInput {
   type: CommunityVisibilityInputType;
   id: string | number;
   hidden: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }
 
 export interface CommunityRestrictionInput {
   sessionToken: string;
   restricted: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }
 
 export type CommunityReportStatusInputStatus =
@@ -113,11 +123,21 @@ export const CommunityReportStatusInputStatus = {
 
 export interface CommunityReportStatusInput {
   status: CommunityReportStatusInputStatus;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }
 
 export interface CommunitySettingsInput {
   /** @nullable */
   cutoffAt: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }
 
 export type CommunityLeaderboardLeadersItem = {
@@ -140,6 +160,7 @@ export interface CommunityLeaderboard {
 }
 
 export type CommunityLeaderboardExportLeadersItem = {
+  sessionToken: string;
   name: string;
   points: number;
   rank: number;
@@ -194,6 +215,7 @@ export type CommunityAdminDataContentItem = {
   type: CommunityAdminDataContentItemType;
   id: string | number;
   body: string;
+  objectPath?: string;
   authorName: string;
   sessionToken: string;
   hidden: boolean;
@@ -212,6 +234,26 @@ export interface CommunityAdminData {
   users: CommunityAdminDataUsersItem[];
   /** @nullable */
   cutoffAt: string | null;
+}
+
+export interface CommunityAdminAction {
+  id: number;
+  action: string;
+  targetType: string;
+  targetId: string;
+  /** @nullable */
+  previousValue: string | null;
+  /** @nullable */
+  newValue: string | null;
+  reason: string;
+  actorLabel: string;
+  createdAt: string;
+}
+
+export interface CommunityAdminActionPage {
+  actions: CommunityAdminAction[];
+  /** @nullable */
+  nextBefore: number | null;
 }
 
 export interface UploadUrlRequest {
@@ -393,6 +435,7 @@ export interface SpeakerUpdate {
   /** @nullable */
   photoUrl?: string | null;
 }
+
 export interface Session {
   id: number;
   conference_id: number;
@@ -455,6 +498,7 @@ export interface SessionUpdate {
   track?: string | null;
   speakerIds?: string[];
 }
+
 export interface Sponsor {
   id: number;
   conference_id: number;
@@ -538,6 +582,13 @@ export type CommunitySessionTokenParameter = string;
 
 export type AdminPinParameter = string;
 
+export type GetConferencePhotoObjectParams = {
+  /**
+   * @minimum 1
+   */
+  conferenceId?: number;
+};
+
 export type SaveCommunityProfile200 = {
   name: string;
   restricted: boolean;
@@ -569,6 +620,7 @@ export type GetCommunityDiscussionParams = {
 };
 
 export type GetCommunityDiscussion200Discussion = CommunityDiscussion & {
+  canDelete: boolean;
   replies: CommunityComment[];
 };
 
@@ -603,6 +655,14 @@ export type CreatePhotoComment201 = {
 
 export type GetCommunityLeaderboardParams = {
   sessionToken: CommunitySessionTokenParameter;
+};
+
+export type ListCommunityAdminActionsParams = {
+  /**
+   * Load decisions older than this action ID
+   * @minimum 1
+   */
+  before?: number;
 };
 
 export type UpdateCommunitySettings200 = {

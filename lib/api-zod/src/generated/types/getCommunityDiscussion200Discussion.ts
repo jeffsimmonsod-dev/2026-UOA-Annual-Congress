@@ -9,5 +9,6 @@ import type { CommunityComment } from "./communityComment";
 import type { CommunityDiscussion } from "./communityDiscussion";
 
 export type GetCommunityDiscussion200Discussion = CommunityDiscussion & {
+  canDelete: boolean;
   replies: CommunityComment[];
 };

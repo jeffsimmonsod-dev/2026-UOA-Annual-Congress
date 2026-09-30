@@ -184,6 +184,19 @@ export const communitySettings = pgTable("community_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const communityAdminActions = pgTable("community_admin_actions", {
+  id: serial("id").primaryKey(),
+  conferenceId: integer("conference_id").notNull(),
+  action: varchar("action", { length: 32 }).notNull(),
+  targetType: varchar("target_type", { length: 32 }).notNull(),
+  targetId: text("target_id").notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  reason: varchar("reason", { length: 500 }).notNull(),
+  actorLabel: varchar("actor_label", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const congressPushTokens = pgTable("congress_push_tokens", {
   token: text("token").primaryKey(),
   conferenceId: integer("conference_id").notNull().default(1),

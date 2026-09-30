@@ -9,4 +9,9 @@ import type { CommunityReportStatusInputStatus } from "./communityReportStatusIn
 
 export interface CommunityReportStatusInput {
   status: CommunityReportStatusInputStatus;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
 }
