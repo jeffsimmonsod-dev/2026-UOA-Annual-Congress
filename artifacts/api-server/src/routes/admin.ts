@@ -1,32 +1,39 @@
 import { Router, type Request, type Response } from "express";
 import { createOperatorSession } from "../lib/operator-session";
+import { checkAdminPin, clientIp, sendAdminFailure } from "../lib/adminAuth";
 
 const router = Router();
 
-// POST /api/admin/verify — validate admin PIN without revealing whether env var exists
+// POST /api/admin/verify — validate the admin PIN (constant-time, locked out
+// after repeated failures) and, for the dashboard, issue a named operator session.
 router.post("/admin/verify", (req: Request, res: Response) => {
-  const { pin, name } = (req.body ?? {}) as { pin?: string; name?: string };
-  const serverPin = process.env.ADMIN_PIN;
+  const { pin, name } = (req.body ?? {}) as { pin?: unknown; name?: unknown };
+  const result = checkAdminPin(clientIp(req), pin);
 
-  if (!serverPin) {
-    return res.status(503).json({ error: "Admin access is not configured on this server" });
-  }
-
-  if (!pin || pin !== serverPin) {
-    return res.status(401).json({ valid: false });
+  if (!result.ok) {
+    if (result.reason === "invalid" || result.reason === "missing") {
+      res.status(401).json({ valid: false });
+      return;
+    }
+    sendAdminFailure(res, result);
+    return;
   }
 
   // Older mobile admin clients only verify their PIN. They receive no named
   // session and cannot use the session-required community decision endpoints.
-  if (name === undefined) return res.json({ valid: true });
+  if (name === undefined) {
+    res.json({ valid: true });
+    return;
+  }
 
   const operatorName = typeof name === "string" ? name.trim() : "";
   if (!operatorName || operatorName.length > 50 || /[\x00-\x1f\x7f]/.test(operatorName) || operatorName === "Admin (shared PIN)") {
-    return res.status(400).json({ error: "Operator name must be 1–50 characters" });
+    res.status(400).json({ error: "Operator name must be 1–50 characters" });
+    return;
   }
 
   const { token, session } = createOperatorSession(operatorName);
-  return res.json({ valid: true, operatorName: session.name, operatorSession: token });
+  res.json({ valid: true, operatorName: session.name, operatorSession: token });
 });
 
 export default router;

@@ -4,6 +4,7 @@ import compression from "compression";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { corsOptions } from "./lib/cors";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -28,7 +29,9 @@ app.use(
     },
   }),
 );
-app.use(cors());
+// Only our own web origins may call the API from a browser. Native apps send
+// no Origin header and are unaffected.
+app.use(cors(corsOptions()));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -37,12 +40,14 @@ app.use(express.urlencoded({ extended: true }));
 // - /api/conferences: creating/listing conferences (no tenant yet)
 // - /api/conferences/*: fetching config for a specific conference (bootstrap)
 // - /api/admin/qr-codes: browser-facing HTML admin page (PIN-protected, no custom headers)
+// - /api/push/run-scheduled: cron entry point, processes every conference
 // - /api/storage/objects/*: image clients may pass the conference via query instead
 const CONFERENCE_EXEMPT = [
   /^\/api\/healthz$/,
   /^\/api\/conferences(\/|$)/,
   /^\/api\/admin\/qr-codes/,
   /^\/api\/admin\/verify$/,
+  /^\/api\/push\/run-scheduled$/,
   /^\/api\/storage\/objects\//,
   /^\/api\/storage\/uploads\//,
 ];

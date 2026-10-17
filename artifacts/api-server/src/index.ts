@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { logAdminPinStatus } from "./lib/adminAuth";
 
 const adminPin = process.env["ADMIN_PIN"];
 if (!adminPin) {
@@ -25,6 +26,8 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+logAdminPinStatus();
 
 app.listen(port, (err) => {
   if (err) {

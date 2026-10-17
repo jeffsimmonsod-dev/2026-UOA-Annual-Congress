@@ -36,9 +36,9 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - Updates as a timeline feed with categorized announcements
 - FAQ with expandable accordion by category + contact section
 - Dark/light mode support (automatic based on system preference)
-- Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN: UOA2026)
+- Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN comes from the `ADMIN_PIN` secret — never write it in this file)
 - Admin screen (/admin) — PIN-protected, quick-fill templates, compose + send to all registered devices
-- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per device, gated by voting open/closed state
+- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per server-signed device token, gated by voting open/closed state
 
 **Push Notification Architecture:**
 - Mobile: `services/pushNotifications.ts` — Expo Push Token registration + send utility
@@ -120,3 +120,17 @@ artifacts/conference-app/
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+**Security configuration (API server secrets / env vars):**
+- `ADMIN_PIN` (required for admin features) — at least 10 characters, not a repeated character or simple sequence. In production the server refuses to start if it is missing; if it is too weak, the server starts but every admin route returns 503. Admin PIN checks lock an IP out for 15 minutes after 5 wrong attempts.
+- `VOTE_TOKEN_SECRET` (recommended, 32+ random characters) — signs voting device tokens. If unset, a random secret is generated once and stored in the `congress_server_secrets` table. Changing it invalidates existing voting tokens (apps fetch a new one automatically).
+- `CORS_ALLOWED_ORIGINS` (optional, comma-separated) — extra browser origins allowed to call the API. `REPLIT_DOMAINS`, `REPLIT_DEV_DOMAIN`, `REPLIT_EXPO_DEV_DOMAIN` and `EXPO_PUBLIC_DOMAIN` are allowed automatically; native apps (no Origin header) are always allowed.
+- `BOOTH_REQUIRE_ROTATING_CODE` (optional, default `false`) — when `true`, printed booth QR codes stop working and check-ins must use the live 30-second codes from `POST /api/booths/admin/:id/scan-code` (QR payload `uoa2026:boothcode:<boothId>:<code>`).
+- Tunable limits (optional): `ATTENDEE_REGISTRATIONS_PER_IP_PER_HOUR` (200), `BOOTH_CHECKINS_PER_ATTENDEE_PER_10_MIN` (15), `VOTE_DEVICE_TOKENS_PER_IP_PER_HOUR` (200), `VOTE_SUBMISSIONS_PER_IP_PER_HOUR` (200).
+- `PUSH_CRON_SECRET` (recommended, 24+ random characters) — protects `POST /api/push/run-scheduled`. A scheduled job should call it every minute with header `x-cron-secret: <secret>`; it sends due scheduled announcements (a database lock prevents double sends) and checks delivery receipts. The admin PIN in `x-admin-pin` is also accepted.
+- `PUSH_SCHEDULER_IN_PROCESS` (optional, default `false`) — when `true`, the API server also runs scheduled announcements on an in-process 60-second timer. Only use this on an always-on single instance (it does not run while an autoscale deployment is asleep).
+- `EXPO_ACCESS_TOKEN` (optional) — only needed if "Enhanced push security" is turned on in the Expo project.
+- The admin dashboard is served on the same domain (`/admin-dashboard/`), so it is covered by the CORS rules above.
+- Unit tests: `pnpm --filter @workspace/api-server run test:unit`. DB-backed suites (`test:community`, `test:push`) need `DATABASE_URL`.
+
+**Push notifications:** devices register with `POST /api/push/register` (one row per conference + token). Sends use `expo-server-sdk` with high priority and Android channel `default`; tickets are stored in `congress_push_tickets` and delivery receipts are checked about 15 minutes later (tokens reported as `DeviceNotRegistered` are removed). Android push needs `google-services.json` (see `GOOGLE_SERVICES_JSON` in `app.config.ts`) plus an FCM V1 key in Expo credentials; iOS needs an APNs key in Expo credentials.

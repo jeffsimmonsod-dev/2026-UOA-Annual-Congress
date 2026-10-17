@@ -2,27 +2,26 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import { pool } from "../lib/db";
 import { ensureConferencesTable } from "../lib/ensureConferences";
+import { clientIp, requireAdmin, safeEqual } from "../lib/adminAuth";
+import { envInt } from "../lib/rateLimit";
 const router = Router();
 
-const MAX_REGISTRATIONS_PER_IP_PER_HOUR = 500;
+// Conference wifi puts many attendees behind one IP, so this stays fairly
+// generous; it mainly stops one person scripting thousands of passports.
+// Counted per conference + IP. Override with ATTENDEE_REGISTRATIONS_PER_IP_PER_HOUR.
+const MAX_REGISTRATIONS_PER_IP_PER_HOUR = envInt("ATTENDEE_REGISTRATIONS_PER_IP_PER_HOUR", 200);
 const SCAN_CODE_TTL_SECONDS = 30;
 
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
-}
+// Velocity limit on *new* booth stamps per attendee. Walking the hall takes
+// time; stamping every booth in seconds from shared photos does not.
+const MAX_NEW_CHECKINS_PER_WINDOW = envInt("BOOTH_CHECKINS_PER_ATTENDEE_PER_10_MIN", 15);
+const CHECKIN_WINDOW_MINUTES = 10;
 
-function isAuthorized(req: Request): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
-
-function clientIp(req: Request): string {
-  return req.ip ?? req.socket.remoteAddress ?? "unknown";
+// When true, the permanent printed QR codes are no longer accepted and every
+// check-in must use a short-lived code from /booths/admin/:id/scan-code
+// (shown on a screen at the booth). Default false so printed codes keep working.
+function rotatingCodesRequired(): boolean {
+  return process.env.BOOTH_REQUIRE_ROTATING_CODE === "true";
 }
 
 async function ensureTables() {
@@ -196,7 +195,7 @@ async function checkAndIncrementRegistrationRate(ip: string): Promise<boolean> {
 // POST /api/attendees/register — issue a server-generated attendee credential (rate-limited per IP)
 router.post("/attendees/register", async (req: Request, res: Response) => {
   const ip = clientIp(req);
-  const allowed = await checkAndIncrementRegistrationRate(ip);
+  const allowed = await checkAndIncrementRegistrationRate(`${req.conferenceId}:${ip}`);
   if (!allowed) {
     return res.status(429).json({ error: "Too many registrations from this network. Please try again later." });
   }
@@ -252,11 +251,9 @@ router.get("/booths", async (req: Request, res: Response) => {
 
 // POST /api/booths/admin/:id/scan-code — issue a fresh short-lived one-time scan code for a booth (admin only)
 router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   if (typeof req.params.id !== "string") return res.status(400).json({ error: "Invalid booth ID" });
-  const boothId = parseInt(req.params.id, 10);
+  const boothId = parseInt(String(req.params.id), 10);
   if (isNaN(boothId)) return res.status(400).json({ error: "Invalid booth ID" });
 
   const boothRes = await pool.query(
@@ -266,14 +263,25 @@ router.post("/booths/admin/:id/scan-code", async (req: Request, res: Response) =
   if (boothRes.rows.length === 0) return res.status(404).json({ error: "Booth not found" });
 
   const code = crypto.randomBytes(16).toString("hex");
-  const expiresAt = new Date(Date.now() + SCAN_CODE_TTL_SECONDS * 1000);
 
-  await pool.query(
-    `INSERT INTO congress_booth_scan_codes (code, booth_id, expires_at) VALUES ($1, $2, $3)`,
-    [code, boothId, expiresAt]
+  // Expiry is computed in the database so it is compared against the same clock at check-in.
+  const { rows } = await pool.query(
+    `INSERT INTO congress_booth_scan_codes (code, booth_id, expires_at)
+     VALUES ($1, $2, NOW() + make_interval(secs => $3))
+     RETURNING expires_at`,
+    [code, boothId, SCAN_CODE_TTL_SECONDS]
   );
+  // Clean up long-expired codes opportunistically.
+  pool.query(`DELETE FROM congress_booth_scan_codes WHERE expires_at < NOW() - INTERVAL '1 day'`).catch(() => {});
 
-  return res.json({ code, boothId, expiresAt, ttlSeconds: SCAN_CODE_TTL_SECONDS });
+  return res.json({
+    code,
+    boothId,
+    expiresAt: rows[0].expires_at,
+    ttlSeconds: SCAN_CODE_TTL_SECONDS,
+    // What the booth screen should render as a QR code for attendees to scan.
+    qrPayload: `uoa2026:boothcode:${boothId}:${code}`,
+  });
 });
 
 // POST /api/booths/checkin-nonce — issue a booth-scoped, single-use nonce tied to a server attendee ID
@@ -304,18 +312,22 @@ router.post("/booths/checkin-nonce", async (req: Request, res: Response) => {
   return res.json({ nonce });
 });
 
-// POST /api/booths/checkin — record a booth visit by verifying the booth's static secret token
+// POST /api/booths/checkin — record a booth visit.
+// Accepts either a short-lived rotating `scanCode` (from /booths/admin/:id/scan-code,
+// valid ~30 s) or, unless BOOTH_REQUIRE_ROTATING_CODE=true, the booth's permanent
+// printed-QR `secretToken`. New stamps are velocity-limited per attendee.
 router.post("/booths/checkin", async (req: Request, res: Response) => {
-  const { boothId, secretToken, attendeeToken, attendeeName, attendeeEmail, emailConsent } = req.body as {
+  const { boothId, secretToken, scanCode, attendeeToken, attendeeName, attendeeEmail, emailConsent } = req.body as {
     boothId: number;
-    secretToken: string;
+    secretToken?: string;
+    scanCode?: string;
     attendeeToken: string;
     attendeeName?: string;
     attendeeEmail?: string;
     emailConsent?: boolean;
   };
 
-  if (!boothId || !secretToken || !attendeeToken) {
+  if (!boothId || (!secretToken && !scanCode) || !attendeeToken) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -331,8 +343,40 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
   }
   const booth = boothRes.rows[0];
 
-  if (booth.secret_token !== secretToken) {
+  let codeValid = false;
+  if (typeof scanCode === "string" && scanCode.length > 0) {
+    const codeRes = await pool.query(
+      `SELECT 1 FROM congress_booth_scan_codes
+       WHERE code = $1 AND booth_id = $2 AND expires_at > NOW()`,
+      [scanCode, booth.id]
+    );
+    codeValid = codeRes.rows.length > 0;
+    if (!codeValid) {
+      return res.status(403).json({ error: "This booth code has expired. Please scan the code on the booth screen again." });
+    }
+  } else if (typeof secretToken === "string") {
+    if (rotatingCodesRequired()) {
+      return res.status(403).json({ error: "Please scan the live code shown on the booth's screen." });
+    }
+    codeValid = safeEqual(secretToken, String(booth.secret_token));
+  }
+
+  if (!codeValid) {
     return res.status(403).json({ error: "Invalid booth QR code" });
+  }
+
+  // Velocity check (only for booths this attendee has not visited yet).
+  const { rows: velocity } = await pool.query(
+    `SELECT
+       EXISTS(SELECT 1 FROM congress_booth_visits WHERE booth_id = $1 AND attendee_id = $2) AS already,
+       (SELECT COUNT(*)::int FROM congress_booth_visits
+         WHERE attendee_id = $2 AND visited_at > NOW() - make_interval(mins => $3)) AS recent`,
+    [booth.id, attendee.id, CHECKIN_WINDOW_MINUTES]
+  );
+  if (!velocity[0].already && velocity[0].recent >= MAX_NEW_CHECKINS_PER_WINDOW) {
+    return res.status(429).json({
+      error: "You're checking in very quickly. Please wait a few minutes and scan this booth again.",
+    });
   }
 
   const consent = emailConsent === true;
@@ -363,9 +407,7 @@ router.post("/booths/checkin", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin — admin view with tokens and visit counts
 router.get("/booths/admin", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   const { rows } = await pool.query(
     `SELECT b.id, b.name, b.company, b.booth_number, b.description, b.created_at,
             (SELECT COUNT(*) FROM congress_booth_visits v WHERE v.booth_id = b.id AND v.attendee_id IS NOT NULL) AS visit_count
@@ -379,9 +421,7 @@ router.get("/booths/admin", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/analytics — per-booth visitor details for sponsor reporting
 router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   const { rows: booths } = await pool.query(
     `SELECT b.id, b.name, b.company, b.booth_number,
             (SELECT COUNT(*) FROM congress_booth_visits v WHERE v.booth_id = b.id AND v.attendee_id IS NOT NULL) AS visit_count
@@ -416,9 +456,7 @@ router.get("/booths/admin/analytics", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/entries — raffle entries (attendees that visited all booths)
 router.get("/booths/admin/entries", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   const totalRes = await pool.query(
     "SELECT COUNT(*) as count FROM congress_booths WHERE conference_id = $1",
     [req.conferenceId]
@@ -444,9 +482,7 @@ router.get("/booths/admin/entries", async (req: Request, res: Response) => {
 
 // POST /api/booths — create booth (admin)
 router.post("/booths", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   const { name, company, boothNumber, description } = req.body as {
     name: string;
     company: string;
@@ -467,9 +503,7 @@ router.post("/booths", async (req: Request, res: Response) => {
 
 // DELETE /api/booths/:id — delete booth (admin)
 router.delete("/booths/:id", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
   await pool.query(
     "DELETE FROM congress_booths WHERE id = $1 AND conference_id = $2",
     [req.params.id, req.conferenceId]

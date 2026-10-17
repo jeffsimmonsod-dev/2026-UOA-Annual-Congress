@@ -470,7 +470,10 @@ export default function ExhibitHallScreen() {
           // If already visited that's fine — don't re-queue it
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
-            if (!body.alreadyVisited) remaining.push(checkin);
+            // Permanent rejections (bad/expired code, unknown booth) are dropped;
+            // rate limits (429) and server errors are retried on the next sync.
+            const permanent = res.status === 400 || res.status === 403 || res.status === 404;
+            if (!body.alreadyVisited && !permanent) remaining.push(checkin);
           }
         } catch {
           remaining.push(checkin);
@@ -557,31 +560,40 @@ export default function ExhibitHallScreen() {
 
   const handleBarcodeScan = ({ data }: { data: string }) => {
     if (scanned || !attendeeToken) return;
-    const prefix = `${conferenceConfig.qrBoothPrefix}:booth:`;
-    if (!data.startsWith(prefix)) {
+    // Printed booth QR:        <prefix>:booth:<boothId>:<permanent secret>
+    // Live booth-screen code:  <prefix>:boothcode:<boothId>:<short-lived code>
+    const staticPrefix = `${conferenceConfig.qrBoothPrefix}:booth:`;
+    const rotatingPrefix = `${conferenceConfig.qrBoothPrefix}:boothcode:`;
+    const isRotating = data.startsWith(rotatingPrefix);
+    if (!isRotating && !data.startsWith(staticPrefix)) {
       Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
       return;
     }
     setScanned(true);
-    const parts = data.slice(prefix.length).split(":");
+    const parts = data.slice((isRotating ? rotatingPrefix : staticPrefix).length).split(":");
     if (parts.length < 2) {
       Alert.alert("Invalid QR Code", "Malformed booth code.");
       return;
     }
     const boothId = parseInt(parts[0], 10);
-    const secretToken = parts[1];
+    const code = isRotating ? { scanCode: parts[1] } : { secretToken: parts[1] };
     setScannerVisible(false);
-    doCheckin(boothId, secretToken, profile?.name ?? "", profile?.email ?? "");
+    doCheckin(boothId, code, profile?.name ?? "", profile?.email ?? "");
   };
 
-  const doCheckin = async (boothId: number, secretToken: string, name: string, email: string = "") => {
+  const doCheckin = async (
+    boothId: number,
+    code: { secretToken?: string; scanCode?: string },
+    name: string,
+    email: string = "",
+  ) => {
     if (!attendeeToken) return;
     setCheckingIn(true);
     try {
       const res = await apiFetch(`${API_BASE}/api/booths/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ boothId, secretToken, attendeeToken, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
+        body: JSON.stringify({ boothId, ...code, attendeeToken, attendeeName: name, attendeeEmail: email || undefined, emailConsent: profile?.emailConsent ?? false }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -602,7 +614,14 @@ export default function ExhibitHallScreen() {
         }
       }
     } catch {
-      // Network unavailable — queue the check-in and apply an optimistic update
+      // Network unavailable — queue the check-in and apply an optimistic update.
+      // Live booth-screen codes expire within seconds, so only printed codes can be queued.
+      const secretToken = code.secretToken;
+      if (!secretToken) {
+        Alert.alert("No connection", "Live booth codes can't be saved offline. Please scan again once you're connected.");
+        setCheckingIn(false);
+        return;
+      }
       try {
         const stored = await AsyncStorage.getItem(PENDING_CHECKINS_KEY);
         const pending: PendingCheckin[] = stored ? JSON.parse(stored) : [];

@@ -1600,7 +1600,7 @@ export const sendPushNotification = async (
 };
 
 export const getSendPushNotificationMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | PushSendResult>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1641,13 +1641,14 @@ export type SendPushNotificationMutationResult = NonNullable<
   Awaited<ReturnType<typeof sendPushNotification>>
 >;
 export type SendPushNotificationMutationBody = BodyType<PushNotificationInput>;
-export type SendPushNotificationMutationError = ErrorType<void>;
+export type SendPushNotificationMutationError =
+  ErrorType<void | PushSendResult>;
 
 /**
  * @summary Send a push notification to all registered devices
  */
 export const useSendPushNotification = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | PushSendResult>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1688,7 +1689,7 @@ export const getGetPushStatsQueryKey = () => {
 
 export const getGetPushStatsQueryOptions = <
   TData = Awaited<ReturnType<typeof getPushStats>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getPushStats>>,
@@ -1715,7 +1716,7 @@ export const getGetPushStatsQueryOptions = <
 export type GetPushStatsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getPushStats>>
 >;
-export type GetPushStatsQueryError = ErrorType<unknown>;
+export type GetPushStatsQueryError = ErrorType<void>;
 
 /**
  * @summary Get registered device count
@@ -1723,7 +1724,7 @@ export type GetPushStatsQueryError = ErrorType<unknown>;
 
 export function useGetPushStats<
   TData = Awaited<ReturnType<typeof getPushStats>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(options?: {
   query?: UseQueryOptions<
     Awaited<ReturnType<typeof getPushStats>>,

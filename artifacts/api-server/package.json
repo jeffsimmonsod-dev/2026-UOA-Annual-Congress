@@ -9,7 +9,9 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test:community": "node --test test/community/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:operator-sessions": "esbuild src/lib/operator-session.test.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/operator-session-test.mjs && NODE_ENV=production node --test dist/operator-session-test.mjs"
+    "test:operator-sessions": "esbuild src/lib/operator-session.test.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/operator-session-test.mjs && NODE_ENV=production node --test dist/operator-session-test.mjs",
+    "test:unit": "node ./test.mjs",
+    "test:push": "node --test test/push/*.test.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
@@ -24,6 +26,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
+    "expo-server-sdk": "^3.15.0",
     "express": "^5",
     "google-auth-library": "^10.6.2",
     "multer": "^2.1.1",

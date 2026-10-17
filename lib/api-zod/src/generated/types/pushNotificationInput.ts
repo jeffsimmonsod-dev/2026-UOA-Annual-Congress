@@ -9,5 +9,6 @@
 export interface PushNotificationInput {
   title: string;
   body: string;
-  adminPin: string;
+  /** Deprecated; send the X-Admin-Pin header instead. */
+  adminPin?: string;
 }

@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { pool } from "../lib/db";
 import type { PoolClient } from "pg";
 import { readOperatorSession, type OperatorSession } from "../lib/operator-session";
+import { requireAdmin } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 const validTypes = new Set(["photo", "comment", "discussion", "reply"]);
@@ -53,10 +54,6 @@ function writeLimited(req: Request, token: string): boolean {
   return limited(writeWindows, `${req.conferenceId}:${token}`, 20, 10 * 60_000);
 }
 
-function adminAllowed(req: Request): boolean {
-  const pin = req.headers["x-admin-pin"];
-  return typeof pin === "string" && !!process.env.ADMIN_PIN && pin === process.env.ADMIN_PIN;
-}
 
 type Decision = { previousValue: string | null; newValue: string | null };
 
@@ -488,7 +485,7 @@ router.get("/community/leaderboard", async (req: Request, res: Response): Promis
 });
 
 router.get("/community/admin/leaderboard", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!requireAdmin(req, res, 403)) return;
   try {
     const scoreboard = await calculateLeaderboard(req.conferenceId);
     res.json({ leaders: scoreboard.leaders, cutoffAt: scoreboard.cutoffAt });
@@ -499,7 +496,7 @@ router.get("/community/admin/leaderboard", async (req: Request, res: Response): 
 });
 
 router.get("/community/admin/actions", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!requireAdmin(req, res, 403)) return;
   const rawBefore = req.query.before;
   const before = rawBefore === undefined ? null : positiveIntegerId(rawBefore);
   if (rawBefore !== undefined && before === null) { res.status(400).json({ error: "before must be a positive action id" }); return; }
@@ -522,7 +519,7 @@ router.get("/community/admin/actions", async (req: Request, res: Response): Prom
 });
 
 router.get("/community/admin/actions/export", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!requireAdmin(req, res, 403)) return;
   try {
     const result = await pool.query<{
       id: number;
@@ -560,7 +557,7 @@ router.get("/community/admin/actions/export", async (req: Request, res: Response
 });
 
 router.get("/community/admin", async (req: Request, res: Response): Promise<void> => {
-  if (!adminAllowed(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!requireAdmin(req, res, 403)) return;
   try {
     const [reports, photos, discussions, replies, comments, users, settings] = await Promise.all([
       pool.query(

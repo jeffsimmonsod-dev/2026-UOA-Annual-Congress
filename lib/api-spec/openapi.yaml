@@ -516,6 +516,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: X-Admin-Pin
+          in: header
+          required: false
+          description: Admin PIN (preferred over the deprecated adminPin body field)
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -531,6 +537,14 @@ paths:
                 $ref: "#/components/schemas/PushSendResult"
         "401":
           description: Unauthorized
+        "429":
+          description: Too many failed PIN attempts
+        "502":
+          description: The Expo push service could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushSendResult"
 
   /push/stats:
     get:
@@ -545,7 +559,7 @@ paths:
             type: integer
         - name: X-Admin-Pin
           in: header
-          required: false
+          required: true
           schema:
             type: string
       responses:
@@ -555,6 +569,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PushStats"
+        "401":
+          description: Unauthorized
 
   /voting/state:
     get:
@@ -1769,7 +1785,7 @@ components:
 
     PushNotificationInput:
       type: object
-      required: [title, body, adminPin]
+      required: [title, body]
       properties:
         title:
           type: string
@@ -1777,6 +1793,7 @@ components:
           type: string
         adminPin:
           type: string
+          description: Deprecated; send the X-Admin-Pin header instead.
 
     PushSendResult:
       type: object
@@ -1784,18 +1801,33 @@ components:
       properties:
         success:
           type: boolean
+        attempted:
+          type: integer
+          description: Number of registered devices the message was sent to
         sent:
           type: integer
+          description: Devices the Expo push service accepted the message for
         failed:
           type: integer
+          description: Devices the Expo push service rejected
         message:
           type: string
+        warning:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
 
     PushStats:
       type: object
       required: [registeredDevices]
       properties:
         registeredDevices:
+          type: integer
+        ios:
+          type: integer
+        android:
           type: integer
 
     VotingState:

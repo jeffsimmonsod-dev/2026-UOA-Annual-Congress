@@ -552,18 +552,27 @@ export interface BulkImportResult {
 export interface PushNotificationInput {
   title: string;
   body: string;
-  adminPin: string;
+  /** Deprecated; send the X-Admin-Pin header instead. */
+  adminPin?: string;
 }
 
 export interface PushSendResult {
   success: boolean;
+  /** Number of registered devices the message was sent to */
+  attempted?: number;
+  /** Devices the Expo push service accepted the message for */
   sent?: number;
+  /** Devices the Expo push service rejected */
   failed?: number;
   message?: string;
+  warning?: string;
+  errors?: string[];
 }
 
 export interface PushStats {
   registeredDevices: number;
+  ios?: number;
+  android?: number;
 }
 
 export interface VotingState {
