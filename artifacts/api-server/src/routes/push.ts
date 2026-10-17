@@ -1,28 +1,7 @@
-import { Router, type Request } from "express";
+import { Router } from "express";
 import { pool } from "../lib/db";
+import { checkAdminPin, clientIp, requireAdmin, sendAdminFailure } from "../lib/adminAuth";
 const router = Router();
-
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
-}
-
-function isAuthorizedHeader(req: Request): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
-
-function isAuthorizedBody(adminPin: string | undefined): boolean {
-  try {
-    return adminPin === getAdminPin();
-  } catch {
-    return false;
-  }
-}
 
 function isValidExpoToken(token: string): boolean {
   return /^ExponentPushToken\[.+\]$/.test(token);
@@ -224,8 +203,13 @@ router.post("/push/send", async (req, res) => {
     adminPin?: string;
   };
 
-  if (!isAuthorizedBody(adminPin)) {
-    res.status(401).json({ error: "Invalid admin PIN" });
+  // Same header-based auth as every other admin route. The body field is still
+  // accepted (through the same lockout + constant-time check) only so admin
+  // devices running an older app build keep working until they update.
+  const headerPin = req.headers["x-admin-pin"];
+  const auth = checkAdminPin(clientIp(req), headerPin !== undefined ? headerPin : adminPin);
+  if (!auth.ok) {
+    sendAdminFailure(res, auth);
     return;
   }
 
@@ -242,7 +226,8 @@ router.post("/push/send", async (req, res) => {
       message: result.sent === 0 ? "No registered devices" : `Sent to ${result.sent} device(s)`,
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to send notifications", details: String(err) });
+    req.log.error({ err }, "push send failed");
+    res.status(500).json({ error: "Failed to send notifications" });
   }
 });
 
@@ -253,10 +238,7 @@ router.post("/push/schedule", async (req, res) => {
     scheduledFor?: string;
   };
 
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
 
   if (!title || !body || !scheduledFor) {
     res.status(400).json({ error: "title, body, and scheduledFor required" });
@@ -284,10 +266,7 @@ router.post("/push/schedule", async (req, res) => {
 });
 
 router.get("/push/scheduled", async (req, res) => {
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
 
   const { rows } = await pool.query(
     `SELECT * FROM congress_scheduled_announcements
@@ -298,10 +277,7 @@ router.get("/push/scheduled", async (req, res) => {
 });
 
 router.delete("/push/scheduled/:id", async (req, res) => {
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
 
   const { rows } = await pool.query(
     `DELETE FROM congress_scheduled_announcements WHERE id = $1 AND sent_at IS NULL RETURNING id`,

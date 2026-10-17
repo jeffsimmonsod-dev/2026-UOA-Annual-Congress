@@ -88,8 +88,8 @@ export async function sendPushNotification(
   try {
     const response = await fetch(`${apiBase}/api/push/send`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body, adminPin }),
+      headers: { "Content-Type": "application/json", "x-admin-pin": adminPin },
+      body: JSON.stringify({ title, body }),
     });
     const data = await response.json();
     if (!response.ok) {

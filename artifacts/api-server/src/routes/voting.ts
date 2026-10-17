@@ -1,8 +1,44 @@
 import { Router } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
+import { clientIp, requireAdmin } from "../lib/adminAuth";
+import { SlidingWindowLimiter, envInt } from "../lib/rateLimit";
+import { issueSignedToken, verifySignedToken } from "../lib/signedToken";
+import { getVoteTokenSecret } from "../lib/serverSecret";
 
 const router = Router();
+
+/*
+ * How "one vote per device" works now:
+ *  - The app asks the server for a voting token (POST /voting/device). The
+ *    server makes up a random ID and signs it with a secret only the server
+ *    knows (HMAC). The app stores that token.
+ *  - A vote is only accepted with a valid signed token, and each token can
+ *    vote once. Made-up device IDs are no longer accepted.
+ *  - Issuing tokens and submitting votes are both rate limited per IP.
+ *
+ * Limits (honest version): someone can still delete the app / clear storage
+ * and fetch a new token, up to the per-IP limits. True one-person-one-vote
+ * needs attendee identity (e.g. a badge code or member number per voter).
+ */
+const TOKEN_PURPOSE = "vote-device";
+const TOKEN_ID_PREFIX = "t:";
+const HOUR_MS = 60 * 60 * 1000;
+
+// Business meetings often have everyone on the same venue wifi, so these are
+// per-IP ceilings, not per-person. Tune with env vars if needed.
+const deviceTokenLimiter = new SlidingWindowLimiter(envInt("VOTE_DEVICE_TOKENS_PER_IP_PER_HOUR", 200), HOUR_MS);
+const submitLimiter = new SlidingWindowLimiter(envInt("VOTE_SUBMISSIONS_PER_IP_PER_HOUR", 200), HOUR_MS);
+setInterval(() => {
+  deviceTokenLimiter.prune();
+  submitLimiter.prune();
+}, 5 * 60 * 1000).unref();
+
+async function voterKeyFromToken(token: unknown): Promise<string | null> {
+  const secret = await getVoteTokenSecret();
+  const id = verifySignedToken(secret, TOKEN_PURPOSE, token);
+  return id ? TOKEN_ID_PREFIX + id : null;
+}
 
 const TRUSTEE_CANDIDATES = [
   "Dr. Steven Blake",
@@ -12,20 +48,6 @@ const TRUSTEE_CANDIDATES = [
 ];
 
 const SLATE_OPTIONS = ["approve", "disapprove", "abstain"] as const;
-
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
-}
-
-function isAdmin(req: { headers: Record<string, string | string[] | undefined> }): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
 
 async function ensureTables() {
   await pool.query(`
@@ -72,28 +94,52 @@ router.get("/voting/state", async (req, res) => {
   }
 });
 
+// POST /api/voting/device — issue a server-signed voting token for this device
+router.post("/voting/device", async (req, res) => {
+  if (!deviceTokenLimiter.tryHit(clientIp(req))) {
+    res.status(429).json({ error: "Too many requests from this network. Please try again in a few minutes." });
+    return;
+  }
+  try {
+    const secret = await getVoteTokenSecret();
+    const { token } = issueSignedToken(secret, TOKEN_PURPOSE);
+    res.json({ votingToken: token });
+  } catch (err) {
+    req.log.error({ err }, "voting device token error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /api/voting/status — has this device's token already voted? (token in x-voting-token header)
+router.get("/voting/status", async (req, res) => {
+  try {
+    const key = await voterKeyFromToken(req.headers["x-voting-token"]);
+    if (!key) {
+      res.status(401).json({ error: "Invalid voting token" });
+      return;
+    }
+    await withTables(async () => {
+      const result = await pool.query("SELECT 1 FROM congress_votes WHERE device_id = $1", [key]);
+      res.json({ hasVoted: result.rows.length > 0 });
+    });
+  } catch (err) {
+    req.log.error({ err }, "voting status error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /api/voting/status/:deviceId — legacy (older app builds). Only says whether
+// that ID voted; no longer returns the ballot choices.
 router.get("/voting/status/:deviceId", async (req, res) => {
-  const { deviceId } = req.params;
+  const deviceId = String(req.params.deviceId ?? "");
   if (!deviceId) {
     res.status(400).json({ error: "deviceId required" });
     return;
   }
   try {
     await withTables(async () => {
-      const result = await pool.query(
-        "SELECT slate_vote, trustee_votes, submitted_at FROM congress_votes WHERE device_id = $1",
-        [deviceId]
-      );
-      if (result.rows.length === 0) {
-        res.json({ hasVoted: false });
-      } else {
-        res.json({
-          hasVoted: true,
-          slateVote: result.rows[0].slate_vote,
-          trusteeVotes: result.rows[0].trustee_votes,
-          submittedAt: result.rows[0].submitted_at,
-        });
-      }
+      const result = await pool.query("SELECT 1 FROM congress_votes WHERE device_id = $1", [deviceId]);
+      res.json({ hasVoted: result.rows.length > 0 });
     });
   } catch (err) {
     req.log.error({ err }, "voting status error");
@@ -102,16 +148,28 @@ router.get("/voting/status/:deviceId", async (req, res) => {
 });
 
 router.post("/voting/submit", async (req, res) => {
-  const { deviceId, slateVote, trusteeVotes } = req.body as {
+  const { votingToken, deviceId, slateVote, trusteeVotes } = req.body as {
+    votingToken?: string;
     deviceId?: string;
     slateVote?: string;
     trusteeVotes?: string[];
   };
 
-  if (!deviceId?.trim()) {
-    res.status(400).json({ error: "deviceId is required" });
+  if (!votingToken) {
+    if (deviceId) {
+      // Older app builds send a self-generated deviceId, which is trivially forged.
+      res.status(426).json({ error: "Please update the UOA Congress app to the latest version to vote." });
+    } else {
+      res.status(400).json({ error: "votingToken is required" });
+    }
     return;
   }
+
+  if (!submitLimiter.tryHit(clientIp(req))) {
+    res.status(429).json({ error: "Too many votes from this network. Please try again in a few minutes." });
+    return;
+  }
+
   if (!slateVote || !SLATE_OPTIONS.includes(slateVote as any)) {
     res.status(400).json({ error: "slateVote must be approve, disapprove, or abstain" });
     return;
@@ -121,13 +179,23 @@ router.post("/voting/submit", async (req, res) => {
     res.status(400).json({ error: "You may select at most 3 trustee candidates" });
     return;
   }
+  if (new Set(trustees).size !== trustees.length) {
+    res.status(400).json({ error: "Each trustee candidate may be selected only once" });
+    return;
+  }
   const invalidTrustee = trustees.find((t) => !TRUSTEE_CANDIDATES.includes(t));
   if (invalidTrustee) {
-    res.status(400).json({ error: `Invalid trustee candidate: ${invalidTrustee}` });
+    res.status(400).json({ error: "Invalid trustee candidate" });
     return;
   }
 
   try {
+    const voterKey = await voterKeyFromToken(votingToken);
+    if (!voterKey) {
+      res.status(401).json({ error: "Invalid voting token. Please close and reopen the voting screen." });
+      return;
+    }
+
     await withTables(async () => {
       const stateResult = await pool.query(
         "SELECT is_open FROM congress_voting_state WHERE id = 1"
@@ -141,9 +209,10 @@ router.post("/voting/submit", async (req, res) => {
         await pool.query(
           `INSERT INTO congress_votes (device_id, slate_vote, trustee_votes)
            VALUES ($1, $2, $3)`,
-          [deviceId.trim(), slateVote, trustees]
+          [voterKey, slateVote, trustees]
         );
-        logger.info({ deviceId: deviceId.trim(), slateVote, trustees }, "vote submitted");
+        // Deliberately not logging the voter key or the choices together.
+        logger.info("vote submitted");
         res.json({ success: true });
       } catch (err: any) {
         if (err?.code === "23505") {
@@ -160,10 +229,7 @@ router.post("/voting/submit", async (req, res) => {
 });
 
 router.get("/voting/results", async (req, res) => {
-  if (!isAdmin(req as any)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
       const [stateResult, totalResult, slateResult, trusteeResult] = await Promise.all([
@@ -211,10 +277,7 @@ router.get("/voting/results", async (req, res) => {
 });
 
 router.post("/voting/open", async (req, res) => {
-  if (!isAdmin(req as any)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
       await pool.query(
@@ -229,10 +292,7 @@ router.post("/voting/open", async (req, res) => {
 });
 
 router.post("/voting/close", async (req, res) => {
-  if (!isAdmin(req as any)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
       await pool.query(
@@ -247,10 +307,7 @@ router.post("/voting/close", async (req, res) => {
 });
 
 router.post("/voting/reset", async (req, res) => {
-  if (!isAdmin(req as any)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
       await pool.query("DELETE FROM congress_votes");

@@ -1,22 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import QRCode from "qrcode";
 import { pool } from "../lib/db";
+import { checkAdminPin, clientIp, requireAdmin } from "../lib/adminAuth";
 
 const router = Router();
-
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
-}
-
-function isAuthorized(req: Request): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
 
 // GET /admin/qr-codes — show PIN login form
 router.get("/admin/qr-codes", (_req: Request, res: Response) => {
@@ -56,12 +43,19 @@ router.get("/admin/qr-codes", (_req: Request, res: Response) => {
 
 // POST /admin/qr-codes — verify PIN in request body then render QR sheet
 router.post("/admin/qr-codes", async (req: Request, res: Response) => {
-  const submittedPin: string = (req.body?.pin as string) ?? "";
+  const submittedPin: unknown = req.body?.pin;
+  const auth = checkAdminPin(clientIp(req), submittedPin);
 
-  try {
-    if (submittedPin !== getAdminPin()) {
+  if (!auth.ok && auth.reason === "not_configured") {
+    return void res.status(503).json({ error: "Admin access is not configured on this server" });
+  }
+  {
+    if (!auth.ok) {
+      const errMsg = auth.reason === "locked"
+        ? "Too many incorrect attempts. Please wait 15 minutes and try again."
+        : "Incorrect PIN. Please try again.";
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(403).send(`<!DOCTYPE html>
+      return void res.status(auth.reason === "locked" ? 429 : 403).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -88,14 +82,12 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
       <label for="pin">Admin PIN</label>
       <input type="password" id="pin" name="pin" autofocus autocomplete="current-password" required />
       <button type="submit">View QR Codes</button>
-      <p class="err">Incorrect PIN. Please try again.</p>
+      <p class="err">${errMsg}</p>
     </form>
   </div>
 </body>
 </html>`);
     }
-  } catch {
-    return res.status(503).json({ error: "Server configuration error" });
   }
 
   const { rows } = await pool.query(
@@ -106,7 +98,7 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
 
   if (rows.length === 0) {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    return res.send(`
+    return void res.send(`
       <html><body style="font-family:sans-serif;padding:40px;text-align:center">
         <h2>No Booths Found</h2>
         <p>Create booths in the admin panel first.</p>
@@ -174,9 +166,7 @@ router.post("/admin/qr-codes", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/qr-codes — API endpoint for admin mobile app (uses x-admin-pin header)
 router.get("/booths/admin/qr-codes", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
 
   const { rows } = await pool.query(
     `SELECT id, name, company, booth_number
@@ -189,13 +179,11 @@ router.get("/booths/admin/qr-codes", async (req: Request, res: Response) => {
 
 // GET /api/booths/admin/:id/qr — returns QR data URL for a booth's static secret token (admin only)
 router.get("/booths/admin/:id/qr", async (req: Request, res: Response) => {
-  if (!isAuthorized(req)) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
+  if (!requireAdmin(req, res, 403)) return;
 
-  const boothId = parseInt(req.params.id, 10);
+  const boothId = parseInt(String(req.params.id), 10);
   if (isNaN(boothId)) {
-    return res.status(400).json({ error: "Invalid booth ID" });
+    return void res.status(400).json({ error: "Invalid booth ID" });
   }
 
   const { rows } = await pool.query(
@@ -203,7 +191,7 @@ router.get("/booths/admin/:id/qr", async (req: Request, res: Response) => {
     [boothId]
   );
   if (rows.length === 0) {
-    return res.status(404).json({ error: "Booth not found" });
+    return void res.status(404).json({ error: "Booth not found" });
   }
 
   const payload = `uoa2026:booth:${boothId}:${rows[0].secret_token}`;

@@ -154,6 +154,11 @@ export default function AdminScreen() {
       } else if (res.status === 401) {
         setPinError("Incorrect PIN. Try again.");
         setPin("");
+      } else if (res.status === 429) {
+        setPinError("Too many incorrect attempts. Please wait 15 minutes and try again.");
+        setPin("");
+      } else if (res.status === 503) {
+        setPinError("Admin access is not set up on the server yet.");
       } else {
         setPinError("Could not verify PIN. Please try again.");
       }

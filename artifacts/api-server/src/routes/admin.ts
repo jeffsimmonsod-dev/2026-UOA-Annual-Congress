@@ -1,21 +1,22 @@
 import { Router, type Request, type Response } from "express";
+import { checkAdminPin, clientIp, sendAdminFailure } from "../lib/adminAuth";
 
 const router = Router();
 
-// POST /api/admin/verify — validate admin PIN without revealing whether env var exists
+// POST /api/admin/verify — validate the admin PIN (rate limited / locked out after repeated failures)
 router.post("/admin/verify", (req: Request, res: Response) => {
-  const { pin } = req.body as { pin?: string };
-  const serverPin = process.env.ADMIN_PIN;
+  const { pin } = (req.body ?? {}) as { pin?: unknown };
+  const result = checkAdminPin(clientIp(req), pin);
 
-  if (!serverPin) {
-    return res.status(503).json({ error: "Admin access is not configured on this server" });
+  if (result.ok) {
+    res.json({ valid: true });
+    return;
   }
-
-  if (!pin || pin !== serverPin) {
-    return res.status(401).json({ valid: false });
+  if (result.reason === "invalid" || result.reason === "missing") {
+    res.status(401).json({ valid: false });
+    return;
   }
-
-  return res.json({ valid: true });
+  sendAdminFailure(res, result);
 });
 
 export default router;

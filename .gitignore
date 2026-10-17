@@ -47,3 +47,16 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Personal / debugging files pasted into Replit chat (not used by the app)
+*.eml
+attached_assets/Screenshot_*
+attached_assets/image_*.png
+!attached_assets/image_1776407337305.png
+!attached_assets/image_1776894189530.png
+!attached_assets/image_1776894217778.png
+!attached_assets/image_1777052147485.png
+attached_assets/Pasted--Submitting-*
+
+# API server unit-test build output
+artifacts/api-server/.test-dist/

@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
-import { getDeviceId } from "@/services/deviceId";
+import { clearVotingToken, getVotingToken } from "@/services/votingToken";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -49,17 +49,24 @@ export default function VotingScreen() {
   const [trusteeError, setTrusteeError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const deviceIdRef = useRef<string>("");
+  const votingTokenRef = useRef<string>("");
 
   useEffect(() => {
     async function init() {
-      const deviceId = await getDeviceId();
-      deviceIdRef.current = deviceId;
       try {
-        const [stateRes, statusRes] = await Promise.all([
+        let votingToken = await getVotingToken(API_BASE);
+        const [stateRes, firstStatusRes] = await Promise.all([
           fetch(`${API_BASE}/api/voting/state`),
-          fetch(`${API_BASE}/api/voting/status/${encodeURIComponent(deviceId)}`),
+          fetch(`${API_BASE}/api/voting/status`, { headers: { "x-voting-token": votingToken } }),
         ]);
+        let statusRes = firstStatusRes;
+        if (statusRes.status === 401) {
+          // Stored token no longer valid (e.g. server secret rotated) — get a fresh one.
+          await clearVotingToken();
+          votingToken = await getVotingToken(API_BASE);
+          statusRes = await fetch(`${API_BASE}/api/voting/status`, { headers: { "x-voting-token": votingToken } });
+        }
+        votingTokenRef.current = votingToken;
         const stateData = await stateRes.json();
         const statusData = await statusRes.json();
 
@@ -106,7 +113,7 @@ export default function VotingScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          deviceId: deviceIdRef.current,
+          votingToken: votingTokenRef.current,
           slateVote,
           trusteeVotes: selectedTrustees,
         }),
@@ -118,6 +125,9 @@ export default function VotingScreen() {
         setPageState("already_voted");
       } else if (res.status === 403) {
         setPageState("closed");
+      } else if (res.status === 401) {
+        await clearVotingToken();
+        setSubmitError(data.error || "Please close and reopen the voting screen, then try again.");
       } else {
         setSubmitError(data.error || "Could not submit your vote. Please try again.");
       }

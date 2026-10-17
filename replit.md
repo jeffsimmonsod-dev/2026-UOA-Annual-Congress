@@ -36,9 +36,9 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - Updates as a timeline feed with categorized announcements
 - FAQ with expandable accordion by category + contact section
 - Dark/light mode support (automatic based on system preference)
-- Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN: UOA2026)
+- Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN comes from the `ADMIN_PIN` secret — never write it in this file)
 - Admin screen (/admin) — PIN-protected, quick-fill templates, compose + send to all registered devices
-- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per device, gated by voting open/closed state
+- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per server-signed device token, gated by voting open/closed state
 
 **Push Notification Architecture:**
 - Mobile: `services/pushNotifications.ts` — Expo Push Token registration + send utility
@@ -120,3 +120,11 @@ artifacts/conference-app/
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+**Security configuration (API server secrets / env vars):**
+- `ADMIN_PIN` (required for admin features) — at least 10 characters, not a repeated character or simple sequence. If missing or weak, the server still starts but every admin route returns 503. Admin PIN checks lock an IP out for 15 minutes after 5 wrong attempts.
+- `VOTE_TOKEN_SECRET` (recommended, 32+ random characters) — signs voting device tokens. If unset, a random secret is generated once and stored in the `congress_server_secrets` table. Changing it invalidates existing voting tokens (apps fetch a new one automatically).
+- `CORS_ALLOWED_ORIGINS` (optional, comma-separated) — extra browser origins allowed to call the API. `REPLIT_DOMAINS`, `REPLIT_DEV_DOMAIN`, `REPLIT_EXPO_DEV_DOMAIN` and `EXPO_PUBLIC_DOMAIN` are allowed automatically; native apps (no Origin header) are always allowed.
+- `BOOTH_REQUIRE_ROTATING_CODE` (optional, default `false`) — when `true`, printed booth QR codes stop working and check-ins must use the live 30-second codes from `POST /api/booths/admin/:id/scan-code` (QR payload `uoa2026:boothcode:<boothId>:<code>`).
+- Tunable limits (optional): `ATTENDEE_REGISTRATIONS_PER_IP_PER_HOUR` (200), `BOOTH_CHECKINS_PER_ATTENDEE_PER_10_MIN` (15), `VOTE_DEVICE_TOKENS_PER_IP_PER_HOUR` (200), `VOTE_SUBMISSIONS_PER_IP_PER_HOUR` (200).
+- Unit tests: `pnpm --filter @workspace/api-server run test`.
