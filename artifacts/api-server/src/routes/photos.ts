@@ -5,6 +5,7 @@ import multer from "multer";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "../lib/objectStorage";
 import { uploadPhotoToDrive, deleteDriveFile } from "../lib/googleDrive";
 import { pool } from "../lib/db";
+import { checkAdminPin, clientIp, hasAdminAccess, requireAdmin, sendAdminFailure } from "../lib/adminAuth";
 import { ensureConferencesTable } from "../lib/ensureConferences";
 
 const router = Router();
@@ -157,9 +158,7 @@ setInterval(() => {
 // Rate-limited: max 30 sessions per IP per hour to prevent Sybil identity farming
 // while allowing conference NAT environments where many users share an IP
 router.post("/photos/session", async (req: Request, res: Response) => {
-  const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0].trim()
-    ?? req.socket.remoteAddress
-    ?? "unknown";
+  const ip = `${req.conferenceId}:${clientIp(req)}`;
   if (isRateLimited(`session:${ip}`, 30, 3_600_000)) {
     res.status(429).json({ error: "Too many session requests. Please try again later." });
     return;
@@ -172,7 +171,8 @@ router.post("/photos/session", async (req: Request, res: Response) => {
     );
     res.status(201).json({ sessionToken });
   } catch (err) {
-    res.status(500).json({ error: "Failed to create session", details: String(err) });
+    req.log.error({ err }, "photo session error");
+    res.status(500).json({ error: "Failed to create session" });
   }
 });
 
@@ -257,7 +257,8 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
     // Normalize the GCS URL to the internal object path
     const objectPath = objectStorageService.normalizeObjectEntityPath(rawGcsUrl);
     if (!objectPath.startsWith("/objects/")) {
-      res.status(500).json({ error: "Path normalization failed", rawGcsUrl, objectPath });
+      req.log.error({ rawGcsUrl, objectPath }, "photo upload path normalization failed");
+      res.status(500).json({ error: "Upload failed" });
       return;
     }
 
@@ -289,7 +290,7 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
       );
       driveFileId = driveResult?.fileId ?? null;
     } catch (err) {
-      console.error("[photos] Drive mirror failed:", err);
+      req.log.error({ err }, "photo Drive mirror failed");
     }
 
     await pool.query(
@@ -311,8 +312,8 @@ router.post("/photos/upload", upload.single("photo"), async (req: Request, res: 
 
     res.status(201).json({ ...photoToJSON(row), deleteToken });
   } catch (err) {
-    console.error("[photos/upload] error:", err);
-    res.status(500).json({ error: "Upload failed", details: String(err) });
+    req.log.error({ err }, "photo upload error");
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 
@@ -345,7 +346,8 @@ router.get("/photos", async (req: Request, res: Response) => {
     );
     res.json({ photos: result.rows.map((r) => photoToJSON(r, validatedToken)) });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch photos", details: String(err) });
+    req.log.error({ err }, "photo list error");
+    res.status(500).json({ error: "Failed to fetch photos" });
   }
 });
 
@@ -356,9 +358,7 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
     return;
   }
   // Rate-limit like operations: max 60 per IP per 10 minutes
-  const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0].trim()
-    ?? req.socket.remoteAddress
-    ?? "unknown";
+  const ip = `${req.conferenceId}:${clientIp(req)}`;
   if (isRateLimited(`like:${ip}`, 60, 600_000)) {
     res.status(429).json({ error: "Too many like requests. Please slow down." });
     return;
@@ -417,26 +417,53 @@ router.post("/photos/:id/like", async (req: Request, res: Response) => {
     if (result.rows.length === 0) { res.status(404).json({ error: "Photo not found" }); return; }
     res.json(photoToJSON(result.rows[0], sessionToken));
   } catch (err) {
-    res.status(500).json({ error: "Failed to toggle like", details: String(err) });
+    req.log.error({ err }, "photo like error");
+    res.status(500).json({ error: "Failed to toggle like" });
   }
 });
 
-router.delete("/photos/:id", async (req: Request, res: Response) => {
-  const adminPin = req.headers["x-admin-pin"] as string | undefined;
-  const isAdmin = adminPin && adminPin === process.env.ADMIN_PIN;
+async function removeStoredFiles(objectPath: string | null, driveFileId: string | null, log: Request["log"]) {
+  // Delete the GCS object synchronously (bounded timeout) so the file is
+  // revoked as close to the DB delete as possible.
+  if (objectPath) {
+    try {
+      await withTimeout(objectStorageService.deleteObjectEntity(objectPath), 8000);
+    } catch (err) {
+      log.error({ err }, "photo delete: GCS object delete failed");
+    }
+  }
+  // Delete the Google Drive mirror if we have its ID (non-blocking)
+  if (driveFileId) {
+    deleteDriveFile(driveFileId)
+      .catch((err) => log.error({ err }, "photo delete: Drive delete failed"));
+  }
+}
 
-  if (isAdmin) {
+router.delete("/photos/:id", async (req: Request, res: Response) => {
+  const photoId = String(req.params.id);
+
+  // Requests that carry an x-admin-pin header are treated as admin deletes and
+  // go through the same lockout + constant-time check as other admin routes.
+  if (req.headers["x-admin-pin"] !== undefined) {
+    const auth = checkAdminPin(clientIp(req), req.headers["x-admin-pin"]);
+    if (!auth.ok) {
+      sendAdminFailure(res, auth, 403);
+      return;
+    }
     try {
       const result = await pool.query(
-        `DELETE FROM congress_photos WHERE id = $1 AND conference_id = $2 RETURNING id`,
-        [req.params.id, req.conferenceId]
+        `DELETE FROM congress_photos WHERE id = $1 AND conference_id = $2 RETURNING id, object_path, drive_file_id`,
+        [photoId, req.conferenceId]
       );
       if (result.rows.length === 0) {
         res.status(404).json({ error: "Photo not found" }); return;
       }
+      const { object_path, drive_file_id } = result.rows[0];
+      await removeStoredFiles(object_path, drive_file_id, req.log);
       res.json({ success: true });
     } catch (err) {
-      res.status(500).json({ error: "Failed to delete photo", details: String(err) });
+      req.log.error({ err }, "photo delete error");
+      res.status(500).json({ error: "Failed to delete photo" });
     }
     return;
   }
@@ -447,39 +474,24 @@ router.delete("/photos/:id", async (req: Request, res: Response) => {
     const result = await pool.query(
       `DELETE FROM congress_photos WHERE id = $1 AND delete_token = $2 AND conference_id = $3
        RETURNING id, object_path, drive_file_id`,
-      [req.params.id, deleteToken, req.conferenceId]
+      [photoId, deleteToken, req.conferenceId]
     );
     if (result.rows.length === 0) {
       res.status(403).json({ error: "Photo not found or no permission" }); return;
     }
 
     const { object_path, drive_file_id } = result.rows[0];
-
-    // Delete the GCS object synchronously (bounded timeout) so the file is
-    // revoked as close to the DB delete as possible.
-    try {
-      await withTimeout(objectStorageService.deleteObjectEntity(object_path), 8000);
-    } catch (err) {
-      console.error("[photos/delete] GCS object delete failed:", err);
-    }
-
-    // Delete the Google Drive mirror if we have its ID (non-blocking)
-    if (drive_file_id) {
-      deleteDriveFile(drive_file_id)
-        .catch((err) => console.error("[photos/delete] Drive delete failed:", err));
-    }
+    await removeStoredFiles(object_path, drive_file_id, req.log);
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: "Failed to delete photo", details: String(err) });
+    req.log.error({ err }, "photo delete error");
+    res.status(500).json({ error: "Failed to delete photo" });
   }
 });
 
 router.get("/photos/admin", async (req: Request, res: Response) => {
-  const adminPin = req.headers["x-admin-pin"] as string | undefined;
-  if (!adminPin || adminPin !== process.env.ADMIN_PIN) {
-    res.status(403).json({ error: "Forbidden" }); return;
-  }
+  if (!requireAdmin(req, res, 403)) return;
   try {
     const result = await pool.query(
       `SELECT p.id, p.object_path, p.uploader_name, p.caption, p.hidden, p.created_at,
@@ -493,7 +505,8 @@ router.get("/photos/admin", async (req: Request, res: Response) => {
     );
     res.json({ photos: result.rows.map((r) => photoToJSON(r)) });
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch photos", details: String(err) });
+    req.log.error({ err }, "photo list error");
+    res.status(500).json({ error: "Failed to fetch photos" });
   }
 });
 
@@ -502,8 +515,7 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
-    const adminPin = req.headers["x-admin-pin"];
-    const isAdmin = typeof adminPin === "string" && !!process.env.ADMIN_PIN && adminPin === process.env.ADMIN_PIN;
+    const isAdmin = hasAdminAccess(req);
 
     // Public access is limited to visible photos; moderators may inspect hidden photos.
     const dbCheck = await pool.query(

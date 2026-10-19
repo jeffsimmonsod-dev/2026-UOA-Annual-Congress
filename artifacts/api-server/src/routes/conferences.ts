@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
+import { hasAdminAccess, requireAdmin } from "../lib/adminAuth";
 import { ensureConferencesTable } from "../lib/ensureConferences";
 import { ObjectStorageService } from "../lib/objectStorage";
 import {
@@ -56,20 +57,6 @@ async function fetchAndStorePhoto(remoteUrl: string): Promise<string | null> {
 }
 
 const router = Router();
-
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
-}
-
-function isAdmin(req: Request): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^[1-9]\d*$/.test(value)) return null;
@@ -213,10 +200,7 @@ ensureStructuralTables().catch((err) =>
 
 // GET /api/conferences — list all conferences (admin only)
 router.get("/conferences", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   try {
     const { rows } = await pool.query(
       `SELECT * FROM conferences ORDER BY id ASC`
@@ -230,10 +214,7 @@ router.get("/conferences", async (req: Request, res: Response) => {
 
 // PATCH /api/conferences/:id — update conference settings and branding
 router.patch("/conferences/:id", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -303,6 +284,19 @@ router.patch("/conferences/:id", async (req: Request, res: Response) => {
 });
 
 // GET /api/conferences/:id/speakers — list speakers (public)
+/**
+ * Public content of an unpublished conference is only visible to admins.
+ * Sends 404 (same as an unknown conference) and returns false otherwise.
+ */
+async function ensureVisible(req: Request, res: Response, conferenceId: number): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT published FROM conferences WHERE id = $1`, [conferenceId]);
+  if (rows.length === 0 || (!rows[0].published && !hasAdminAccess(req))) {
+    res.status(404).json({ error: "Conference not found" });
+    return false;
+  }
+  return true;
+}
+
 router.get("/conferences/:id/speakers", async (req: Request, res: Response) => {
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
@@ -310,6 +304,7 @@ router.get("/conferences/:id/speakers", async (req: Request, res: Response) => {
     return;
   }
   try {
+    if (!(await ensureVisible(req, res, id))) return;
     const { rows } = await pool.query(
       `SELECT * FROM conference_speakers WHERE conference_id = $1 ORDER BY id ASC`,
       [id]
@@ -323,10 +318,7 @@ router.get("/conferences/:id/speakers", async (req: Request, res: Response) => {
 
 // POST /api/conferences/:id/speakers/bulk — bulk import speakers
 router.post("/conferences/:id/speakers/bulk", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -413,6 +405,7 @@ router.get("/conferences/:id/sessions", async (req: Request, res: Response) => {
     return;
   }
   try {
+    if (!(await ensureVisible(req, res, id))) return;
     const { rows } = await pool.query(
       `SELECT * FROM conference_sessions WHERE conference_id = $1 ORDER BY day, start_time, id ASC`,
       [id]
@@ -426,10 +419,7 @@ router.get("/conferences/:id/sessions", async (req: Request, res: Response) => {
 
 // POST /api/conferences/:id/sessions/bulk — bulk import sessions
 router.post("/conferences/:id/sessions/bulk", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -514,6 +504,7 @@ router.get("/conferences/:id/sponsors", async (req: Request, res: Response) => {
     return;
   }
   try {
+    if (!(await ensureVisible(req, res, id))) return;
     const { rows } = await pool.query(
       `SELECT * FROM conference_sponsors WHERE conference_id = $1 ORDER BY tier, name ASC`,
       [id]
@@ -527,10 +518,7 @@ router.get("/conferences/:id/sponsors", async (req: Request, res: Response) => {
 
 // POST /api/conferences/:id/sponsors/bulk — bulk import sponsors
 router.post("/conferences/:id/sponsors/bulk", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const id = parseInt(req.params["id"] as string, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -614,7 +602,7 @@ router.get("/conferences/:id/config", async (req: Request, res: Response) => {
       return;
     }
     const c = rows[0];
-    const adminAccess = isAdmin(req);
+    const adminAccess = hasAdminAccess(req);
     if (!c.published && !adminAccess) {
       res.status(404).json({ error: "Conference not found" });
       return;
@@ -645,10 +633,7 @@ router.get("/conferences/:id/config", async (req: Request, res: Response) => {
 });
 
 router.post("/conferences", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const {
     name,
     organization,
@@ -720,10 +705,7 @@ router.post("/conferences", async (req: Request, res: Response) => {
 });
 
 router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const sourceId = parseInt(req.params["id"] as string, 10);
   if (isNaN(sourceId)) {
     res.status(400).json({ error: "Invalid conference id" });
@@ -900,10 +882,7 @@ router.post("/conferences/:id/clone", async (req: Request, res: Response) => {
 const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
 
 router.post("/conferences/:id/logo", upload.single("logo"), async (req: Request, res: Response) => {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded. Send a multipart/form-data request with field 'logo'." });
     return;
@@ -954,10 +933,7 @@ async function patchStructuralRow(
   rowParam: string,
   columns: Record<string, string>,
 ): Promise<void> {
-  if (!isAdmin(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
   const conferenceId = positiveId(req.params["id"] as string);
   const rowId = positiveId(req.params[rowParam] as string);
   if (!conferenceId || !rowId) {

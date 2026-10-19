@@ -24,6 +24,7 @@ import { ProfileProvider } from "@/context/ProfileContext";
 import { ScheduleProvider } from "@/context/ScheduleContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { startPushRegistrationSync } from "@/services/pushNotifications";
 
 
 SplashScreen.preventAutoHideAsync();
@@ -63,6 +64,10 @@ export default function RootLayout() {
     Inter_700Bold,
     ...Ionicons.font,
   });
+  // Keep the server's push token for this device fresh on every launch
+  // (only if notifications were already allowed; never prompts).
+  useEffect(() => startPushRegistrationSync(), []);
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();

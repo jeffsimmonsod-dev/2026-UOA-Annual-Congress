@@ -8,4 +8,6 @@
 
 export interface PushStats {
   registeredDevices: number;
+  ios?: number;
+  android?: number;
 }

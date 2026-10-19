@@ -68,6 +68,11 @@ interface ScheduledAnnouncement {
   failed_at: string | null;
   attempts: number;
   last_error: string | null;
+  attempted?: number | null;
+  accepted?: number | null;
+  failed?: number | null;
+  delivered?: number | null;
+  receipt_failed?: number | null;
 }
 
 function formatScheduledDate(iso: string) {
@@ -156,6 +161,11 @@ export default function AdminScreen() {
       } else if (res.status === 401) {
         setPinError("Incorrect PIN. Try again.");
         setPin("");
+      } else if (res.status === 429) {
+        setPinError("Too many incorrect attempts. Please wait 15 minutes and try again.");
+        setPin("");
+      } else if (res.status === 503) {
+        setPinError("Admin access is not set up on the server yet.");
       } else {
         setPinError("Could not verify PIN. Please try again.");
       }
@@ -174,9 +184,15 @@ export default function AdminScreen() {
     const result = await sendPushNotification(title.trim(), body.trim(), verifiedPin);
     setSending(false);
     if (result.success) {
-      Alert.alert("Sent!", result.message, [{ text: "OK", onPress: () => { setTitle(""); setBody(""); } }]);
+      const counts = result.attempted !== undefined
+        ? `\n\nAccepted: ${result.sent ?? 0} of ${result.attempted} device(s)` + (result.failed ? `\nFailed: ${result.failed}` : "")
+        : "";
+      const alertTitle = result.failed ? "Partly sent" : "Sent!";
+      Alert.alert(alertTitle, `${result.message}${counts}${result.warning ? `\n\n${result.warning}` : ""}`, [
+        { text: "OK", onPress: () => { setTitle(""); setBody(""); } },
+      ]);
     } else {
-      Alert.alert("Error", result.message);
+      Alert.alert("Not sent", result.message);
     }
   };
 
@@ -845,6 +861,17 @@ export default function AdminScreen() {
                                 Sent {formatScheduledDate(item.sent_at!)}
                               </Text>
                             </View>
+                            {item.attempted != null && (
+                              <Text style={[styles.scheduledItemTime, { color: colors.mutedForeground }]}>
+                                {item.attempted === 0
+                                  ? "No registered devices"
+                                  : `Accepted ${item.accepted ?? 0}/${item.attempted}` +
+                                    (item.failed ? ` · failed ${item.failed}` : "") +
+                                    (item.delivered || item.receipt_failed
+                                      ? ` · delivered ${item.delivered ?? 0}` + (item.receipt_failed ? ` · undeliverable ${item.receipt_failed}` : "")
+                                      : "")}
+                              </Text>
+                            )}
                           </View>
                         </View>
                       ))}

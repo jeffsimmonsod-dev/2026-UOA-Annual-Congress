@@ -61,6 +61,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Sign in an operator with the admin PIN
  */
 export const verifyAdminBodyNameMax = 50;
+
 export const VerifyAdminBody = zod.object({
   pin: zod.string(),
   name: zod
@@ -498,19 +499,38 @@ export const BulkImportSponsorsResponse = zod.object({
  */
 export const SendPushNotificationHeader = zod.object({
   "X-Conference-Id": zod.number(),
+  "X-Admin-Pin": zod
+    .string()
+    .optional()
+    .describe("Admin PIN (preferred over the deprecated adminPin body field)"),
 });
 
 export const SendPushNotificationBody = zod.object({
   title: zod.string(),
   body: zod.string(),
-  adminPin: zod.string(),
+  adminPin: zod
+    .string()
+    .optional()
+    .describe("Deprecated; send the X-Admin-Pin header instead."),
 });
 
 export const SendPushNotificationResponse = zod.object({
   success: zod.boolean(),
-  sent: zod.number().optional(),
-  failed: zod.number().optional(),
+  attempted: zod
+    .number()
+    .optional()
+    .describe("Number of registered devices the message was sent to"),
+  sent: zod
+    .number()
+    .optional()
+    .describe("Devices the Expo push service accepted the message for"),
+  failed: zod
+    .number()
+    .optional()
+    .describe("Devices the Expo push service rejected"),
   message: zod.string().optional(),
+  warning: zod.string().optional(),
+  errors: zod.array(zod.string()).optional(),
 });
 
 /**
@@ -518,11 +538,13 @@ export const SendPushNotificationResponse = zod.object({
  */
 export const GetPushStatsHeader = zod.object({
   "X-Conference-Id": zod.number(),
-  "X-Admin-Pin": zod.string().optional(),
+  "X-Admin-Pin": zod.string(),
 });
 
 export const GetPushStatsResponse = zod.object({
   registeredDevices: zod.number(),
+  ios: zod.number().optional(),
+  android: zod.number().optional(),
 });
 
 /**

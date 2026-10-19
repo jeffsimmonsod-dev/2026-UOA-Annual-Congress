@@ -8,7 +8,13 @@
 
 export interface PushSendResult {
   success: boolean;
+  /** Number of registered devices the message was sent to */
+  attempted?: number;
+  /** Devices the Expo push service accepted the message for */
   sent?: number;
+  /** Devices the Expo push service rejected */
   failed?: number;
   message?: string;
+  warning?: string;
+  errors?: string[];
 }

@@ -3,6 +3,17 @@
 // The resulting require() call uses Node.js standard resolution, which cannot
 // resolve .ts extensions without a TypeScript hook registered first.
 // The value here must match conferenceConfig.conferenceName in conference.config.ts.
+import fs from "fs";
+import path from "path";
+
+// Firebase config for Android push (FCM). Provide it either as an EAS "file"
+// environment variable named GOOGLE_SERVICES_JSON, or by placing
+// google-services.json next to this file. It is only referenced when the file
+// actually exists, so builds keep working before it has been added (Android
+// push notifications will not work until it is).
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json";
+const hasGoogleServicesFile = fs.existsSync(path.resolve(googleServicesFile));
+
 export default {
   expo: {
     name: "2026 UOA Annual Congress",
@@ -31,6 +42,7 @@ export default {
     android: {
       package: "org.utaheyedoc.congress2026",
       versionCode: 6,
+      ...(hasGoogleServicesFile ? { googleServicesFile } : {}),
       adaptiveIcon: {
         foregroundImage: "./assets/images/app-icon-adaptive.png",
         backgroundColor: "#ffffff",
@@ -56,6 +68,15 @@ export default {
       "expo-font",
       "expo-web-browser",
       "expo-camera",
+      [
+        "expo-notifications",
+        {
+          // Android status-bar icon: white silhouette on transparent background.
+          icon: "./assets/images/notification-icon.png",
+          color: "#117DAB",
+          defaultChannel: "default",
+        },
+      ],
     ],
     updates: {
       enabled: false,

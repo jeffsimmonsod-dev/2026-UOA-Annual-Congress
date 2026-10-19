@@ -1,258 +1,67 @@
-import { Router, type Request } from "express";
+import { Router, type Request, type Response } from "express";
 import { pool } from "../lib/db";
 import { logger } from "../lib/logger";
-import { ensureConferencesTable } from "../lib/ensureConferences";
+import { checkAdminPin, clientIp, requireAdmin, safeEqual, sendAdminFailure } from "../lib/adminAuth";
+import { SlidingWindowLimiter } from "../lib/rateLimit";
+import {
+  checkReceipts,
+  ensurePushTables,
+  isValidPushToken,
+  runScheduledAnnouncements,
+  sendToConference,
+  startInProcessScheduler,
+} from "../lib/push";
 
 const router = Router();
 
-function getAdminPin(): string {
-  const pin = process.env.ADMIN_PIN;
-  if (!pin) throw new Error("ADMIN_PIN environment variable is not set");
-  return pin;
+ensurePushTables().catch((err) => logger.error({ err }, "push ensureTables error"));
+
+// Scheduled announcements are sent by POST /api/push/run-scheduled (called by a
+// cron job / Replit Scheduled Deployment). The old always-on timer is opt-in.
+if (process.env.PUSH_SCHEDULER_IN_PROCESS === "true") startInProcessScheduler();
+
+const registerLimiter = new SlidingWindowLimiter(120, 10 * 60 * 1000);
+setInterval(() => registerLimiter.prune(), 5 * 60 * 1000).unref();
+
+async function conferenceExists(id: number): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT 1 FROM conferences WHERE id = $1`, [id]);
+  return rows.length > 0;
 }
-
-function isAuthorizedHeader(req: Request): boolean {
-  try {
-    return req.headers["x-admin-pin"] === getAdminPin();
-  } catch {
-    return false;
-  }
-}
-
-function isAuthorizedBody(adminPin: string | undefined): boolean {
-  try {
-    return adminPin === getAdminPin();
-  } catch {
-    return false;
-  }
-}
-
-function isValidExpoToken(token: string): boolean {
-  return /^ExponentPushToken\[.+\]$/.test(token);
-}
-
-async function ensureTables() {
-  // Ensure the full conferences table exists before adding FKs to it
-  await ensureConferencesTable().catch(() => {});
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS congress_push_tokens (
-      token      TEXT PRIMARY KEY,
-      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      last_seen     TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS congress_scheduled_announcements (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      body TEXT NOT NULL,
-      scheduled_for TIMESTAMP NOT NULL,
-      sent_at TIMESTAMP,
-      failed_at TIMESTAMP,
-      attempts INT NOT NULL DEFAULT 0,
-      last_error TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
-  await pool.query(`
-    ALTER TABLE congress_scheduled_announcements
-      ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS last_error TEXT
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE congress_push_tokens
-      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE congress_scheduled_announcements
-      ADD COLUMN IF NOT EXISTS conference_id INTEGER NOT NULL DEFAULT 1
-  `).catch(() => {});
-  await pool.query(`
-    DELETE FROM congress_push_tokens
-    WHERE token NOT LIKE 'ExponentPushToken[%'
-  `).catch(() => {});
-  await pool.query(`
-    DO $$ BEGIN
-      ALTER TABLE congress_push_tokens
-        ADD CONSTRAINT fk_push_tokens_conf
-        FOREIGN KEY (conference_id) REFERENCES conferences(id);
-    EXCEPTION WHEN others THEN NULL; END $$;
-  `).catch(() => {});
-  await pool.query(`
-    DO $$ BEGIN
-      ALTER TABLE congress_scheduled_announcements
-        ADD CONSTRAINT fk_sched_ann_conf
-        FOREIGN KEY (conference_id) REFERENCES conferences(id);
-    EXCEPTION WHEN others THEN NULL; END $$;
-  `).catch(() => {});
-}
-
-ensureTables().catch((err) => logger.error({ err }, "push ensureTable error"));
-
-const EXPO_PUSH_BATCH_SIZE = 100;
-const MAX_SEND_ATTEMPTS = 3;
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
-interface ExpoTicket {
-  status: "ok" | "error";
-  id?: string;
-  message?: string;
-  details?: { error?: string };
-}
-
-async function sendToAll(title: string, body: string, conferenceId: number) {
-  const { rows } = await pool.query(
-    `SELECT token FROM congress_push_tokens WHERE conference_id = $1`,
-    [conferenceId]
-  );
-  const tokens = rows.map((r: { token: string }) => r.token);
-  if (tokens.length === 0) return { sent: 0, failed: 0 };
-
-  const batches = chunkArray(tokens, EXPO_PUSH_BATCH_SIZE);
-  let totalSent = 0;
-  let totalFailed = 0;
-  const invalidTokens: string[] = [];
-
-  for (const batch of batches) {
-    const messages = batch.map((to) => ({
-      to,
-      title,
-      body,
-      sound: "default",
-      data: { type: "announcement", timestamp: new Date().toISOString() },
-    }));
-
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(messages),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => response.status.toString());
-      throw new Error(`Expo push API error ${response.status}: ${errText}`);
-    }
-
-    const result = (await response.json()) as { data: ExpoTicket[] };
-    const tickets: ExpoTicket[] = result.data ?? [];
-
-    tickets.forEach((ticket, i) => {
-      if (ticket.status === "ok") {
-        totalSent++;
-      } else {
-        totalFailed++;
-        const errCode = ticket.details?.error;
-        if (errCode === "DeviceNotRegistered") {
-          invalidTokens.push(batch[i]);
-        }
-      }
-    });
-  }
-
-  if (invalidTokens.length > 0) {
-    for (const token of invalidTokens) {
-      await pool.query(
-        `DELETE FROM congress_push_tokens WHERE token = $1 AND conference_id = $2`,
-        [token, conferenceId]
-      ).catch(() => {});
-    }
-  }
-
-  return { sent: totalSent, failed: totalFailed };
-}
-
-const STALE_AFTER_MS = 60 * 60 * 1000;
-
-async function processScheduled() {
-  try {
-    const { rows } = await pool.query(
-      `SELECT * FROM congress_scheduled_announcements
-       WHERE sent_at IS NULL AND failed_at IS NULL AND scheduled_for <= NOW()
-       ORDER BY scheduled_for ASC`
-    );
-
-    const now = Date.now();
-
-    for (const row of rows) {
-      const scheduledAt = new Date(row.scheduled_for).getTime();
-      if (now - scheduledAt > STALE_AFTER_MS) {
-        await pool.query(
-          `UPDATE congress_scheduled_announcements
-           SET failed_at = NOW(), last_error = $1
-           WHERE id = $2`,
-          [`Announcement expired: more than 1 hour past scheduled time (${row.scheduled_for})`, row.id]
-        );
-        logger.warn({ id: row.id, title: row.title }, "Scheduled announcement expired without sending");
-        continue;
-      }
-
-      try {
-        const result = await sendToAll(row.title, row.body, row.conference_id ?? 1);
-        await pool.query(
-          `UPDATE congress_scheduled_announcements SET sent_at = NOW(), attempts = attempts + 1 WHERE id = $1`,
-          [row.id]
-        );
-        logger.info({ id: row.id, title: row.title, sent: result.sent, failed: result.failed }, "Scheduled announcement sent");
-      } catch (err) {
-        const attempts = (row.attempts ?? 0) + 1;
-        const errMsg = String(err);
-        if (attempts >= MAX_SEND_ATTEMPTS) {
-          await pool.query(
-            `UPDATE congress_scheduled_announcements
-             SET attempts = $1, last_error = $2, failed_at = NOW()
-             WHERE id = $3`,
-            [attempts, errMsg, row.id]
-          );
-          logger.error({ id: row.id, attempts, errMsg }, "Scheduled announcement permanently failed");
-        } else {
-          await pool.query(
-            `UPDATE congress_scheduled_announcements SET attempts = $1, last_error = $2 WHERE id = $3`,
-            [attempts, errMsg, row.id]
-          );
-          logger.error({ id: row.id, attempt: attempts, errMsg }, "Scheduled announcement attempt failed");
-        }
-      }
-    }
-  } catch (err) {
-    logger.error({ err }, "processScheduled error");
-  }
-}
-
-setInterval(processScheduled, 30_000);
 
 router.post("/push/register", async (req, res) => {
-  const { token } = req.body as { token?: string };
+  const { token, platform } = req.body as { token?: unknown; platform?: unknown };
   if (!token || typeof token !== "string") {
     res.status(400).json({ error: "token required" });
     return;
   }
-  if (!isValidExpoToken(token)) {
+  if (!isValidPushToken(token)) {
     res.status(400).json({ error: "Invalid push token format" });
     return;
   }
-  const conferenceId = req.conferenceId;
-  await pool.query(
-    `INSERT INTO congress_push_tokens (token, conference_id, last_seen)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (token) DO UPDATE SET last_seen = NOW(), conference_id = $2`,
-    [token, conferenceId]
-  );
-  const { rows } = await pool.query(
-    `SELECT COUNT(*) AS cnt FROM congress_push_tokens WHERE conference_id = $1`,
-    [conferenceId]
-  );
-  res.json({ success: true, registered: parseInt(rows[0].cnt, 10) });
+  if (!registerLimiter.tryHit(`${req.conferenceId}:${clientIp(req)}`)) {
+    res.status(429).json({ error: "Too many registrations from this network. Please try again later." });
+    return;
+  }
+  try {
+    await ensurePushTables();
+    const conferenceId = req.conferenceId;
+    if (!(await conferenceExists(conferenceId))) {
+      res.status(404).json({ error: "Conference not found" });
+      return;
+    }
+    // A device is registered per conference: registering for one conference no
+    // longer silently removes it from another.
+    await pool.query(
+      `INSERT INTO congress_push_tokens (token, conference_id, platform, last_seen)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (conference_id, token) DO UPDATE SET last_seen = NOW(), platform = COALESCE(EXCLUDED.platform, congress_push_tokens.platform)`,
+      [token, conferenceId, platform === "ios" || platform === "android" ? platform : null],
+    );
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "push register error");
+    res.status(500).json({ error: "Could not register device" });
+  }
 });
 
 router.post("/push/send", async (req, res) => {
@@ -262,26 +71,52 @@ router.post("/push/send", async (req, res) => {
     adminPin?: string;
   };
 
-  if (!isAuthorizedBody(adminPin)) {
-    res.status(401).json({ error: "Invalid admin PIN" });
+  // Same header-based auth as every other admin route. The body field is still
+  // accepted (through the same lockout + constant-time check) only so admin
+  // clients running an older build keep working until they update.
+  const headerPin = req.headers["x-admin-pin"];
+  const auth = checkAdminPin(clientIp(req), headerPin !== undefined ? headerPin : adminPin);
+  if (!auth.ok) {
+    sendAdminFailure(res, auth);
     return;
   }
 
-  if (!title || !body) {
+  if (typeof title !== "string" || typeof body !== "string" || !title.trim() || !body.trim()) {
     res.status(400).json({ error: "title and body required" });
     return;
   }
 
   try {
-    const result = await sendToAll(title, body, req.conferenceId);
+    const result = await sendToConference(req.conferenceId, title.trim(), body.trim(), "manual");
+    if (result.attempted === 0) {
+      res.json({
+        success: false,
+        sent: 0,
+        failed: 0,
+        attempted: 0,
+        message: "No devices are registered for this conference yet, so nothing was sent.",
+      });
+      return;
+    }
+    const reasons = Object.entries(result.errors).map(([code, n]) => `${code}: ${n}`).join(", ");
+    const warning = result.failed > 0
+      ? `${result.failed} of ${result.attempted} device(s) could not be sent to (${reasons}).`
+      : undefined;
     res.json({
-      success: true,
-      ...result,
-      message: result.sent === 0 ? "No registered devices" : `Sent to ${result.sent} device(s)`,
+      success: result.accepted > 0,
+      sent: result.accepted,
+      failed: result.failed,
+      attempted: result.attempted,
+      errors: result.errors,
+      sendId: result.sendId,
+      warning,
+      message: result.accepted > 0
+        ? `Accepted for delivery to ${result.accepted} of ${result.attempted} device(s). Final delivery is confirmed by receipts about 15 minutes later.`
+        : `Not sent: ${reasons || "no device accepted the message"}.`,
     });
   } catch (err) {
     req.log.error({ err }, "push/send error");
-    res.status(500).json({ error: "Failed to send notifications", details: String(err) });
+    res.status(502).json({ success: false, error: "Could not reach the push notification service. Nothing was sent; please try again." });
   }
 });
 
@@ -292,10 +127,7 @@ router.post("/push/schedule", async (req, res) => {
     scheduledFor?: string;
   };
 
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+  if (!requireAdmin(req, res)) return;
 
   if (!title || !body || !scheduledFor) {
     res.status(400).json({ error: "title, body, and scheduledFor required" });
@@ -313,56 +145,138 @@ router.post("/push/schedule", async (req, res) => {
     return;
   }
 
-  const { rows } = await pool.query(
-    `INSERT INTO congress_scheduled_announcements (title, body, scheduled_for, conference_id)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [title, body, scheduledDate, req.conferenceId]
-  );
-
-  res.json({ success: true, announcement: rows[0] });
+  try {
+    await ensurePushTables();
+    const { rows } = await pool.query(
+      `INSERT INTO congress_scheduled_announcements (title, body, scheduled_for, conference_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [title, body, scheduledDate.toISOString(), req.conferenceId],
+    );
+    res.json({ success: true, announcement: rows[0] });
+  } catch (err) {
+    req.log.error({ err }, "push schedule error");
+    res.status(500).json({ error: "Could not schedule announcement" });
+  }
 });
 
 router.get("/push/scheduled", async (req, res) => {
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
+  if (!requireAdmin(req, res)) return;
+  try {
+    await ensurePushTables();
+    const { rows } = await pool.query(
+      `SELECT a.id, a.title, a.body, a.scheduled_for, a.sent_at, a.failed_at, a.attempts, a.last_error,
+              a.created_at, a.conference_id,
+              s.attempted, s.accepted, s.failed, s.delivered, s.receipt_failed
+       FROM congress_scheduled_announcements a
+       LEFT JOIN congress_push_sends s ON s.id = a.send_id
+       WHERE a.conference_id = $1
+       ORDER BY a.scheduled_for ASC`,
+      [req.conferenceId],
+    );
+    res.json({ announcements: rows });
+  } catch (err) {
+    req.log.error({ err }, "push scheduled list error");
+    res.status(500).json({ error: "Server error" });
   }
-
-  const { rows } = await pool.query(
-    `SELECT * FROM congress_scheduled_announcements
-     WHERE conference_id = $1
-     ORDER BY scheduled_for ASC`,
-    [req.conferenceId]
-  );
-
-  res.json({ announcements: rows });
 });
 
 router.delete("/push/scheduled/:id", async (req, res) => {
-  if (!isAuthorizedHeader(req)) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
+  if (!requireAdmin(req, res)) return;
+  try {
+    const { rows } = await pool.query(
+      `DELETE FROM congress_scheduled_announcements
+       WHERE id = $1 AND conference_id = $2 AND sent_at IS NULL AND claimed_at IS NULL RETURNING id`,
+      [String(req.params.id), req.conferenceId],
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ error: "Not found, already sent, or being sent right now" });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "push scheduled delete error");
+    res.status(500).json({ error: "Server error" });
   }
-
-  const { rows } = await pool.query(
-    `DELETE FROM congress_scheduled_announcements WHERE id = $1 AND conference_id = $2 AND sent_at IS NULL RETURNING id`,
-    [req.params.id, req.conferenceId]
-  );
-
-  if (rows.length === 0) {
-    res.status(404).json({ error: "Not found or already sent" });
-    return;
-  }
-
-  res.json({ success: true });
 });
 
+// GET /api/push/stats — registered device count (admin only)
 router.get("/push/stats", async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT COUNT(*) AS cnt FROM congress_push_tokens WHERE conference_id = $1`,
-    [req.conferenceId]
-  );
-  res.json({ registeredDevices: parseInt(rows[0].cnt, 10) });
+  if (!requireAdmin(req, res)) return;
+  try {
+    await ensurePushTables();
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS cnt,
+              COUNT(*) FILTER (WHERE platform = 'ios')::int AS ios,
+              COUNT(*) FILTER (WHERE platform = 'android')::int AS android
+       FROM congress_push_tokens WHERE conference_id = $1`,
+      [req.conferenceId],
+    );
+    res.json({ registeredDevices: rows[0].cnt, ios: rows[0].ios, android: rows[0].android });
+  } catch (err) {
+    req.log.error({ err }, "push stats error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /api/push/history — recent sends with acceptance and delivery-receipt counts (admin only)
+router.get("/push/history", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    await ensurePushTables();
+    const { rows } = await pool.query(
+      `SELECT id, title, source, announcement_id, attempted, accepted, failed, ticket_errors,
+              delivered, receipt_failed, receipt_errors, created_at,
+              (SELECT COUNT(*)::int FROM congress_push_tickets t WHERE t.send_id = s.id AND t.status IN ('pending', 'checking')) AS awaiting_receipts
+       FROM congress_push_sends s
+       WHERE conference_id = $1
+       ORDER BY created_at DESC
+       LIMIT 20`,
+      [req.conferenceId],
+    );
+    res.json({ sends: rows });
+  } catch (err) {
+    req.log.error({ err }, "push history error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/push/check-receipts — check delivery receipts now for this conference (admin only)
+router.post("/push/check-receipts", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const summary = await checkReceipts(req.conferenceId);
+    res.json({ success: true, ...summary });
+  } catch (err) {
+    req.log.error({ err }, "push receipts error");
+    res.status(502).json({ success: false, error: "Could not check receipts right now" });
+  }
+});
+
+function cronAuthorized(req: Request, res: Response): boolean {
+  const secret = process.env.PUSH_CRON_SECRET;
+  const supplied = req.headers["x-cron-secret"];
+  if (secret && secret.length >= 24 && typeof supplied === "string") {
+    if (safeEqual(supplied, secret)) return true;
+    res.status(401).json({ error: "Unauthorized" });
+    return false;
+  }
+  // Fall back to the admin PIN (useful for manual runs).
+  return requireAdmin(req, res);
+}
+
+// POST /api/push/run-scheduled — send due scheduled announcements (all conferences)
+// and check delivery receipts. Call every minute from a cron job or a Replit
+// Scheduled Deployment with header `x-cron-secret: $PUSH_CRON_SECRET`.
+router.post("/push/run-scheduled", async (req, res) => {
+  if (!cronAuthorized(req, res)) return;
+  try {
+    const scheduled = await runScheduledAnnouncements();
+    const receipts = await checkReceipts();
+    res.json({ success: true, scheduled, receipts });
+  } catch (err) {
+    req.log.error({ err }, "push run-scheduled error");
+    res.status(500).json({ success: false, error: "Scheduled run failed" });
+  }
 });
 
 export default router;

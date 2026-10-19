@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdmin } from "@/hooks/use-admin";
 import { useGetPushStats, useSendPushNotification, getGetPushStatsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -16,40 +17,80 @@ const pushSchema = z.object({
   body: z.string().min(1, "Body is required"),
 });
 
+interface PushSendRecord {
+  id: number;
+  title: string;
+  source: string;
+  attempted: number;
+  accepted: number;
+  failed: number;
+  delivered: number;
+  receipt_failed: number;
+  awaiting_receipts: number;
+  created_at: string;
+}
+
 export function PushTab({ conferenceId }: { conferenceId: number }) {
   const { pin } = useAdmin();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const headers = { "X-Conference-Id": String(conferenceId), "X-Admin-Pin": pin || "" };
 
+  const statsKey = [...getGetPushStatsQueryKey(), conferenceId];
   const { data: stats } = useGetPushStats({
-    request: { headers: { "X-Conference-Id": String(conferenceId) } },
-    query: { enabled: !!conferenceId, queryKey: getGetPushStatsQueryKey() }
+    request: { headers },
+    query: { enabled: !!conferenceId && !!pin, queryKey: statsKey },
+  });
+
+  const historyKey = ["push-history", conferenceId];
+  const { data: history } = useQuery({
+    queryKey: historyKey,
+    enabled: !!conferenceId && !!pin,
+    queryFn: async () => {
+      const res = await fetch("/api/push/history", { headers });
+      if (!res.ok) throw new Error(`Could not load send history (${res.status})`);
+      return (await res.json()) as { sends: PushSendRecord[] };
+    },
   });
 
   const form = useForm<z.infer<typeof pushSchema>>({
     resolver: zodResolver(pushSchema),
-    defaultValues: { title: "", body: "" }
+    defaultValues: { title: "", body: "" },
   });
 
-  const sendPush = useSendPushNotification({
-    request: { headers: { "X-Conference-Id": String(conferenceId) } }
-  });
+  const sendPush = useSendPushNotification({ request: { headers } });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: statsKey });
+    queryClient.invalidateQueries({ queryKey: historyKey });
+  };
 
   const onSubmit = (values: z.infer<typeof pushSchema>) => {
     sendPush.mutate(
-      { data: { ...values, adminPin: pin || "" } },
+      { data: values },
       {
         onSuccess: (res) => {
-          if (res.success) {
-            toast({ title: "Notification Sent", description: `Successfully sent ${res.sent} notifications.` });
-            form.reset();
-          } else {
-            toast({ variant: "destructive", title: "Send Failed", description: res.message || "Unknown error" });
+          refresh();
+          const attempted = res.attempted ?? 0;
+          const sent = res.sent ?? 0;
+          const failed = res.failed ?? 0;
+          if (!res.success) {
+            toast({ variant: "destructive", title: "Not sent", description: res.message || "Unknown error" });
+            return;
           }
+          const counts = `Accepted for ${sent} of ${attempted} device(s)${failed ? `, ${failed} failed` : ""}.`;
+          toast({
+            variant: failed ? "destructive" : undefined,
+            title: failed ? "Partly sent" : "Notification sent",
+            description: res.warning ? `${counts} ${res.warning}` : counts,
+          });
+          form.reset();
         },
-        onError: () => {
-          toast({ variant: "destructive", title: "Error", description: "Failed to send notification." });
-        }
-      }
+        onError: (err) => {
+          refresh();
+          toast({ variant: "destructive", title: "Not sent", description: err.message || "Failed to send notification." });
+        },
+      },
     );
   };
 
@@ -64,7 +105,13 @@ export function PushTab({ conferenceId }: { conferenceId: number }) {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">{stats?.registeredDevices || 0}</div>
-          <p className="text-sm text-muted-foreground mt-1">Registered devices capable of receiving notifications.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Registered devices capable of receiving notifications
+            {stats && (stats.ios !== undefined || stats.android !== undefined)
+              ? ` (iOS ${stats.ios ?? 0}, Android ${stats.android ?? 0})`
+              : ""}
+            .
+          </p>
         </CardContent>
       </Card>
 
@@ -99,6 +146,35 @@ export function PushTab({ conferenceId }: { conferenceId: number }) {
           </Form>
         </CardContent>
       </Card>
+
+      {history && history.sends.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Sends</CardTitle>
+            <CardDescription>
+              "Accepted" means Expo's push service took the message. "Delivered" comes from delivery receipts, which
+              arrive about 15 minutes later.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y text-sm">
+              {history.sends.map((s) => (
+                <li key={s.id} className="py-2">
+                  <div className="font-medium">{s.title}</div>
+                  <div className="text-muted-foreground">
+                    {new Date(s.created_at).toLocaleString()} · {s.source === "scheduled" ? "scheduled" : "manual"} ·{" "}
+                    {s.attempted === 0
+                      ? "no registered devices"
+                      : `accepted ${s.accepted}/${s.attempted}${s.failed ? `, failed ${s.failed}` : ""}` +
+                        ` · delivered ${s.delivered}${s.receipt_failed ? `, undeliverable ${s.receipt_failed}` : ""}` +
+                        (s.awaiting_receipts ? ` · ${s.awaiting_receipts} awaiting receipts` : "")}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

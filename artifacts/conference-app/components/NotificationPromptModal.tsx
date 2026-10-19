@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/context/ProfileContext";
-import { registerForPushNotificationsAsync } from "@/services/pushNotifications";
+import { enablePushNotificationsAsync } from "@/services/pushNotifications";
 
 const STORAGE_KEY = "@uoa_notif_prompt_shown";
 
@@ -34,9 +34,17 @@ export default function NotificationPromptModal() {
 
   const handleEnable = async () => {
     setLoading(true);
-    await registerForPushNotificationsAsync();
+    const result = await enablePushNotificationsAsync();
     setLoading(false);
-    await markShown();
+    // Only stop showing the prompt once the user has actually made a choice.
+    // If permission was granted but the server could not be reached
+    // ("registration_pending"), the token is re-registered automatically on
+    // every launch, so the prompt is not needed again.
+    if (result.status === "failed") {
+      console.warn("Notification setup failed; the prompt will be offered again next launch:", result.error);
+    } else {
+      await markShown();
+    }
     setVisible(false);
   };
 
