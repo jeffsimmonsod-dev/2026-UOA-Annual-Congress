@@ -114,6 +114,17 @@ Work through these in order. Items marked **(Jarf)** need an account owner.
 - [ ] Set branding and feature flags on the row (`feature_voting`,
   `feature_photos`, `feature_exhibit_hall`) to match the app.
 - [ ] Load speakers / sessions / sponsors (bulk endpoints or dashboard).
+- [ ] **Voting (if the event has it):** in the dashboard's *Voting* tab, fill
+  in the **Ballot** card — trustee candidates (one per line, in ballot order)
+  and max picks per voter — and save. Or call
+  `PUT /api/voting/config` with headers `X-Conference-Id` and `X-Admin-Pin`
+  and body `{ "trusteeCandidates": ["…"], "maxTrusteeSelections": 2 }`.
+  Until a ballot is saved, the app shows "Voting not available" and the
+  server refuses to open voting for that conference. The ballot can't be
+  changed while voting is open; changing names after votes were cast needs
+  a reset (or `"force": true`). Keep the event's `trusteeInstructions` text
+  ("select up to N") in step with the server's max. The officer-slate text
+  stays in `events/<slug>/index.ts`.
 - [ ] Mark it **published** when ready — unpublished conferences are only
   visible to admins, and the app falls back to its bundled content.
 
@@ -140,9 +151,11 @@ Work through these in order. Items marked **(Jarf)** need an account owner.
 
 ## Known limits (follow-ups)
 
-- **Voting candidates on the server are global.** `api-server/src/routes/voting.ts`
-  hard-codes the 2026 UOA trustee list and a max of 3. A second event with
-  voting needs that moved into a per-conference table first.
+- **Cloning a conference doesn't copy its ballot** (on purpose: a new
+  election has new candidates). Set it in the Voting tab.
+- The **officer slate** (names shown under "Approve officer slate") is still
+  app-side text in the event folder; the server only records
+  approve/disapprove/abstain.
 - **Admin access is one shared PIN.** Per-conference admin logins are a
   planned follow-up.
 - The **Photos/Community tab** is always shown; it isn't gated by the event

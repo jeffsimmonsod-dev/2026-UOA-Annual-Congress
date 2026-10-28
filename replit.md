@@ -40,7 +40,7 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - Dark/light mode support (automatic based on system preference)
 - Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN comes from the `ADMIN_PIN` secret — never write it in this file)
 - Admin screen (/admin) — PIN-protected, quick-fill templates, compose + send to all registered devices
-- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per server-signed device token, gated by voting open/closed state
+- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (candidates and max picks set per conference on the server; UOA: 4 candidates, pick up to 3), one vote per server-signed device token, gated by voting open/closed state
 
 **Push Notification Architecture:**
 - Mobile: `services/pushNotifications.ts` — Expo Push Token registration + send utility
@@ -66,9 +66,10 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 
 **Business Meeting Voting Architecture:**
 - Mobile: `app/voting.tsx` — two-section ballot UI, deviceId-based one-vote limit, voting open/closed awareness
-- API: `POST /api/voting/submit` (cast ballot), `GET /api/voting/state` (open/closed), `GET /api/voting/status/:deviceId` (has voted?), `GET /api/voting/results` (admin only), `POST /api/voting/open|close|reset` (admin controls)
-- DB: `congress_votes` (device_id UNIQUE, slate_vote, trustee_votes TEXT[]), `congress_voting_state` (is_open flag)
-- Admin panel: "Voting" tab with open/close/reset controls + live bar charts for both Officer Slate and Trustee results
+- API: `POST /api/voting/submit` (cast ballot), `GET /api/voting/state` (open/closed + configured), `GET /api/voting/config` (this conference's candidates + max picks; 404 `voting_not_configured` if none), `PUT|DELETE /api/voting/config` (admin), `GET /api/voting/status` (has voted?), `GET /api/voting/results` (admin only), `POST /api/voting/open|close|reset` (admin controls)
+- DB: `congress_votes` (conference_id + device_id unique, slate_vote, trustee_votes TEXT[]), `congress_voting_state` (is_open per conference), `congress_voting_config` (conference_id PK, trustee_candidates TEXT[], max_trustee_selections). Created on the first voting request; conference 1 is seeded once with the UOA 2026 ballot.
+- Admin panel: "Voting" tab with open/close/reset controls, a Ballot editor, and live bar charts for both Officer Slate and Trustee results
+- Tests: `pnpm --filter @workspace/api-server test:voting` (needs `DATABASE_URL` of a throwaway database)
 - DeviceId: `services/deviceId.ts` — persisted via AsyncStorage (native) / localStorage (web), cached in memory
 
 **File structure:**
@@ -136,6 +137,6 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `PUSH_SCHEDULER_IN_PROCESS` (optional, default `false`) — when `true`, the API server also runs scheduled announcements on an in-process 60-second timer. Only use this on an always-on single instance (it does not run while an autoscale deployment is asleep).
 - `EXPO_ACCESS_TOKEN` (optional) — only needed if "Enhanced push security" is turned on in the Expo project.
 - The admin dashboard is served on the same domain (`/admin-dashboard/`), so it is covered by the CORS rules above.
-- Unit tests: `pnpm --filter @workspace/api-server run test:unit`. DB-backed suites (`test:community`, `test:push`) need `DATABASE_URL`.
+- Unit tests: `pnpm --filter @workspace/api-server run test:unit`. DB-backed suites (`test:community`, `test:push`, `test:voting`) need `DATABASE_URL`.
 
 **Push notifications:** devices register with `POST /api/push/register` (one row per conference + token). Sends use `expo-server-sdk` with high priority and Android channel `default`; tickets are stored in `congress_push_tickets` and delivery receipts are checked about 15 minutes later (tokens reported as `DeviceNotRegistered` are removed). Android push needs `google-services.json` (see `GOOGLE_SERVICES_JSON` in `app.config.ts`) plus an FCM V1 key in Expo credentials; iOS needs an APNs key in Expo credentials.
