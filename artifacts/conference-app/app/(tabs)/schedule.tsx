@@ -14,44 +14,17 @@ import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useConferenceData } from "@/context/ConferenceDataContext";
 import type { Session } from "@/types";
+import event from "@event";
 
-const DOCTOR_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
-const PARA_DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
-const TABS = [...DOCTOR_DAYS, "Para"];
+const SCHEDULE = event.content.schedule;
+const DOCTOR_DAYS = SCHEDULE.doctorDays;
+const PARA_DAYS = SCHEDULE.paraDays;
+// "Para" is the internal tab key; the visible label comes from the event.
+const TABS = [...DOCTOR_DAYS, ...(PARA_DAYS.length > 0 ? ["Para"] : [])];
 
-const TRACK_COLORS: Record<string, string> = {
-  "Retinal Disease": "#ef4444",
-  "Neuro-Optometry": "#8b5cf6",
-  Glaucoma: "#10b981",
-  Pharmacology: "#d946ef",
-  "Practice Management": "#3b82f6",
-  "Pediatrics & BV": "#ec4899",
-  "ABO/CPC": "#3b82f6",
-  General: "#64748b",
-  Optical: "#f97316",
-  "Contact Lenses": "#06b6d4",
-  "Clinical Knowledge": "#84cc16",
-  "Topical Diagnosis": "#14b8a6",
-  "Ocular Disease": "#6366f1",
-  "Systemic Disease": "#f97316",
-  CPC: "#0ea5e9",
-  CPO: "#0ea5e9",
-  "ABO/CPO": "#0ea5e9",
-  "Meal / Social": "#f59e0b",
-};
+const TRACK_COLORS: Record<string, string> = event.content.scheduleTrackColors ?? event.content.trackColors;
 
-const TRACK_SHORT_LABELS: Record<string, string> = {
-  "Retinal Disease": "Retina",
-  "Neuro-Optometry": "Neuro",
-  Glaucoma: "Glaucoma",
-  Pharmacology: "Pharm",
-  "Practice Management": "Practice",
-  "Pediatrics & BV": "Peds/BV",
-  "Topical Diagnosis": "Anterior Seg",
-  "Ocular Disease": "Ocular Dis.",
-  "Systemic Disease": "Systemic",
-  "Meal / Social": "Social",
-};
+const TRACK_SHORT_LABELS: Record<string, string> = event.content.trackShortLabels;
 
 function getShortLabel(track: string) {
   return TRACK_SHORT_LABELS[track] ?? track;
@@ -111,7 +84,7 @@ export default function ScheduleScreen() {
         ]}
       >
         <Text style={[styles.headerTitle, { color: colors.primary }]}>
-          {isPara ? "Paraoptometric Education" : "Doctor Education Schedule"}
+          {isPara ? SCHEDULE.paraScheduleTitle : SCHEDULE.mainScheduleTitle}
         </Text>
         <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
           {isPara
@@ -128,7 +101,7 @@ export default function ScheduleScreen() {
         ]}
       >
         {TABS.map((tab) => {
-          const label = tab === "Para" ? "Para" : tab.split(",")[0];
+          const label = tab === "Para" ? SCHEDULE.paraTabLabel : tab.split(",")[0];
           const isActive = activeTab === tab;
           const sessionCount =
             tab === "Para"

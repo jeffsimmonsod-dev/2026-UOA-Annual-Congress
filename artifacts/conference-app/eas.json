@@ -25,6 +25,24 @@
         "resourceClass": "m-medium"
       },
       "env": {
+        "EVENT": "uoa-2026",
+        "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
+      }
+    },
+    "uoa-2026": {
+      "extends": "production"
+    },
+    "sample-event": {
+      "extends": "production",
+      "env": {
+        "EVENT": "sample-event",
+        "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
+      }
+    },
+    "sample-event-preview": {
+      "extends": "preview",
+      "env": {
+        "EVENT": "sample-event",
         "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
       }
     }
@@ -35,6 +53,12 @@
       "android": {
         "track": "internal"
       }
+    },
+    "uoa-2026": {
+      "extends": "production"
+    },
+    "sample-event": {
+      "extends": "production"
     }
   }
 }

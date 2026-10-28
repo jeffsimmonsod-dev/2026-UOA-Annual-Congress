@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { BallotCard } from "./ballot-card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const SLATE_COLORS: Record<string, string> = {
@@ -175,6 +176,8 @@ export function VotingTab({ conferenceId }: { conferenceId: number }) {
           </div>
         </CardContent>
       </Card>
+
+      <BallotCard conferenceId={conferenceId} isOpen={isOpen} />
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-6">

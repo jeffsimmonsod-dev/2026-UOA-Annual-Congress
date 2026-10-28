@@ -27,79 +27,27 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/context/ProfileContext";
-import { BOOTH_NAMES } from "@/components/ExhibitHallMap";
+import event from "@event";
 import conferenceConfig from "@/conference.config";
 import { apiFetch } from "@/services/apiFetch";
 
-const MAP_IMAGE = require("../assets/images/exhibit-hall-map.png");
-// Actual pixel dimensions of exhibit-hall-map.png
-const IMG_W = 1824;
-const IMG_H = 2362;
+// Exhibit hall map, booth zones and directory come from the event folder.
+// This screen is only reachable when the event has an exhibit hall configured.
+const EXHIBIT_HALL = event.content.exhibitHall ?? {
+  mapImage: 0,
+  mapWidth: 1,
+  mapHeight: 1,
+  boothZones: [],
+  boothNames: {},
+  directory: [],
+};
+const MAP_IMAGE = EXHIBIT_HALL.mapImage;
+const IMG_W = EXHIBIT_HALL.mapWidth;
+const IMG_H = EXHIBIT_HALL.mapHeight;
+const BOOTH_ZONES = EXHIBIT_HALL.boothZones;
+const BOOTH_NAMES = EXHIBIT_HALL.boothNames;
+const EXHIBITOR_DIRECTORY = EXHIBIT_HALL.directory;
 
-// Booth tap zones in original image pixel coordinates (x, y, w, h)
-// Each entry defines a tappable region over the corresponding booth
-const BOOTH_ZONES: { id: string; x: number; y: number; w: number; h: number }[] = [
-  // ── Foyer top row (98–112) ──────────────────────────────────────────────────
-  { id:"099", x:367, y:-3,  w:132, h:143 }, { id:"098", x:503, y:-5,  w:132, h:145 },
-  { id:"100", x:645, y:1,   w:132, h:139 }, { id:"102", x:783, y:-1,  w:132, h:143 },
-  { id:"104", x:917, y:1,   w:132, h:141 }, { id:"106", x:1053,y:1,   w:132, h:141 },
-  { id:"108", x:1187,y:3,   w:132, h:141 }, { id:"110", x:1323,y:1,   w:132, h:141 },
-  { id:"112", x:1459,y:-3,  w:132, h:141 },
-  // ── Foyer bottom row (101–111) ──────────────────────────────────────────────
-  { id:"101", x:696, y:290, w:132, h:140 }, { id:"103", x:834, y:290, w:132, h:138 },
-  { id:"105", x:968, y:290, w:132, h:136 }, { id:"107", x:1108,y:294, w:132, h:138 },
-  { id:"109", x:1246,y:294, w:132, h:136 }, { id:"111", x:1380,y:292, w:132, h:138 },
-  // ── Top ballroom row (202, 204, 206, 210) ──────────────────────────────────
-  { id:"202", x:740, y:443, w:169, h:143 }, { id:"204", x:920, y:445, w:173, h:139 },
-  { id:"206", x:1111,y:531, w:141, h:83  }, { id:"210", x:1353,y:443, w:137, h:141 },
-  // ── Left wall ───────────────────────────────────────────────────────────────
-  { id:"200", x:300, y:545, w:144, h:168 },
-  { id:"300", x:308, y:951, w:150, h:133 },
-  { id:"400", x:314, y:1790,w:134, h:171 },
-  { id:"500", x:302, y:1965,w:150, h:169 },
-  // ── Narrow left (302, 401) ──────────────────────────────────────────────────
-  { id:"302", x:393, y:1088,w:72,  h:150 },
-  { id:"401", x:395, y:1633,w:72,  h:150 },
-  // ── Right wall ──────────────────────────────────────────────────────────────
-  { id:"212", x:1684,y:537, w:140, h:273 },
-  { id:"314", x:1686,y:820, w:140, h:161 },
-  { id:"313", x:1676,y:1234,w:154, h:155 },
-  { id:"414", x:1684,y:1400,w:142, h:155 },
-  { id:"516", x:1682,y:1818,w:144, h:141 },
-  { id:"515", x:1684,y:1965,w:142, h:265 },
-  // ── Narrow right (315, 415) ─────────────────────────────────────────────────
-  { id:"315", x:1654,y:1008,w:72,  h:130 },
-  { id:"415", x:1658,y:1616,w:72,  h:130 },
-  // ── Island row P1a (201, 203, 205, 207, 211) ────────────────────────────────
-  { id:"201", x:639, y:790, w:125, h:285 }, { id:"203", x:775, y:790, w:137, h:137 },
-  { id:"205", x:917, y:790, w:131, h:145 }, { id:"207", x:1055,y:790, w:263, h:145 },
-  { id:"211", x:1323,y:786, w:175, h:145 },
-  // ── Island row P1b (304, 306, 308, 310, 312) ────────────────────────────────
-  { id:"304", x:773, y:935, w:139, h:134 }, { id:"306", x:917, y:935, w:135, h:140 },
-  { id:"308", x:1057,y:931, w:133, h:140 }, { id:"310", x:1194,y:937, w:131, h:140 },
-  { id:"312", x:1330,y:933, w:165, h:140 },
-  // ── Island row P2a (301, 303, 305, 307, 309, 311) ───────────────────────────
-  { id:"301", x:643, y:1266,w:162, h:140 }, { id:"303", x:819, y:1262,w:132, h:140 },
-  { id:"305", x:953, y:1266,w:130, h:140 }, { id:"307", x:1084,y:1268,w:142, h:140 },
-  { id:"309", x:1228,y:1270,w:134, h:140 }, { id:"311", x:1370,y:1270,w:128, h:140 },
-  // ── Island row P2b (402, 404, 406, 408, 410, 412) ───────────────────────────
-  { id:"402", x:643, y:1404,w:170, h:145 }, { id:"404", x:819, y:1406,w:132, h:145 },
-  { id:"406", x:953, y:1404,w:132, h:145 }, { id:"408", x:1090,y:1410,w:136, h:145 },
-  { id:"410", x:1228,y:1410,w:132, h:145 }, { id:"412", x:1370,y:1410,w:128, h:145 },
-  // ── Island row P3a (403, 405, 407, 409, 411) ────────────────────────────────
-  { id:"403", x:781, y:1743,w:134, h:145 }, { id:"405", x:915, y:1743,w:132, h:145 },
-  { id:"407", x:1050,y:1745,w:152, h:145 }, { id:"409", x:1194,y:1745,w:152, h:145 },
-  { id:"411", x:1346,y:1745,w:152, h:145 },
-  // ── Island row P3b (502, 504, 506, 508, 510, 512) ───────────────────────────
-  { id:"502", x:625, y:1736,w:150, h:296 }, { id:"504", x:781, y:1890,w:136, h:150 },
-  { id:"506", x:917, y:1886,w:138, h:150 }, { id:"508", x:1050,y:1890,w:152, h:150 },
-  { id:"510", x:1196,y:1890,w:152, h:150 }, { id:"512", x:1342,y:1888,w:152, h:150 },
-  // ── Bottom row (501–514) ─────────────────────────────────────────────────────
-  { id:"501", x:406, y:2225,w:140, h:130 }, { id:"503", x:554, y:2227,w:160, h:130 },
-  { id:"505", x:726, y:2201,w:142, h:88  }, { id:"507", x:906, y:2225,w:160, h:130 },
-  { id:"509", x:1072,y:2223,w:146, h:130 }, { id:"511", x:1256,y:2205,w:140, h:88  },
-  { id:"513", x:1418,y:2231,w:130, h:130 }, { id:"514", x:1554,y:2231,w:130, h:130 },
-];
 
 function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
   // Measure the actual rendered container so overlay pixels line up exactly
@@ -274,65 +222,6 @@ function ZoomableMap({ visitedBooths }: { visitedBooths: string[] }) {
   );
 }
 
-// Full exhibitor directory from CSV (booth number → full company name)
-const EXHIBITOR_DIRECTORY: { booth: string; company: string }[] = [
-  { booth: "300", company: "ADIT" },
-  { booth: "411", company: "Alcon" },
-  { booth: "206", company: "Apellis Pharmaceuticals" },
-  { booth: "306", company: "Aseptikits" },
-  { booth: "301", company: "Bausch+Lomb" },
-  { booth: "400", company: "Blue River Medical, Inc" },
-  { booth: "308", company: "Cherry Optical Lab" },
-  { booth: "406", company: "Contamac" },
-  { booth: "313", company: "CooperVision" },
-  { booth: "200", company: "Dompé" },
-  { booth: "108", company: "DSBVI" },
-  { booth: "098", company: "Edward Jones" },
-  { booth: "512", company: "Essilor Instruments" },
-  { booth: "508", company: "Essilor Labs of America" },
-  { booth: "506", company: "EssilorLuxottica Eyecare" },
-  { booth: "309", company: "Europa Eyewear" },
-  { booth: "307", company: "Eyefficient/S4Optik" },
-  { booth: "304", company: "Eye Designs LLC" },
-  { booth: "112", company: "Friends for Sight" },
-  { booth: "202", company: "Glaukos" },
-  { booth: "515", company: "Hoopes Vision" },
-  { booth: "110", company: "Hope Alliance" },
-  { booth: "312", company: "iOR Partners" },
-  { booth: "314", company: "IT4Eyes" },
-  { booth: "211", company: "Johnson & Johnson" },
-  { booth: "099", company: "Kering Eyewear" },
-  { booth: "409", company: "L'Amy America" },
-  { booth: "101", company: "Lenz Therapeutics" },
-  { booth: "203", company: "LKC Technologies" },
-  { booth: "510", company: "Luxottica Frames" },
-  { booth: "205", company: "MacuHealth" },
-  { booth: "302", company: "Medically USA" },
-  { booth: "509", company: "Modern Optical" },
-  { booth: "511", company: "MOREL Eyewear" },
-  { booth: "310", company: "MyEyeDr" },
-  { booth: "516", company: "Nikon Optical US" },
-  { booth: "415", company: "Optos, Inc" },
-  { booth: "311", company: "Optikam Tech Inc" },
-  { booth: "412", company: "Optometric Aesthetics" },
-  { booth: "402", company: "Orgreens Optics" },
-  { booth: "408", company: "Premier Vision Lab" },
-  { booth: "111", company: "Rawzi Eyewear" },
-  { booth: "106", company: "Restoration Ophthalmics" },
-  { booth: "210", company: "Rocky Mountain University" },
-  { booth: "404", company: "Shamir Insights Inc" },
-  { booth: "410", company: "Sun Pharma" },
-  { booth: "305", company: "Tarsus" },
-  { booth: "414", company: "Teem" },
-  { booth: "201", company: "The Eye Institute" },
-  { booth: "500", company: "Topcon Healthcare" },
-  { booth: "502", company: "Utah Eye Centers" },
-  { booth: "103", company: "Visionix" },
-  { booth: "207", company: "VSP" },
-  { booth: "212", company: "Waite Vision" },
-  { booth: "501", company: "ZEISS (501)" },
-  { booth: "503", company: "ZEISS (503)" },
-];
 
 const SORTED_EXHIBITORS = [...EXHIBITOR_DIRECTORY].sort((a, b) =>
   a.company.localeCompare(b.company)
@@ -566,7 +455,7 @@ export default function ExhibitHallScreen() {
     const rotatingPrefix = `${conferenceConfig.qrBoothPrefix}:boothcode:`;
     const isRotating = data.startsWith(rotatingPrefix);
     if (!isRotating && !data.startsWith(staticPrefix)) {
-      Alert.alert("Invalid QR Code", "This QR code is not a UOA booth code. Please scan a booth QR code.");
+      Alert.alert("Invalid QR Code", `This QR code is not a ${conferenceConfig.organizationShortName} booth code. Please scan a booth QR code.`);
       return;
     }
     setScanned(true);
@@ -608,7 +497,7 @@ export default function ExhibitHallScreen() {
         const newVisited = (passport?.visitedCount ?? 0) + 1;
         const total = passport?.total ?? 0;
         if (total > 0 && newVisited === total) {
-          Alert.alert("🎉 Passport Complete!", "You've visited all booths! Find a UOA staff member to enter the raffle.");
+          Alert.alert("🎉 Passport Complete!", `You've visited all booths! Find a ${conferenceConfig.organizationShortName} staff member to enter the raffle.`);
         } else {
           Alert.alert("✓ Checked in!", `Welcome to ${data.booth.name} (${data.booth.company})!`);
         }
@@ -751,7 +640,7 @@ export default function ExhibitHallScreen() {
               <Ionicons name="trophy" size={28} color="#10b981" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.completeTitle, { color: "#10b981" }]}>Passport Complete! 🎉</Text>
-                <Text style={[styles.completeSubtitle, { color: colors.mutedForeground }]}>Find a UOA staff member to enter the raffle.</Text>
+                <Text style={[styles.completeSubtitle, { color: colors.mutedForeground }]}>Find a {conferenceConfig.organizationShortName} staff member to enter the raffle.</Text>
               </View>
             </View>
           )}

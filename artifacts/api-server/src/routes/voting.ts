@@ -6,6 +6,15 @@ import { clientIp, requireAdmin } from "../lib/adminAuth";
 import { SlidingWindowLimiter, envInt } from "../lib/rateLimit";
 import { issueSignedToken, verifySignedToken } from "../lib/signedToken";
 import { getVoteTokenSecret } from "../lib/serverSecret";
+import {
+  UOA_2026_CONFERENCE_ID,
+  UOA_2026_VOTING_CONFIG,
+  VOTING_NOT_CONFIGURED,
+  checkTrusteeVotes,
+  parseVotingConfig,
+  sameCandidates,
+  type VotingConfig,
+} from "../lib/votingConfig";
 
 const router = Router();
 
@@ -48,12 +57,23 @@ async function voterKeyFromToken(conferenceId: number, token: unknown): Promise<
   return id ? TOKEN_ID_PREFIX + id : null;
 }
 
-const TRUSTEE_CANDIDATES = [
-  "Dr. Steven Blake",
-  "Dr. Aaron King",
-  "Dr. Jonathon King",
-  "Dr. Taylor Linton",
-];
+// Trustee candidates and the max-picks limit are per conference
+// (table congress_voting_config, see lib/votingConfig.ts).
+async function getVotingConfig(conferenceId: number): Promise<VotingConfig | null> {
+  const { rows } = await pool.query(
+    `SELECT trustee_candidates, max_trustee_selections FROM congress_voting_config WHERE conference_id = $1`,
+    [conferenceId]
+  );
+  if (rows.length === 0) return null;
+  const candidates = (rows[0].trustee_candidates ?? []) as string[];
+  if (candidates.length === 0) return null;
+  return { trusteeCandidates: candidates, maxTrusteeSelections: Number(rows[0].max_trustee_selections) };
+}
+
+async function isVotingOpen(conferenceId: number): Promise<boolean> {
+  const { rows } = await pool.query("SELECT is_open FROM congress_voting_state WHERE conference_id = $1", [conferenceId]);
+  return rows[0]?.is_open ?? false;
+}
 
 const SLATE_OPTIONS = ["approve", "disapprove", "abstain"] as const;
 
@@ -149,6 +169,35 @@ async function ensureTables() {
     EXCEPTION WHEN others THEN NULL; END $$;
   `).catch(() => {});
 
+  // Per-conference ballot settings. Seeded once (when the table is first
+  // created) with the 2026 UOA ballot for conference 1, so admins can later
+  // edit or remove it without a restart putting it back.
+  const existed = await pool.query(`SELECT to_regclass('congress_voting_config') IS NOT NULL AS ok`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS congress_voting_config (
+      conference_id          INTEGER PRIMARY KEY,
+      trustee_candidates     TEXT[] NOT NULL,
+      max_trustee_selections INTEGER NOT NULL CHECK (max_trustee_selections >= 1),
+      updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  if (!existed.rows[0]?.ok) {
+    await pool.query(
+      `INSERT INTO congress_voting_config (conference_id, trustee_candidates, max_trustee_selections)
+       SELECT $1::int, $2::text[], $3::int
+       WHERE EXISTS (SELECT 1 FROM conferences WHERE id = $1::int)
+       ON CONFLICT (conference_id) DO NOTHING`,
+      [UOA_2026_CONFERENCE_ID, UOA_2026_VOTING_CONFIG.trusteeCandidates, UOA_2026_VOTING_CONFIG.maxTrusteeSelections]
+    );
+  }
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE congress_voting_config
+        ADD CONSTRAINT fk_voting_config_conf
+        FOREIGN KEY (conference_id) REFERENCES conferences(id);
+    EXCEPTION WHEN others THEN NULL; END $$;
+  `).catch(() => {});
+
   // Replace the hard-coded DEFAULT 1 on congress_voting_state.id with a proper sequence
   // so multiple conference rows can exist (multi-tenancy).
   await pool.query(`
@@ -164,24 +213,25 @@ async function ensureTables() {
   `).catch(() => {});
 }
 
-let tablesReady = false;
+// One shared setup promise, so parallel first requests (the app asks for
+// state, status and config at once) don't run the migration concurrently.
+let tablesReady: Promise<void> | null = null;
 async function withTables<T>(fn: () => Promise<T>): Promise<T> {
   if (!tablesReady) {
-    await ensureTables();
-    tablesReady = true;
+    tablesReady = ensureTables().catch((err) => {
+      tablesReady = null;
+      throw err;
+    });
   }
+  await tablesReady;
   return fn();
 }
 
 router.get("/voting/state", async (req, res) => {
   try {
     await withTables(async () => {
-      const result = await pool.query(
-        "SELECT is_open FROM congress_voting_state WHERE conference_id = $1",
-        [req.conferenceId]
-      );
-      const isOpen = result.rows[0]?.is_open ?? false;
-      res.json({ isOpen });
+      const [isOpen, config] = await Promise.all([isVotingOpen(req.conferenceId), getVotingConfig(req.conferenceId)]);
+      res.json({ isOpen, configured: config !== null });
     });
   } catch (err) {
     req.log.error({ err }, "voting state error");
@@ -190,6 +240,93 @@ router.get("/voting/state", async (req, res) => {
 });
 
 // POST /api/voting/device — issue a server-signed voting token for this device + conference
+// GET /api/voting/config — this conference's ballot (public; the app shows it).
+router.get("/voting/config", async (req, res) => {
+  try {
+    await withTables(async () => {
+      const config = await getVotingConfig(req.conferenceId);
+      if (!config) {
+        res.status(404).json({ configured: false, ...VOTING_NOT_CONFIGURED });
+        return;
+      }
+      res.json({ configured: true, ...config });
+    });
+  } catch (err) {
+    req.log.error({ err }, "voting config error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// PUT /api/voting/config — admin: set this conference's candidates and max picks.
+// Body: { trusteeCandidates: string[], maxTrusteeSelections: number, force?: boolean }
+// Refused while voting is open. Changing the candidate list after votes were
+// cast needs force: true (or reset voting first) so results stay meaningful.
+router.put("/voting/config", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const parsed = parseVotingConfig(req.body);
+  if (!parsed.ok) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
+  const force = (req.body as { force?: unknown })?.force === true;
+  try {
+    await withTables(async () => {
+      if (await isVotingOpen(req.conferenceId)) {
+        res.status(409).json({ code: "voting_open", error: "Close voting before changing the ballot." });
+        return;
+      }
+      const current = await getVotingConfig(req.conferenceId);
+      if (!force && current && !sameCandidates(current.trusteeCandidates, parsed.config.trusteeCandidates)) {
+        const votes = await pool.query("SELECT 1 FROM congress_votes WHERE conference_id = $1 LIMIT 1", [req.conferenceId]);
+        if (votes.rows.length > 0) {
+          res.status(409).json({
+            code: "votes_exist",
+            error: "Votes have already been cast. Reset voting first, or send force: true to change the candidates anyway.",
+          });
+          return;
+        }
+      }
+      await pool.query(
+        `INSERT INTO congress_voting_config (conference_id, trustee_candidates, max_trustee_selections, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (conference_id) DO UPDATE
+           SET trustee_candidates = EXCLUDED.trustee_candidates,
+               max_trustee_selections = EXCLUDED.max_trustee_selections,
+               updated_at = NOW()`,
+        [req.conferenceId, parsed.config.trusteeCandidates, parsed.config.maxTrusteeSelections]
+      );
+      logger.info({ conferenceId: req.conferenceId, candidates: parsed.config.trusteeCandidates.length }, "voting config updated");
+      res.json({ success: true, configured: true, ...parsed.config });
+    });
+  } catch (err: any) {
+    if (err?.code === "23503") {
+      res.status(404).json({ error: "Conference not found" });
+      return;
+    }
+    req.log.error({ err }, "voting config update error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE /api/voting/config — admin: remove this conference's ballot (voting becomes "not configured").
+router.delete("/voting/config", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    await withTables(async () => {
+      if (await isVotingOpen(req.conferenceId)) {
+        res.status(409).json({ code: "voting_open", error: "Close voting before removing the ballot." });
+        return;
+      }
+      await pool.query("DELETE FROM congress_voting_config WHERE conference_id = $1", [req.conferenceId]);
+      logger.warn({ conferenceId: req.conferenceId }, "voting config removed");
+      res.json({ success: true, configured: false });
+    });
+  } catch (err) {
+    req.log.error({ err }, "voting config delete error");
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 router.post("/voting/device", async (req, res) => {
   if (!deviceTokenLimiter.tryHit(limiterKey(req))) {
     res.status(429).json({ error: "Too many requests from this network. Please try again in a few minutes." });
@@ -275,22 +412,20 @@ router.post("/voting/submit", async (req, res) => {
     res.status(400).json({ error: "slateVote must be approve, disapprove, or abstain" });
     return;
   }
-  const trustees = Array.isArray(trusteeVotes) ? trusteeVotes : [];
-  if (trustees.length > 3) {
-    res.status(400).json({ error: "You may select at most 3 trustee candidates" });
-    return;
-  }
-  if (new Set(trustees).size !== trustees.length) {
-    res.status(400).json({ error: "Each trustee candidate may be selected only once" });
-    return;
-  }
-  const invalidTrustee = trustees.find((t) => !TRUSTEE_CANDIDATES.includes(t));
-  if (invalidTrustee) {
-    res.status(400).json({ error: "Invalid trustee candidate" });
-    return;
-  }
 
   try {
+    const config = await withTables(() => getVotingConfig(req.conferenceId));
+    if (!config) {
+      res.status(404).json(VOTING_NOT_CONFIGURED);
+      return;
+    }
+    const checked = checkTrusteeVotes(config, trusteeVotes);
+    if (!checked.ok) {
+      res.status(400).json({ error: checked.error });
+      return;
+    }
+    const trustees = checked.votes;
+
     const voterKey = await voterKeyFromToken(req.conferenceId, votingToken);
     if (!voterKey) {
       res.status(401).json({ error: "Invalid voting token. Please close and reopen the voting screen." });
@@ -334,7 +469,8 @@ router.get("/voting/results", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
-      const [stateResult, totalResult, slateResult, trusteeResult] = await Promise.all([
+      const [config, stateResult, totalResult, slateResult, trusteeResult] = await Promise.all([
+        getVotingConfig(req.conferenceId),
         pool.query("SELECT is_open FROM congress_voting_state WHERE conference_id = $1", [req.conferenceId]),
         pool.query("SELECT COUNT(*) AS count FROM congress_votes WHERE conference_id = $1", [req.conferenceId]),
         pool.query(`
@@ -354,8 +490,8 @@ router.get("/voting/results", async (req, res) => {
         slateMap[row.slate_vote] = parseInt(row.count);
       }
 
-      const trusteeMap: Record<string, number> = {};
-      for (const candidate of TRUSTEE_CANDIDATES) {
+      const trusteeMap: Record<string, number> = Object.create(null);
+      for (const candidate of config?.trusteeCandidates ?? []) {
         trusteeMap[candidate] = 0;
       }
       for (const row of trusteeResult.rows) {
@@ -371,6 +507,9 @@ router.get("/voting/results", async (req, res) => {
         totalVotes,
         slateResults: slateMap,
         trusteeResults: trusteeMap,
+        configured: config !== null,
+        trusteeCandidates: config?.trusteeCandidates ?? [],
+        maxTrusteeSelections: config?.maxTrusteeSelections ?? 0,
       });
     });
   } catch (err) {
@@ -383,6 +522,10 @@ router.post("/voting/open", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     await withTables(async () => {
+      if (!(await getVotingConfig(req.conferenceId))) {
+        res.status(409).json({ ...VOTING_NOT_CONFIGURED, error: "Set up the ballot (trustee candidates) before opening voting." });
+        return;
+      }
       await pool.query(
         `INSERT INTO congress_voting_state (conference_id, is_open) VALUES ($1, true)
          ON CONFLICT (conference_id) DO UPDATE SET is_open = true`,

@@ -21,32 +21,14 @@ import { useSchedule } from "@/context/ScheduleContext";
 import { useConferenceData } from "@/context/ConferenceDataContext";
 import { UPDATES } from "@/services/data";
 import type { Session, Sponsor } from "@/types";
+import event from "@event";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const TRACK_COLORS: Record<string, string> = {
-  "Retinal Disease": "#ef4444",
-  "Neuro-Optometry": "#8b5cf6",
-  Glaucoma: "#10b981",
-  Pharmacology: "#d946ef",
-  "Practice Management": "#3b82f6",
-  "Pediatrics & BV": "#ec4899",
-  "Topical Diagnosis": "#14b8a6",
-  "Ocular Disease": "#6366f1",
-  "Systemic Disease": "#f97316",
-  "ABO/CPC": "#0ea5e9",
-  General: "#6b7280",
-  Optical: "#a855f7",
-  "Clinical Knowledge": "#84cc16",
-  "Contact Lenses": "#06b6d4",
-  CPC: "#0ea5e9",
-  CPO: "#0ea5e9",
-  "ABO/CPO": "#0ea5e9",
-  "Meal / Social": "#f59e0b",
-};
+const TRACK_COLORS: Record<string, string> = event.content.trackColors;
 
 const TIER_COLORS: Record<string, { bg: string; text: string }> = {
   platinum: { bg: "#e8e4f8", text: "#5b21b6" },
@@ -55,7 +37,7 @@ const TIER_COLORS: Record<string, { bg: string; text: string }> = {
   bronze:   { bg: "#fef3c7", text: "#78350f" },
 };
 
-const DAY_ORDER = ["Thu, June 4", "Fri, June 5", "Sat, June 6", "Sun, June 7"];
+const DAY_ORDER = event.content.schedule.doctorDays;
 
 function parseMinutes(t: string): number {
   const parts = t.trim().split(" ");
@@ -76,14 +58,19 @@ function sortSessions(sessions: Session[]): Session[] {
 }
 
 const QUICK_TILES = [
-  {
-    label: "Exhibit Hall",
-    subtitle: "Booth passport & raffle",
-    icon: "storefront-outline" as const,
-    color: conferenceConfig.primaryColor,
-    bg: `${conferenceConfig.primaryColor}1a`,
-    route: "/exhibit-hall",
-  },
+  // Exhibit Hall tile only when the event has an exhibit hall configured.
+  ...(event.content.exhibitHall
+    ? [
+        {
+          label: "Exhibit Hall",
+          subtitle: "Booth passport & raffle",
+          icon: "storefront-outline" as const,
+          color: conferenceConfig.primaryColor,
+          bg: `${conferenceConfig.primaryColor}1a`,
+          route: "/exhibit-hall",
+        },
+      ]
+    : []),
   {
     label: "My Notes",
     subtitle: "Session notes organized by day",
@@ -94,7 +81,7 @@ const QUICK_TILES = [
   },
   {
     label: "Venue Info & Maps",
-    subtitle: "Grand Hyatt Deer Valley",
+    subtitle: event.content.venue.name,
     icon: "business-outline" as const,
     color: "#f59e0b",
     bg: "rgba(245,158,11,0.10)",
@@ -121,12 +108,7 @@ export default function HomeScreen() {
   const allSessions = [...docSessions, ...paraSessions];
   const savedSessions = sortSessions(allSessions.filter((s) => savedIds.has(s.id)));
 
-  const DAY_DATES: Record<string, string> = {
-    "Thu, June 4": "2026-06-04",
-    "Fri, June 5": "2026-06-05",
-    "Sat, June 6": "2026-06-06",
-    "Sun, June 7": "2026-06-07",
-  };
+  const DAY_DATES: Record<string, string> = event.content.schedule.dayDates;
 
   function getSessionEndDate(session: Session): Date {
     const dateStr = DAY_DATES[session.day];
@@ -193,7 +175,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.heroText}>
             <Text style={[styles.heroTitle, { color: colors.primary }]}>
-              {conf.conferenceName.replace(/\bUOA\s+/, "")}
+              {conf.homeTitle}
             </Text>
             <Text style={[styles.heroMetaText, { color: colors.mutedForeground }]}>
               {conf.dates}
@@ -282,7 +264,7 @@ export default function HomeScreen() {
             <View style={styles.featuredMeta}>
               <Ionicons name="school-outline" size={13} color={colors.mutedForeground} />
               <Text style={[styles.featuredMetaText, { color: colors.mutedForeground }]}>
-                COPE: {nextSession.copeId}
+                {event.content.schedule.creditIdLabel}: {nextSession.copeId}
               </Text>
             </View>
           )}

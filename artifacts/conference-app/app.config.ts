@@ -1,51 +1,74 @@
-// NOTE: conference name is hardcoded here (not imported from conference.config.ts)
-// because @expo/config evaluates app.config.ts via sucrase + require-from-string.
-// The resulting require() call uses Node.js standard resolution, which cannot
-// resolve .ts extensions without a TypeScript hook registered first.
-// The value here must match conferenceConfig.conferenceName in conference.config.ts.
+// Builds the Expo config for ONE event, chosen with the EVENT environment
+// variable (folder name under ./events). Defaults to the UOA 2026 demo event so
+// existing builds, the Replit dev server and CI behave exactly as before.
+//
+//   EVENT=sample-event npx expo start          # local dev for another event
+//   eas build --profile sample-event           # eas.json profile sets EVENT
+//
+// NOTE: @expo/config evaluates this file with sucrase + require-from-string, so
+// it cannot import other .ts files. Store identity therefore lives in plain
+// JSON (events/<slug>/event.json); app content lives in events/<slug>/index.ts.
 import fs from "fs";
 import path from "path";
 
+const DEFAULT_EVENT = "uoa-2026";
+const eventSlug = (process.env.EVENT ?? "").trim() || DEFAULT_EVENT;
+const eventDir = path.resolve(__dirname, "events", eventSlug);
+const eventJsonPath = path.join(eventDir, "event.json");
+if (!fs.existsSync(eventJsonPath)) {
+  throw new Error(
+    `EVENT="${eventSlug}" not found: expected ${eventJsonPath}. ` +
+      `Create it from events/sample-event (see docs/NEW_EVENT.md).`
+  );
+}
+const event = JSON.parse(fs.readFileSync(eventJsonPath, "utf8"));
+const asset = (file: string) => `./events/${eventSlug}/assets/${file}`;
+
 // Firebase config for Android push (FCM). Provide it either as an EAS "file"
-// environment variable named GOOGLE_SERVICES_JSON, or by placing
-// google-services.json next to this file. It is only referenced when the file
-// actually exists, so builds keep working before it has been added (Android
-// push notifications will not work until it is).
-const googleServicesFile = process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json";
-const hasGoogleServicesFile = fs.existsSync(path.resolve(googleServicesFile));
+// environment variable named GOOGLE_SERVICES_JSON (recommended, set per EAS
+// project), or by placing google-services.json in events/<slug>/ (or, for the
+// original UOA setup, next to this file). Never commit it. It is only
+// referenced when the file actually exists, so builds keep working before it
+// has been added (Android push notifications will not work until it is).
+const googleServicesCandidates = [
+  process.env.GOOGLE_SERVICES_JSON,
+  `./events/${eventSlug}/google-services.json`,
+  "./google-services.json",
+].filter((p): p is string => !!p);
+const googleServicesFile = googleServicesCandidates.find((p) => fs.existsSync(path.resolve(p)));
 
 export default {
   expo: {
-    name: "2026 UOA Annual Congress",
-    slug: "conference-app",
-    version: "2.0.2",
+    name: event.appName,
+    slug: event.expoSlug,
+    ...(event.owner ? { owner: event.owner } : {}),
+    version: event.version,
     orientation: "portrait",
-    icon: "./assets/images/app-icon.png",
-    scheme: "conference-app",
+    icon: asset(event.images.icon),
+    scheme: event.scheme,
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     splash: {
-      image: "./assets/images/app-icon.png",
+      image: asset(event.images.splash),
       resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      backgroundColor: event.colors.splashBackground,
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "org.utaheyedoc.congress2026",
-      buildNumber: "5",
+      bundleIdentifier: event.ios.bundleIdentifier,
+      ...(event.ios.buildNumber ? { buildNumber: event.ios.buildNumber } : {}),
       infoPlist: {
-        NSCameraUsageDescription:
-          "Used to scan booth QR codes in the exhibit hall",
+        NSCameraUsageDescription: event.ios.cameraUsageDescription,
         ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
-      package: "org.utaheyedoc.congress2026",
-      versionCode: 6,
-      ...(hasGoogleServicesFile ? { googleServicesFile } : {}),
+      package: event.android.package,
+      ...(event.android.versionCode ? { versionCode: event.android.versionCode } : {}),
+      ...(googleServicesFile ? { googleServicesFile } : {}),
       adaptiveIcon: {
-        foregroundImage: "./assets/images/app-icon-adaptive.png",
-        backgroundColor: "#ffffff",
+        foregroundImage: asset(event.images.adaptiveIcon),
+        backgroundColor: event.colors.adaptiveIconBackground,
       },
       permissions: [
         "NOTIFICATIONS",
@@ -56,7 +79,7 @@ export default {
       ],
     },
     web: {
-      favicon: "./assets/images/app-icon.png",
+      favicon: asset(event.images.favicon),
     },
     plugins: [
       [
@@ -72,8 +95,8 @@ export default {
         "expo-notifications",
         {
           // Android status-bar icon: white silhouette on transparent background.
-          icon: "./assets/images/notification-icon.png",
-          color: "#117DAB",
+          icon: asset(event.images.notificationIcon),
+          color: event.colors.notification,
           defaultChannel: "default",
         },
       ],
@@ -86,9 +109,9 @@ export default {
       reactCompiler: true,
     },
     extra: {
-      eas: {
-        projectId: "78c58011-2ce2-4113-80cc-da38f4de6e59",
-      },
+      event: eventSlug,
+      // Leave easProjectId empty until `eas init` has created the EAS project.
+      ...(event.easProjectId ? { eas: { projectId: event.easProjectId } } : {}),
     },
   },
 };

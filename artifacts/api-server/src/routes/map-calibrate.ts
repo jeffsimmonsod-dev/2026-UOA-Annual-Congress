@@ -5,12 +5,17 @@ import fs from "fs";
 const router = Router();
 
 // ── Helper: serve an image from the conference-app assets ────────────────────
+// The UOA demo event's images live in events/uoa-2026/assets (template layout);
+// the old assets/images folder is still checked for older checkouts.
+const ASSET_DIRS = [
+  "/home/runner/workspace/artifacts/conference-app/events/uoa-2026/assets",
+  "/home/runner/workspace/artifacts/conference-app/assets/images",
+];
 function serveAsset(res: Response, relativePath: string) {
-  const abs = path.resolve(
-    "/home/runner/workspace/artifacts/conference-app/assets/images",
-    relativePath
-  );
-  if (fs.existsSync(abs)) return res.sendFile(abs);
+  for (const dir of ASSET_DIRS) {
+    const abs = path.resolve(dir, relativePath);
+    if (fs.existsSync(abs)) return res.sendFile(abs);
+  }
   res.status(404).send("Image not found: " + relativePath);
 }
 
@@ -129,7 +134,7 @@ canvas{display:block;cursor:crosshair}
 
 <div id="output-panel">
   <div id="output-box">
-    <h2>Updated defaultOverlays.ts — paste this into constants/defaultOverlays.ts</h2>
+    <h2>Updated room overlays — copy each plan's overlays into events/&lt;slug&gt;/venueMaps.ts (floorPlans[].overlays)</h2>
     <textarea id="output-txt" readonly></textarea>
     <div class="output-actions">
       <button class="btn btn-indigo" onclick="copyOutput()">Copy to Clipboard</button>
@@ -436,7 +441,7 @@ function showOutput() {
 function copyOutput() {
   const ta = document.getElementById('output-txt');
   ta.select(); document.execCommand('copy');
-  setStatus('Copied to clipboard! Paste into artifacts/conference-app/constants/defaultOverlays.ts');
+  setStatus('Copied to clipboard! Copy the overlays into artifacts/conference-app/events/<slug>/venueMaps.ts');
 }
 
 function setStatus(s) { document.getElementById('status').textContent = s; }
@@ -494,7 +499,7 @@ body{font-family:-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;displ
   <canvas id="canvas"></canvas>
 </div>
 <div id="output-panel">
-  <h2>Updated BOOTH_ZONES — paste into exhibit-hall.tsx</h2>
+  <h2>Updated BOOTH_ZONES — paste into events/&lt;slug&gt;/exhibitHall.ts</h2>
   <textarea id="output-txt" readonly></textarea>
   <button class="btn btn-slate" style="margin-top:6px" onclick="document.getElementById('output-panel').style.display='none'">Close</button>
   <button class="btn btn-indigo" style="margin-top:6px;margin-left:6px" onclick="copyOutput()">Copy to Clipboard</button>

@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:operator-sessions": "esbuild src/lib/operator-session.test.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/operator-session-test.mjs && NODE_ENV=production node --test dist/operator-session-test.mjs",
     "test:unit": "node ./test.mjs",
-    "test:push": "node --test test/push/*.test.mjs"
+    "test:push": "node --test test/push/*.test.mjs",
+    "test:voting": "node --test test/voting/*.test.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

@@ -22,6 +22,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 A cross-platform mobile conference app built with Expo (React Native + TypeScript).
 
+**Template / events:** the app is a white-label template. Branding, store identity and bundled content for each event live in `events/<slug>/` (`event.json` + `index.ts` + `content.ts` + `assets/`). Pick one with `EVENT=<slug>` (default `uoa-2026`); `metro.config.js` resolves `import event from "@event"` to that folder. `events/sample-event` is the blank starter. Launch checklist: `docs/NEW_EVENT.md`.
+
 **Features:**
 - 5-tab bottom navigation: Home, Schedule, Para, My Schedule, More
 - Home screen with UOA logo, latest announcement card (tappable), quick action buttons, featured speakers horizontal scroll
@@ -38,7 +40,7 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 - Dark/light mode support (automatic based on system preference)
 - Push notifications: device registration on startup, admin screen to send announcements to all attendees (PIN comes from the `ADMIN_PIN` secret — never write it in this file)
 - Admin screen (/admin) — PIN-protected, quick-fill templates, compose + send to all registered devices
-- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (select up to 3), one vote per server-signed device token, gated by voting open/closed state
+- Business Meeting Voting screen (/voting) — two-section ballot: Officer Slate (approve/disapprove/abstain) + Board Trustee (candidates and max picks set per conference on the server; UOA: 4 candidates, pick up to 3), one vote per server-signed device token, gated by voting open/closed state
 
 **Push Notification Architecture:**
 - Mobile: `services/pushNotifications.ts` — Expo Push Token registration + send utility
@@ -64,9 +66,10 @@ A cross-platform mobile conference app built with Expo (React Native + TypeScrip
 
 **Business Meeting Voting Architecture:**
 - Mobile: `app/voting.tsx` — two-section ballot UI, deviceId-based one-vote limit, voting open/closed awareness
-- API: `POST /api/voting/submit` (cast ballot), `GET /api/voting/state` (open/closed), `GET /api/voting/status/:deviceId` (has voted?), `GET /api/voting/results` (admin only), `POST /api/voting/open|close|reset` (admin controls)
-- DB: `congress_votes` (device_id UNIQUE, slate_vote, trustee_votes TEXT[]), `congress_voting_state` (is_open flag)
-- Admin panel: "Voting" tab with open/close/reset controls + live bar charts for both Officer Slate and Trustee results
+- API: `POST /api/voting/submit` (cast ballot), `GET /api/voting/state` (open/closed + configured), `GET /api/voting/config` (this conference's candidates + max picks; 404 `voting_not_configured` if none), `PUT|DELETE /api/voting/config` (admin), `GET /api/voting/status` (has voted?), `GET /api/voting/results` (admin only), `POST /api/voting/open|close|reset` (admin controls)
+- DB: `congress_votes` (conference_id + device_id unique, slate_vote, trustee_votes TEXT[]), `congress_voting_state` (is_open per conference), `congress_voting_config` (conference_id PK, trustee_candidates TEXT[], max_trustee_selections). Created on the first voting request; conference 1 is seeded once with the UOA 2026 ballot.
+- Admin panel: "Voting" tab with open/close/reset controls, a Ballot editor, and live bar charts for both Officer Slate and Trustee results
+- Tests: `pnpm --filter @workspace/api-server test:voting` (needs `DATABASE_URL` of a throwaway database)
 - DeviceId: `services/deviceId.ts` — persisted via AsyncStorage (native) / localStorage (web), cached in memory
 
 **File structure:**
@@ -97,12 +100,15 @@ artifacts/conference-app/
   context/
     ScheduleContext.tsx   # Saved sessions via AsyncStorage
   services/
-    data.ts               # Real UOA 2026 conference data (27 sessions, 9 speakers)
-    speakerImages.ts      # Speaker photo mapping (s1–s9)
+    data.ts               # Re-exports the selected event's bundled content
+    speakerImages.ts      # Speaker photo mapping (from the selected event)
     pushNotifications.ts  # Push notification utilities
   shims/
     react-native-worklets-web.js  # No-op web stub for worklets package
-  assets/speakers/        # Real speaker photos (s1.jpg–s9.jpg)
+  events/
+    types.ts              # EventDefinition types
+    uoa-2026/             # UOA 2026: event.json, index.ts, content.ts, assets/ (icons, maps, speaker photos)
+    sample-event/         # Blank starter event
   types/
     index.ts
   constants/
@@ -131,6 +137,6 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `PUSH_SCHEDULER_IN_PROCESS` (optional, default `false`) — when `true`, the API server also runs scheduled announcements on an in-process 60-second timer. Only use this on an always-on single instance (it does not run while an autoscale deployment is asleep).
 - `EXPO_ACCESS_TOKEN` (optional) — only needed if "Enhanced push security" is turned on in the Expo project.
 - The admin dashboard is served on the same domain (`/admin-dashboard/`), so it is covered by the CORS rules above.
-- Unit tests: `pnpm --filter @workspace/api-server run test:unit`. DB-backed suites (`test:community`, `test:push`) need `DATABASE_URL`.
+- Unit tests: `pnpm --filter @workspace/api-server run test:unit`. DB-backed suites (`test:community`, `test:push`, `test:voting`) need `DATABASE_URL`.
 
 **Push notifications:** devices register with `POST /api/push/register` (one row per conference + token). Sends use `expo-server-sdk` with high priority and Android channel `default`; tickets are stored in `congress_push_tickets` and delivery receipts are checked about 15 minutes later (tokens reported as `DeviceNotRegistered` are removed). Android push needs `google-services.json` (see `GOOGLE_SERVICES_JSON` in `app.config.ts`) plus an FCM V1 key in Expo credentials; iOS needs an APNs key in Expo credentials.

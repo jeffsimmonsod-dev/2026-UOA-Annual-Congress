@@ -14,6 +14,7 @@ import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
 import { useConferenceData } from "@/context/ConferenceDataContext";
+import event from "@event";
 
 const DAYS = ["Thu, June 4", "Fri, June 5", "Sat, June 6"];
 
@@ -46,7 +47,7 @@ export default function ParaScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: colors.primary }]}>
-              Paraoptometric Education
+              {event.content.schedule.paraScheduleTitle}
             </Text>
             <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>
               {conf.conferenceName} · {conf.paraCreditType}
