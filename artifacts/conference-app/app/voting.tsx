@@ -21,8 +21,10 @@ import { apiFetch } from "@/services/apiFetch";
 import event from "@event";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
-// Ballot content comes from the event folder (events/<slug>/index.ts → content.voting).
-// NOTE: the API server also validates trustee names (api-server/src/routes/voting.ts).
+// Ballot text comes from the event folder (events/<slug>/index.ts → content.voting).
+// Trustee candidates and the max-picks limit come from the server
+// (GET /api/voting/config, set per conference by an admin) when it answers;
+// the event folder's list is only a fallback for when the server can't be reached.
 const VOTING = event.content.voting ?? {
   officerSlateDescription: "",
   officerSlate: [],
@@ -31,12 +33,30 @@ const VOTING = event.content.voting ?? {
   trusteeInstructions: "",
 };
 const OFFICER_SLATE = VOTING.officerSlate;
-const TRUSTEE_CANDIDATES = VOTING.trusteeCandidates;
-const MAX_TRUSTEES = VOTING.maxTrusteeSelections;
+
+type Ballot = { trusteeCandidates: string[]; maxTrusteeSelections: number };
+const FALLBACK_BALLOT: Ballot = {
+  trusteeCandidates: VOTING.trusteeCandidates,
+  maxTrusteeSelections: VOTING.maxTrusteeSelections,
+};
+
+/** Server ballot, `null` if the server says voting isn't set up, or `undefined` if unknown (use fallback). */
+async function readServerBallot(res: Response): Promise<Ballot | null | undefined> {
+  try {
+    const data = await res.json();
+    if (res.ok && Array.isArray(data?.trusteeCandidates) && typeof data?.maxTrusteeSelections === "number") {
+      return { trusteeCandidates: data.trusteeCandidates, maxTrusteeSelections: data.maxTrusteeSelections };
+    }
+    if (res.status === 404 && data?.code === "voting_not_configured") return null;
+  } catch {
+    // Older server or bad response — fall back to the event's ballot.
+  }
+  return undefined;
+}
 
 type SlateVote = "approve" | "disapprove" | "abstain";
 
-type PageState = "loading" | "closed" | "vote" | "already_voted" | "submitted";
+type PageState = "loading" | "closed" | "not_configured" | "vote" | "already_voted" | "submitted";
 
 export default function VotingScreen() {
   const colors = useColors();
@@ -53,15 +73,24 @@ export default function VotingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const votingTokenRef = useRef<string>("");
+  const [ballot, setBallot] = useState<Ballot>(FALLBACK_BALLOT);
+  const TRUSTEE_CANDIDATES = ballot.trusteeCandidates;
+  const MAX_TRUSTEES = ballot.maxTrusteeSelections;
 
   useEffect(() => {
     async function init() {
       try {
         let votingToken = await getVotingToken(API_BASE);
-        const [stateRes, firstStatusRes] = await Promise.all([
+        const [stateRes, firstStatusRes, serverBallot] = await Promise.all([
           apiFetch(`${API_BASE}/api/voting/state`),
           apiFetch(`${API_BASE}/api/voting/status`, { headers: { "x-voting-token": votingToken } }),
+          apiFetch(`${API_BASE}/api/voting/config`).then(readServerBallot, () => undefined),
         ]);
+        if (serverBallot === null) {
+          setPageState("not_configured");
+          return;
+        }
+        if (serverBallot) setBallot(serverBallot);
         let statusRes = firstStatusRes;
         if (statusRes.status === 401) {
           // Stored token no longer valid (e.g. server secret rotated) — get a fresh one.
@@ -128,6 +157,8 @@ export default function VotingScreen() {
         setPageState("already_voted");
       } else if (res.status === 403) {
         setPageState("closed");
+      } else if (res.status === 404 && data.code === "voting_not_configured") {
+        setPageState("not_configured");
       } else if (res.status === 401) {
         await clearVotingToken();
         setSubmitError(data.error || "Please close and reopen the voting screen, then try again.");
@@ -154,16 +185,20 @@ export default function VotingScreen() {
     );
   }
 
-  if (pageState === "closed") {
+  if (pageState === "closed" || pageState === "not_configured") {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.statusIcon, { backgroundColor: "#64748b18" }]}>
             <Ionicons name="lock-closed-outline" size={32} color="#64748b" />
           </View>
-          <Text style={[styles.statusTitle, { color: colors.foreground }]}>Voting is Closed</Text>
+          <Text style={[styles.statusTitle, { color: colors.foreground }]}>
+            {pageState === "closed" ? "Voting is Closed" : "Voting Not Available"}
+          </Text>
           <Text style={[styles.statusDesc, { color: colors.mutedForeground }]}>
-            Voting is not currently open. Please check back during the Business Meeting.
+            {pageState === "closed"
+              ? "Voting is not currently open. Please check back during the Business Meeting."
+              : "Voting hasn't been set up for this event yet."}
           </Text>
           <Pressable
             onPress={() => router.back()}

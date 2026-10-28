@@ -122,7 +122,11 @@ export interface ExhibitHallContent {
 export interface VotingContent {
   officerSlateDescription: string;
   officerSlate: { role: string; name: string }[];
-  /** NOTE: the server currently validates trustee names itself (api-server/src/routes/voting.ts). */
+  /**
+   * Fallback only. The app uses the server's ballot (GET /api/voting/config,
+   * set per conference in the admin dashboard) and only shows this list when
+   * the server can't be reached. Votes are always checked against the server's list.
+   */
   trusteeCandidates: string[];
   maxTrusteeSelections: number;
   trusteeInstructions: string;
