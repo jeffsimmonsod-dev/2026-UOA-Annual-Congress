@@ -22,6 +22,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 A cross-platform mobile conference app built with Expo (React Native + TypeScript).
 
+**Template / events:** the app is a white-label template. Branding, store identity and bundled content for each event live in `events/<slug>/` (`event.json` + `index.ts` + `content.ts` + `assets/`). Pick one with `EVENT=<slug>` (default `uoa-2026`); `metro.config.js` resolves `import event from "@event"` to that folder. `events/sample-event` is the blank starter. Launch checklist: `docs/NEW_EVENT.md`.
+
 **Features:**
 - 5-tab bottom navigation: Home, Schedule, Para, My Schedule, More
 - Home screen with UOA logo, latest announcement card (tappable), quick action buttons, featured speakers horizontal scroll
@@ -97,12 +99,15 @@ artifacts/conference-app/
   context/
     ScheduleContext.tsx   # Saved sessions via AsyncStorage
   services/
-    data.ts               # Real UOA 2026 conference data (27 sessions, 9 speakers)
-    speakerImages.ts      # Speaker photo mapping (s1–s9)
+    data.ts               # Re-exports the selected event's bundled content
+    speakerImages.ts      # Speaker photo mapping (from the selected event)
     pushNotifications.ts  # Push notification utilities
   shims/
     react-native-worklets-web.js  # No-op web stub for worklets package
-  assets/speakers/        # Real speaker photos (s1.jpg–s9.jpg)
+  events/
+    types.ts              # EventDefinition types
+    uoa-2026/             # UOA 2026: event.json, index.ts, content.ts, assets/ (icons, maps, speaker photos)
+    sample-event/         # Blank starter event
   types/
     index.ts
   constants/
