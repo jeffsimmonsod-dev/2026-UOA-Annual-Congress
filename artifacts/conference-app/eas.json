@@ -49,7 +49,9 @@
   },
   "submit": {
     "production": {
-      "ios": {},
+      "ios": {
+        "ascAppId": "6763956551"
+      },
       "android": {
         "track": "internal"
       }
@@ -58,7 +60,10 @@
       "extends": "production"
     },
     "sample-event": {
-      "extends": "production"
+      "android": {
+        "track": "internal"
+      },
+      "ios": {}
     }
   }
 }
