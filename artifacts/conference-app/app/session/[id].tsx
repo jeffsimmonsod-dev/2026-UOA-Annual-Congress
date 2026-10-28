@@ -21,27 +21,9 @@ import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
 import { useConferenceData } from "@/context/ConferenceDataContext";
 import RoomMapModal from "@/components/RoomMapModal";
+import event from "@event";
 
-const TRACK_COLORS: Record<string, string> = {
-  "Retinal Disease": "#ef4444",
-  "Neuro-Optometry": "#8b5cf6",
-  Glaucoma: "#10b981",
-  Pharmacology: "#d946ef",
-  "Practice Management": "#3b82f6",
-  "Pediatrics & BV": "#ec4899",
-  "ABO/CPC": "#3b82f6",
-  General: "#64748b",
-  Optical: "#f97316",
-  "Contact Lenses": "#06b6d4",
-  "Clinical Knowledge": "#84cc16",
-  "Topical Diagnosis": "#14b8a6",
-  "Ocular Disease": "#6366f1",
-  "Systemic Disease": "#f97316",
-  CPC: "#0ea5e9",
-  CPO: "#0ea5e9",
-  "ABO/CPO": "#0ea5e9",
-  "Meal / Social": "#f59e0b",
-};
+const TRACK_COLORS: Record<string, string> = event.content.scheduleTrackColors ?? event.content.trackColors;
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -126,7 +108,7 @@ export default function SessionDetailScreen() {
         />
         <MetaRow icon="calendar-outline" label="Day" value={session.day} colors={colors} />
         {session.copeId && (
-          <MetaRow icon="school-outline" label="COPE" value={session.copeId} colors={colors} />
+          <MetaRow icon="school-outline" label={event.content.schedule.creditIdLabel} value={session.copeId} colors={colors} />
         )}
       </View>
 

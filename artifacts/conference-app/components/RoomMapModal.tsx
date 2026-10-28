@@ -20,35 +20,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getRoomColor } from "@/constants/roomColors";
 import { DEFAULT_OVERLAYS, RoomOverlay } from "@/constants/defaultOverlays";
 import { loadAllOverlays } from "@/hooks/useOverlays";
+import event from "@event";
 
 const SCREEN = Dimensions.get("window");
 
-const FLOOR_PLANS_BASE = [
-  {
-    id: "lake",
-    label: "Lake Level",
-    source: require("@/assets/images/floorplan-lake-level.png"),
-    nativeW: 1000,
-    nativeH: 880,
-    rooms: ["Deer Creek Ballroom", "Jordanelle Ballroom", "Strawberry Conference Room"],
-  },
-  {
-    id: "mid",
-    label: "Mid Mountain Level",
-    source: require("@/assets/images/floorplan-mid-mountain.png"),
-    nativeW: 530,
-    nativeH: 589,
-    rooms: ["Empire Conference Room", "Dutch Conference Room"],
-  },
-  {
-    id: "main",
-    label: "Main Level",
-    source: require("@/assets/images/floorplan-main-level.png"),
-    nativeW: 1163,
-    nativeH: 767,
-    rooms: ["Hailstone Terrace", "Remington Hall Restaurant"],
-  },
-];
+// Floor plans come from the event folder (overlays loaded dynamically from storage).
+const FLOOR_PLANS_BASE = event.content.floorPlans.map(({ overlays: _defaults, ...plan }) => plan);
 
 function RoomOverlaysSvg({
   overlays,

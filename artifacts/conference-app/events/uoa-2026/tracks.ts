@@ -1,0 +1,56 @@
+// Session track colors and short labels for the UOA 2026 schedule.
+export const trackColors: Record<string, string> = {
+  "Retinal Disease": "#ef4444",
+  "Neuro-Optometry": "#8b5cf6",
+  Glaucoma: "#10b981",
+  Pharmacology: "#d946ef",
+  "Practice Management": "#3b82f6",
+  "Pediatrics & BV": "#ec4899",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  "ABO/CPC": "#0ea5e9",
+  General: "#6b7280",
+  Optical: "#a855f7",
+  "Clinical Knowledge": "#84cc16",
+  "Contact Lenses": "#06b6d4",
+  CPC: "#0ea5e9",
+  CPO: "#0ea5e9",
+  "ABO/CPO": "#0ea5e9",
+  "Meal / Social": "#f59e0b",
+};
+
+// Slightly different palette used on the Schedule tab and session detail screen.
+export const scheduleTrackColors: Record<string, string> = {
+  "Retinal Disease": "#ef4444",
+  "Neuro-Optometry": "#8b5cf6",
+  Glaucoma: "#10b981",
+  Pharmacology: "#d946ef",
+  "Practice Management": "#3b82f6",
+  "Pediatrics & BV": "#ec4899",
+  "ABO/CPC": "#3b82f6",
+  General: "#64748b",
+  Optical: "#f97316",
+  "Contact Lenses": "#06b6d4",
+  "Clinical Knowledge": "#84cc16",
+  "Topical Diagnosis": "#14b8a6",
+  "Ocular Disease": "#6366f1",
+  "Systemic Disease": "#f97316",
+  CPC: "#0ea5e9",
+  CPO: "#0ea5e9",
+  "ABO/CPO": "#0ea5e9",
+  "Meal / Social": "#f59e0b",
+};
+
+export const trackShortLabels: Record<string, string> = {
+  "Retinal Disease": "Retina",
+  "Neuro-Optometry": "Neuro",
+  Glaucoma: "Glaucoma",
+  Pharmacology: "Pharm",
+  "Practice Management": "Practice",
+  "Pediatrics & BV": "Peds/BV",
+  "Topical Diagnosis": "Anterior Seg",
+  "Ocular Disease": "Ocular Dis.",
+  "Systemic Disease": "Systemic",
+  "Meal / Social": "Social",
+};

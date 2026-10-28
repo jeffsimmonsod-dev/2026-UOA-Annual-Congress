@@ -8,32 +8,14 @@ import { useConferenceData } from "@/context/ConferenceDataContext";
 import { useColors } from "@/hooks/useColors";
 import { getRoomColor } from "@/constants/roomColors";
 import type { Session } from "@/types";
+import event from "@event";
 
 interface Props {
   session: Session;
   showDay?: boolean;
 }
 
-const TRACK_COLORS: Record<string, string> = {
-  "Retinal Disease": "#ef4444",
-  "Neuro-Optometry": "#8b5cf6",
-  Glaucoma: "#10b981",
-  Pharmacology: "#d946ef",
-  "Practice Management": "#3b82f6",
-  "Pediatrics & BV": "#ec4899",
-  "Topical Diagnosis": "#14b8a6",
-  "Ocular Disease": "#6366f1",
-  "Systemic Disease": "#f97316",
-  "ABO/CPC": "#0ea5e9",
-  General: "#6b7280",
-  Optical: "#a855f7",
-  "Clinical Knowledge": "#84cc16",
-  "Contact Lenses": "#06b6d4",
-  CPC: "#0ea5e9",
-  CPO: "#0ea5e9",
-  "ABO/CPO": "#0ea5e9",
-  "Meal / Social": "#f59e0b",
-};
+const TRACK_COLORS: Record<string, string> = event.content.trackColors;
 
 export default function SessionCard({ session, showDay = false }: Props) {
   "use no memo";

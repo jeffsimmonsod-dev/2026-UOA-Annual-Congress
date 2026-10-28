@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useProfile } from "@/context/ProfileContext";
 import { enablePushNotificationsAsync } from "@/services/pushNotifications";
+import conferenceConfig from "@/conference.config";
 
 const STORAGE_KEY = "@uoa_notif_prompt_shown";
 
@@ -83,7 +84,7 @@ export default function NotificationPromptModal() {
             Stay in the know
           </Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            Enable notifications to get real-time alerts for sponsored lunches, prize giveaways, raffle drawings, and important schedule updates during the congress.
+            Enable notifications to get real-time alerts for sponsored lunches, prize giveaways, raffle drawings, and important schedule updates during the {conferenceConfig.eventNoun}.
           </Text>
 
           <View style={styles.bullets}>

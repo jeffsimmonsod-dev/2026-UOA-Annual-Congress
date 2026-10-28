@@ -14,6 +14,7 @@ import conferenceConfig from "@/conference.config";
 import { useColors } from "@/hooks/useColors";
 import { useConference } from "@/hooks/useConference";
 import { useTabletLayout } from "@/hooks/useTabletLayout";
+import event from "@event";
 
 interface MenuItem {
   label: string;
@@ -22,13 +23,16 @@ interface MenuItem {
   route?: string;
   action?: () => void;
   description: string;
+  /** false hides the item (feature not configured for this event). */
+  enabled?: boolean;
 }
 
 const useMenuItems = (): MenuItem[] => {
   const conf = useConference();
-  return [
+  const items: MenuItem[] = [
     {
       label: "Exhibit Hall",
+      enabled: !!event.content.exhibitHall,
       icon: "storefront-outline" as keyof typeof Ionicons.glyphMap,
       color: "#f59e0b",
       route: "/exhibit-hall",
@@ -67,7 +71,7 @@ const useMenuItems = (): MenuItem[] => {
       icon: "location-outline",
       color: "#14b8a6",
       route: "/(tabs)/venue",
-      description: "Grand Hyatt Deer Valley",
+      description: event.content.venue.name,
     },
     {
       label: "FAQ",
@@ -85,12 +89,14 @@ const useMenuItems = (): MenuItem[] => {
     },
     {
       label: "Business Meeting Voting",
+      enabled: !!event.content.voting,
       icon: "checkbox-outline" as keyof typeof Ionicons.glyphMap,
       color: conferenceConfig.primaryColor,
       route: "/voting",
       description: "Officer slate & board trustee vote",
     },
   ];
+  return items.filter((item) => item.enabled !== false);
 };
 
 export default function MoreScreen() {
@@ -114,7 +120,7 @@ export default function MoreScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={[styles.conferenceTag, { backgroundColor: colors.accent }]}>
-        <Ionicons name="eye-outline" size={14} color={colors.primary} />
+        <Ionicons name={conf.brandIcon as keyof typeof Ionicons.glyphMap} size={14} color={colors.primary} />
         <Text style={[styles.conferenceTagText, { color: colors.primary }]}>
           {conf.conferenceName} · {conf.dates}
         </Text>

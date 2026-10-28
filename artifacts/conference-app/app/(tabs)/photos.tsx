@@ -400,7 +400,7 @@ export default function PhotosScreen() {
               <Ionicons name="images-outline" size={48} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No photos yet</Text>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                Be the first to share a moment from the congress!
+                Be the first to share a moment from the {conferenceConfig.eventNoun}!
               </Text>
             </View>
           )
@@ -453,7 +453,7 @@ export default function PhotosScreen() {
             <View style={[styles.disclaimer, { backgroundColor: colors.muted, borderColor: colors.border }]}>
               <Ionicons name="information-circle-outline" size={14} color={colors.mutedForeground} />
               <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
-                By sharing this photo you consent to it being used by the Utah Optometric Association for marketing and promotional purposes.
+                By sharing this photo you consent to it being used by the {conferenceConfig.organizationName} for marketing and promotional purposes.
               </Text>
             </View>
 

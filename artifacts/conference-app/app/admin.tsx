@@ -555,12 +555,12 @@ export default function AdminScreen() {
             <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Admin Panel</Text>
-              <Text style={[styles.sectionSub, { color: colors.mutedForeground }]}>UOA Staff Only</Text>
+              <Text style={[styles.sectionSub, { color: colors.mutedForeground }]}>{conferenceConfig.organizationShortName} Staff Only</Text>
             </View>
           </View>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.label, { color: colors.foreground }]}>Admin PIN</Text>
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Enter the UOA admin PIN to access this feature.</Text>
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>Enter the {conferenceConfig.organizationShortName} admin PIN to access this feature.</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.muted, color: colors.foreground, borderColor: pinError ? "#ef4444" : colors.border }]}
               placeholder="Enter PIN"

@@ -18,22 +18,21 @@ import { clearVotingToken, getVotingToken } from "@/services/votingToken";
 
 import conferenceConfig from "@/conference.config";
 import { apiFetch } from "@/services/apiFetch";
+import event from "@event";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
-const OFFICER_SLATE = [
-  { role: "President", name: "Dr. Jeff Simmons" },
-  { role: "President-Elect", name: "Dr. Collin Gray" },
-  { role: "Past President", name: "Dr. Kenyon Anderson" },
-  { role: "VP Legislation", name: "Dr. Court Wilkins" },
-  { role: "VP Finance", name: "Dr. Kyle Wilson" },
-];
-
-const TRUSTEE_CANDIDATES = [
-  "Dr. Steven Blake",
-  "Dr. Aaron King",
-  "Dr. Jonathon King",
-  "Dr. Taylor Linton",
-];
+// Ballot content comes from the event folder (events/<slug>/index.ts → content.voting).
+// NOTE: the API server also validates trustee names (api-server/src/routes/voting.ts).
+const VOTING = event.content.voting ?? {
+  officerSlateDescription: "",
+  officerSlate: [],
+  trusteeCandidates: [],
+  maxTrusteeSelections: 0,
+  trusteeInstructions: "",
+};
+const OFFICER_SLATE = VOTING.officerSlate;
+const TRUSTEE_CANDIDATES = VOTING.trusteeCandidates;
+const MAX_TRUSTEES = VOTING.maxTrusteeSelections;
 
 type SlateVote = "approve" | "disapprove" | "abstain";
 
@@ -94,7 +93,7 @@ export default function VotingScreen() {
       if (prev.includes(candidate)) {
         return prev.filter((c) => c !== candidate);
       }
-      if (prev.length >= 3) {
+      if (prev.length >= MAX_TRUSTEES) {
         setTrusteeError(true);
         return prev;
       }
@@ -243,7 +242,7 @@ export default function VotingScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Officer Slate</Text>
         </View>
         <Text style={[styles.sectionDesc, { color: colors.mutedForeground }]}>
-          The following officers have been nominated for the 2026–2027 term. No nominations will be accepted from the floor.
+          {VOTING.officerSlateDescription}
         </Text>
 
         <View style={[styles.slateList, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -302,11 +301,11 @@ export default function VotingScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Board Trustee Vote</Text>
         </View>
         <Text style={[styles.sectionDesc, { color: colors.mutedForeground }]}>
-          Please select up to THREE candidates.
+          {VOTING.trusteeInstructions}
         </Text>
 
         {trusteeError && (
-          <Text style={styles.errorText}>You may select a maximum of 3 candidates.</Text>
+          <Text style={styles.errorText}>You may select a maximum of {MAX_TRUSTEES} candidates.</Text>
         )}
 
         <View style={styles.checkGroup}>
@@ -344,7 +343,7 @@ export default function VotingScreen() {
         </View>
 
         <Text style={[styles.selectionCount, { color: colors.mutedForeground }]}>
-          {selectedTrustees.length} of 3 selected
+          {selectedTrustees.length} of {MAX_TRUSTEES} selected
         </Text>
       </View>
 

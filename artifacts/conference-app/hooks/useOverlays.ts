@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { DEFAULT_OVERLAYS, PlanData, RoomOverlay } from "@/constants/defaultOverlays";
+import { DEFAULT_OVERLAYS, FALLBACK_PLAN, PlanData, RoomOverlay } from "@/constants/defaultOverlays";
 
 const STORAGE_KEY = "@uoa_overlays_v1";
 
@@ -25,13 +25,13 @@ export async function loadAllOverlays(): Promise<Record<string, PlanData>> {
 export async function loadPlanOverlays(planId: string): Promise<PlanData> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_OVERLAYS[planId] ?? DEFAULT_OVERLAYS.lake;
+    if (!raw) return DEFAULT_OVERLAYS[planId] ?? FALLBACK_PLAN;
     const saved: Record<string, RoomOverlay[]> = JSON.parse(raw);
-    const base = DEFAULT_OVERLAYS[planId] ?? DEFAULT_OVERLAYS.lake;
+    const base = DEFAULT_OVERLAYS[planId] ?? FALLBACK_PLAN;
     if (saved[planId]) return { ...base, overlays: saved[planId] };
     return base;
   } catch {
-    return DEFAULT_OVERLAYS[planId] ?? DEFAULT_OVERLAYS.lake;
+    return DEFAULT_OVERLAYS[planId] ?? FALLBACK_PLAN;
   }
 }
 
