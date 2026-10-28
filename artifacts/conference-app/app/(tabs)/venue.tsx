@@ -452,7 +452,8 @@ export default function VenueScreen() {
           })}
         </View>
 
-        {/* Floor Plans */}
+        {/* Floor Plans (only when the event has any) */}
+        {plans.length > 0 && (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SectionHeader icon="map-outline" title="Floor Plans" colors={colors} />
           <Text style={[styles.floorPlanHint, { color: colors.mutedForeground }]}>
@@ -496,6 +497,7 @@ export default function VenueScreen() {
             </Pressable>
           ))}
         </View>
+        )}
       </ScrollView>
 
       {/* ── Full-screen zoomable lightbox ── */}

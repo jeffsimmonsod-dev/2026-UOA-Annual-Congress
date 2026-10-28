@@ -1,0 +1,29 @@
+{
+  "appName": "Sample Event 2027",
+  "version": "1.0.0",
+  "expoSlug": "sample-event-2027",
+  "easProjectId": "",
+  "scheme": "sample-event-2027",
+  "serverDomain": "expo-conference-hub.replit.app",
+  "ios": {
+    "bundleIdentifier": "com.example.sampleevent2027",
+    "buildNumber": "1",
+    "cameraUsageDescription": "Used to scan booth QR codes in the exhibit hall"
+  },
+  "android": {
+    "package": "com.example.sampleevent2027",
+    "versionCode": 1
+  },
+  "images": {
+    "icon": "app-icon.png",
+    "adaptiveIcon": "app-icon-adaptive.png",
+    "splash": "app-icon.png",
+    "notificationIcon": "notification-icon.png",
+    "favicon": "app-icon.png"
+  },
+  "colors": {
+    "splashBackground": "#0f766e",
+    "adaptiveIconBackground": "#0f766e",
+    "notification": "#0f766e"
+  }
+}

@@ -110,9 +110,8 @@ export default {
     },
     extra: {
       event: eventSlug,
-      eas: {
-        projectId: event.easProjectId,
-      },
+      // Leave easProjectId empty until `eas init` has created the EAS project.
+      ...(event.easProjectId ? { eas: { projectId: event.easProjectId } } : {}),
     },
   },
 };
