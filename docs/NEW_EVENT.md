@@ -62,10 +62,10 @@ Work through these in order. Items marked **(Jarf)** need an account owner.
   named after the slug (copy `sample-event`), with
   `"env": { "EVENT": "acme-2027", "EXPO_PUBLIC_DOMAIN": "<server host>" }`.
 - [ ] The `production` profile stays **UOA 2026**. Pushes to `main` that touch
-  `artifacts/conference-app/**` auto-build `production` (Android) via
-  `.github/workflows/eas-build.yml`. Other events build from the Actions tab
-  ("Run workflow" → profile `acme-2027`) or locally:
-  `eas build --profile acme-2027 --platform all`.
+  `artifacts/conference-app/**` auto-build `production` (UOA, Android) via
+  `.github/workflows/eas-build.yml`. Build other events locally:
+  `eas build --profile acme-2027 --platform all`. (Optional: add a `profile`
+  input to that workflow so other events can be built from the Actions tab.)
 
 ### 3. EAS project **(Jarf)**
 
@@ -132,7 +132,6 @@ Work through these in order. Items marked **(Jarf)** need an account owner.
 ### 9. Ship
 
 - [ ] Internal build: `eas build --profile acme-2027 --platform all`
-  (or the GitHub "EAS Build" workflow with that profile — Android only).
 - [ ] Test on devices: schedule, speakers, push (send a test announcement),
   photos, exhibit hall/voting if enabled.
 - [ ] `eas submit --profile acme-2027`, then promote in each store.
