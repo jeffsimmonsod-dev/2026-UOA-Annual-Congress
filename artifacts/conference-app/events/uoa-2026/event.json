@@ -6,8 +6,8 @@
   "scheme": "conference-app",
   "serverDomain": "expo-conference-hub.replit.app",
   "ios": {
-    "bundleIdentifier": "org.utaheyedoc.congress2026",
-    "buildNumber": "5",
+    "bundleIdentifier": "app.replit.uoaannualcongress2026",
+    "buildNumber": "20",
     "cameraUsageDescription": "Used to scan booth QR codes in the exhibit hall"
   },
   "android": {
