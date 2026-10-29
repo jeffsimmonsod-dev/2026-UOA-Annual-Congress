@@ -45,6 +45,14 @@
         "EVENT": "sample-event",
         "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
       }
+    },
+    "uoa-2026-apk": {
+      "extends": "uoa-2026",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
