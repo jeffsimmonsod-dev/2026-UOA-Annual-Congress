@@ -4,6 +4,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
+import { Image as ExpoImage } from "expo-image";
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +29,14 @@ import conferenceConfig from "@/conference.config";
 import ZoomableImage from "@/components/ZoomableImage";
 import { apiFetch } from "@/services/apiFetch";
 import { CommunitySections, PhotoComments, ReportDialog } from "@/components/CommunityFeatures";
-import { API_BASE, communityRequest, getOrCreatePhotoSessionToken } from "@/services/community";
+import {
+  API_BASE,
+  CommunityRequestError,
+  getOrCreatePhotoSessionToken,
+  onPhotoSessionTokenChange,
+  sessionRequest,
+  withPhotoSession,
+} from "@/services/community";
 const PHOTO_TOKENS_KEY = "@photo_delete_tokens";
 
 interface PhotoItem {
@@ -82,6 +90,13 @@ export default function PhotosScreen() {
     });
   }, []);
 
+  // When any request finds the stored token was rejected and replaces it,
+  // pick up the new token here too.
+  useEffect(() => onPhotoSessionTokenChange((token) => {
+    setSessionToken(token);
+    setSessionError("");
+  }), []);
+
   const [uploadModal, setUploadModal] = useState(false);
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
@@ -103,10 +118,9 @@ export default function PhotosScreen() {
 
   const submitPhotoReport = async (reason: string) => {
     if (!sessionToken || !fullscreenPhoto) throw new Error("Your photo session is not ready.");
-    await communityRequest("/api/community/reports", {
+    await sessionRequest("/api/community/reports", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionToken, type: "photo", id: fullscreenPhoto.id, reason }),
+      body: { type: "photo", id: fullscreenPhoto.id, reason },
     });
   };
 
@@ -126,7 +140,9 @@ export default function PhotosScreen() {
     }
   }, [sessionToken]);
 
-  useEffect(() => { fetchPhotos(); }, [fetchPhotos]);
+  // useFocusEffect also runs on first focus and again when fetchPhotos changes
+  // (i.e. when the session token arrives), so a separate mount effect would
+  // only duplicate the request.
   useFocusEffect(useCallback(() => {
     if (section === "photos") fetchPhotos();
   }, [fetchPhotos, section]));
@@ -178,12 +194,7 @@ export default function PhotosScreen() {
       )
     );
     try {
-      const res = await apiFetch(`${API_BASE}/api/photos/${photo.id}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionToken }),
-      });
-      const data = await res.json();
+      const data = await sessionRequest<PhotoItem>(`/api/photos/${encodeURIComponent(photo.id)}/like`, { method: "POST" });
       setPhotos((prev) => prev.map((p) => (p.id === data.id ? data : p)));
     } catch {
       fetchPhotos();
@@ -222,51 +233,53 @@ export default function PhotosScreen() {
     }
     setUploading(true);
     try {
-      let uploadedPhoto: any = null;
-
-      if (Platform.OS === "web") {
-        // Web: use standard FormData + fetch
-        const form = new FormData();
-        form.append("photo", {
-          uri: pickedUri,
-          name: "photo.jpg",
-          type: "image/jpeg",
-        } as any);
-        form.append("uploaderName", uploaderName);
-        form.append("caption", caption.trim());
-        form.append("sessionToken", sessionToken);
-        const res = await apiFetch(`${API_BASE}/api/photos/upload`, {
-          method: "POST",
-          body: form,
-        });
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(`Upload failed (${res.status}): ${JSON.stringify(errBody)}`);
-        }
-        uploadedPhoto = await res.json().catch(() => null);
-      } else {
-        // Native (iOS/Android): use FileSystem.uploadAsync for reliable multipart upload
-        const result = await FileSystem.uploadAsync(
-          `${API_BASE}/api/photos/upload`,
-          pickedUri,
-          {
-            fieldName: "photo",
-            httpMethod: "POST",
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-            headers: { "X-Conference-Id": String(conferenceConfig.conferenceId) },
-            parameters: {
-              uploaderName,
-              caption: caption.trim(),
-              sessionToken,
-            },
+      // withPhotoSession retries once with a new token if the server rejected the stored one.
+      const uploadedPhoto: any = await withPhotoSession(async (sessionToken) => {
+        if (Platform.OS === "web") {
+          // Web: use standard FormData + fetch
+          const form = new FormData();
+          form.append("photo", {
+            uri: pickedUri,
+            name: "photo.jpg",
+            type: "image/jpeg",
+          } as any);
+          form.append("uploaderName", uploaderName);
+          form.append("caption", caption.trim());
+          form.append("sessionToken", sessionToken);
+          const res = await apiFetch(`${API_BASE}/api/photos/upload`, {
+            method: "POST",
+            body: form,
+          });
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new CommunityRequestError(errBody?.error || `Upload failed (${res.status})`, res.status);
           }
-        );
-        if (result.status < 200 || result.status >= 300) {
-          const errBody = JSON.parse(result.body || "{}");
-          throw new Error(`Upload failed (${result.status}): ${JSON.stringify(errBody)}`);
+          return res.json().catch(() => null);
+        } else {
+          // Native (iOS/Android): use FileSystem.uploadAsync for reliable multipart upload
+          const result = await FileSystem.uploadAsync(
+            `${API_BASE}/api/photos/upload`,
+            pickedUri,
+            {
+              fieldName: "photo",
+              httpMethod: "POST",
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              headers: { "X-Conference-Id": String(conferenceConfig.conferenceId) },
+              parameters: {
+                uploaderName,
+                caption: caption.trim(),
+                sessionToken,
+              },
+            }
+          );
+          if (result.status < 200 || result.status >= 300) {
+            let errBody: any = {};
+            try { errBody = JSON.parse(result.body || "{}"); } catch { /* not JSON */ }
+            throw new CommunityRequestError(errBody?.error || `Upload failed (${result.status})`, result.status);
+          }
+          return JSON.parse(result.body || "null");
         }
-        uploadedPhoto = JSON.parse(result.body || "null");
-      }
+      });
       if (uploadedPhoto?.id && uploadedPhoto?.deleteToken) {
         const newTokens = { ...myPhotoTokens, [uploadedPhoto.id]: uploadedPhoto.deleteToken };
         setMyPhotoTokens(newTokens);
@@ -278,7 +291,7 @@ export default function PhotosScreen() {
       setCaption("");
       fetchPhotos();
     } catch (err) {
-      Alert.alert("Upload failed", String(err));
+      Alert.alert("Upload failed", err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
     }
@@ -292,10 +305,15 @@ export default function PhotosScreen() {
     return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Pressable onPress={() => setFullscreenPhoto(item)}>
-        <Image
+        {/* expo-image: decodes off the JS thread, caches to memory+disk, and
+            downsamples to the view size instead of decoding full-size uploads. */}
+        <ExpoImage
           source={{ uri: getImageUrl(item.objectPath) }}
           style={styles.cardImage}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={item.id}
+          transition={120}
         />
       </Pressable>
       <View style={styles.cardFooter}>
@@ -370,6 +388,10 @@ export default function PhotosScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderPhoto}
         numColumns={numPhotoColumns}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === "android"}
         columnWrapperStyle={styles.row}
         contentContainerStyle={[
           styles.list,

@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
+import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
 import {
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -106,7 +106,7 @@ function SponsorCard({
     >
       <View style={styles.cardHeader}>
         <View style={[styles.logoContainer, { backgroundColor: colors.muted }]}>
-          <Image source={{ uri: sponsor.logo }} style={styles.logo} resizeMode="contain" />
+          <ExpoImage source={{ uri: sponsor.logo }} style={styles.logo} contentFit="contain" cachePolicy="memory-disk" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.sponsorName, { color: colors.foreground }]}>{sponsor.name}</Text>
@@ -176,7 +176,7 @@ function SponsorDetailModal({
           {/* Logo + name block */}
           <View style={styles.modalHero}>
             <View style={[styles.modalLogoWrap, { backgroundColor: colors.muted }]}>
-              <Image source={{ uri: sponsor.logo }} style={styles.modalLogo} resizeMode="contain" />
+              <ExpoImage source={{ uri: sponsor.logo }} style={styles.modalLogo} contentFit="contain" cachePolicy="memory-disk" />
             </View>
             <Text style={[styles.modalName, { color: colors.foreground }]}>{sponsor.name}</Text>
             <View style={styles.modalBadgeRow}>

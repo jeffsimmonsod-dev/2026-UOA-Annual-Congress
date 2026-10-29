@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export interface UserProfile {
   name: string;
@@ -55,8 +55,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
   }, []);
 
+  const value = useMemo(
+    () => ({ profile, profileLoaded, saveProfile, clearProfile }),
+    [profile, profileLoaded, saveProfile, clearProfile]
+  );
+
   return (
-    <ProfileContext.Provider value={{ profile, profileLoaded, saveProfile, clearProfile }}>
+    <ProfileContext.Provider value={value}>
       {children}
     </ProfileContext.Provider>
   );

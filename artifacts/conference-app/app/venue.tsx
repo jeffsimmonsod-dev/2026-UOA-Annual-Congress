@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { goBackOrMore } from "@/services/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -12,6 +13,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ImageSourcePropType,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Rect, Svg } from "react-native-svg";
@@ -120,7 +122,7 @@ function ZoomableImageWithOverlays({
   nativeH,
   highlightRoom,
 }: {
-  source: ReturnType<typeof require>;
+  source: ImageSourcePropType;
   overlays: RoomOverlay[];
   nativeW: number;
   nativeH: number;
@@ -333,7 +335,7 @@ export default function VenueScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.navigate("/(tabs)/more")} style={styles.backBtn}>
+        <Pressable onPress={goBackOrMore} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.navTitle, { color: colors.foreground }]}>

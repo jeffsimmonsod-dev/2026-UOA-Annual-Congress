@@ -49,7 +49,7 @@ const useMenuItems = (): MenuItem[] => {
       label: "Speakers",
       icon: "person-circle-outline",
       color: "#6366f1",
-      route: "/(tabs)/speakers",
+      route: "/speakers",
       description: "Faculty & course presenters",
     },
     {
@@ -70,7 +70,7 @@ const useMenuItems = (): MenuItem[] => {
       label: "Venue Info & Maps",
       icon: "location-outline",
       color: "#14b8a6",
-      route: "/(tabs)/venue",
+      route: "/venue",
       description: event.content.venue.name,
     },
     {
