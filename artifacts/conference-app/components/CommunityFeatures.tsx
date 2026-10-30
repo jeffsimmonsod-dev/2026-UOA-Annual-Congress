@@ -18,7 +18,7 @@ import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useColors } from "@/hooks/useColors";
-import { communityRequest } from "@/services/community";
+import { sessionRequest, setCommunityProfileName } from "@/services/community";
 
 type EntityType = "comment" | "reply" | "discussion";
 interface Post { id: string; title: string; body: string; authorName: string; replyCount: number; createdAt: string; }
@@ -54,10 +54,6 @@ function showActionError(title: string, error: unknown) {
   const message = errorText(error);
   if (Platform.OS === "web" && typeof window !== "undefined") window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
-}
-
-function jsonOptions(method: string, body: unknown): RequestInit {
-  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
 export function ReportDialog({
@@ -143,7 +139,7 @@ export function PhotoComments({
     if (!sessionToken) { setError("Your photo session is not ready. Please try again."); setLoading(false); return; }
     try {
       setError("");
-      const data = await communityRequest<{ comments: CommunityComment[] }>(`/api/community/photos/${encodeURIComponent(photoId)}/comments?sessionToken=${encodeURIComponent(sessionToken)}`);
+      const data = await sessionRequest<{ comments: CommunityComment[] }>(`/api/community/photos/${encodeURIComponent(photoId)}/comments`);
       setComments(data.comments ?? []);
     } catch (err) { setError(errorText(err)); }
     finally { setLoading(false); setRefreshing(false); }
@@ -152,7 +148,8 @@ export function PhotoComments({
   useEffect(() => { if (visible) load(); }, [visible, load]);
   useEffect(() => {
     if (!visible || !sessionToken || !name.trim()) return;
-    communityRequest<{ restricted: boolean }>("/api/community/profile", jsonOptions("POST", { sessionToken, name: name.trim() }))
+    setCommunityProfileName(name);
+    sessionRequest<{ restricted: boolean }>("/api/community/profile", { method: "POST", body: { name: name.trim() } })
       .then((data) => setRestricted(data.restricted))
       .catch((err) => setError(errorText(err)));
   }, [visible, sessionToken, name]);
@@ -161,7 +158,7 @@ export function PhotoComments({
     if (!sessionToken || !name.trim() || !body.trim()) return;
     setSending(true);
     try {
-      await communityRequest(`/api/community/photos/${encodeURIComponent(photoId)}/comments`, jsonOptions("POST", { sessionToken, name: name.trim(), body: body.trim() }));
+      await sessionRequest(`/api/community/photos/${encodeURIComponent(photoId)}/comments`, { method: "POST", body: { name: name.trim(), body: body.trim() } });
       setBody("");
       await load();
     } catch (err) { Alert.alert("Comment not sent", errorText(err)); }
@@ -169,13 +166,13 @@ export function PhotoComments({
   };
   const removeComment = (comment: CommunityComment) => confirmDestructiveAction("Delete comment", "Remove this comment?", async () => {
       try {
-        await communityRequest(`/api/community/comment/${encodeURIComponent(comment.id)}`, jsonOptions("DELETE", { sessionToken }));
+        await sessionRequest(`/api/community/comment/${encodeURIComponent(comment.id)}`, { method: "DELETE" });
         await load();
       } catch (err) { showActionError("Delete failed", err); }
   });
   const sendReport = async (reason: string) => {
     if (!sessionToken || !reportTarget) throw new Error("Your photo session is not ready.");
-    await communityRequest("/api/community/reports", jsonOptions("POST", { sessionToken, type: "comment", id: reportTarget, reason }));
+    await sessionRequest("/api/community/reports", { method: "POST", body: { type: "comment", id: reportTarget, reason } });
   };
 
   return (
@@ -250,10 +247,10 @@ export function CommunitySections({
     try {
       setError("");
       if (section === "discussion") {
-        const data = await communityRequest<{ discussions: Post[] }>(`/api/community/discussions?sessionToken=${encodeURIComponent(sessionToken)}`);
+        const data = await sessionRequest<{ discussions: Post[] }>("/api/community/discussions");
         setDiscussions(data.discussions ?? []);
       } else {
-        const data = await communityRequest<{ leaders: Array<{ name: string; points: number; rank: number }>; me: { name: string; points: number; rank: number } | null; cutoffAt: string | null }>(`/api/community/leaderboard?sessionToken=${encodeURIComponent(sessionToken)}`);
+        const data = await sessionRequest<{ leaders: Array<{ name: string; points: number; rank: number }>; me: { name: string; points: number; rank: number } | null; cutoffAt: string | null }>("/api/community/leaderboard");
         setLeaders(data.leaders ?? []);
         setMe(data.me ?? null);
         setCutoffAt(data.cutoffAt ?? null);
@@ -263,8 +260,9 @@ export function CommunitySections({
   }, [section, sessionToken]);
   const syncProfile = useCallback(async () => {
     if (!sessionToken || !name.trim()) return;
+    setCommunityProfileName(name);
     try {
-      const data = await communityRequest<{ restricted: boolean }>("/api/community/profile", jsonOptions("POST", { sessionToken, name: name.trim() }));
+      const data = await sessionRequest<{ restricted: boolean }>("/api/community/profile", { method: "POST", body: { name: name.trim() } });
       setRestricted(data.restricted);
     } catch (err) { setError(errorText(err)); }
   }, [sessionToken, name]);
@@ -275,7 +273,7 @@ export function CommunitySections({
     setDetailLoading(true);
     setDetail(null);
     try {
-      const data = await communityRequest<{ discussion: DiscussionDetail }>(`/api/community/discussions/${encodeURIComponent(id)}?sessionToken=${encodeURIComponent(sessionToken)}`);
+      const data = await sessionRequest<{ discussion: DiscussionDetail }>(`/api/community/discussions/${encodeURIComponent(id)}`);
       setDetail(data.discussion);
     } catch (err) { Alert.alert("Could not open discussion", errorText(err)); }
     finally { setDetailLoading(false); }
@@ -284,7 +282,7 @@ export function CommunitySections({
     if (!sessionToken || !title.trim() || !body.trim()) return;
     setSending(true);
     try {
-      const data = await communityRequest<{ discussion: Post }>("/api/community/discussions", jsonOptions("POST", { sessionToken, name: name.trim(), title: title.trim(), body: body.trim() }));
+      const data = await sessionRequest<{ discussion: Post }>("/api/community/discussions", { method: "POST", body: { name: name.trim(), title: title.trim(), body: body.trim() } });
       setDiscussions((items) => [data.discussion, ...items]);
       setTitle(""); setBody(""); setCreateVisible(false);
       await openDiscussion(data.discussion.id);
@@ -295,7 +293,7 @@ export function CommunitySections({
     if (!sessionToken || !detail || !replyBody.trim()) return;
     setSending(true);
     try {
-      await communityRequest(`/api/community/discussions/${encodeURIComponent(detail.id)}/replies`, jsonOptions("POST", { sessionToken, name: name.trim(), body: replyBody.trim() }));
+      await sessionRequest(`/api/community/discussions/${encodeURIComponent(detail.id)}/replies`, { method: "POST", body: { name: name.trim(), body: replyBody.trim() } });
       setReplyBody("");
       await openDiscussion(detail.id);
       await load();
@@ -305,7 +303,7 @@ export function CommunitySections({
   const remove = (type: EntityType, id: string) => confirmDestructiveAction(`Delete ${type}`, `Remove this ${type}?`, async () => {
       if (!sessionToken) return;
       try {
-        await communityRequest(`/api/community/${type}/${encodeURIComponent(id)}`, jsonOptions("DELETE", { sessionToken }));
+        await sessionRequest(`/api/community/${type}/${encodeURIComponent(id)}`, { method: "DELETE" });
         if (type === "discussion") setDetail(null);
         else if (detail) await openDiscussion(detail.id);
         await load();
@@ -313,7 +311,7 @@ export function CommunitySections({
   });
   const sendReport = async (reason: string) => {
     if (!sessionToken || !reportTarget) throw new Error("Your photo session is not ready.");
-    await communityRequest("/api/community/reports", jsonOptions("POST", { sessionToken, type: reportTarget.type, id: reportTarget.id, reason }));
+    await sessionRequest("/api/community/reports", { method: "POST", body: { type: reportTarget.type, id: reportTarget.id, reason } });
   };
   const listRefresh = () => { setRefreshing(true); load(); };
 

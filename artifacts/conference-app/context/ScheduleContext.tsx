@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useConferenceData } from "@/context/ConferenceDataContext";
 import type { Session } from "@/types";
 
@@ -41,7 +41,7 @@ const ScheduleContext = createContext<ScheduleContextType>({
 export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const { docSessions, paraSessions } = useConferenceData();
-  const allSessions: Session[] = [...docSessions, ...paraSessions];
+  const allSessions = useMemo<Session[]>(() => [...docSessions, ...paraSessions], [docSessions, paraSessions]);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
@@ -94,8 +94,13 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     [savedIds]
   );
 
+  const value = useMemo(
+    () => ({ savedIds, isSaved, toggleSession, checkConflict }),
+    [savedIds, isSaved, toggleSession, checkConflict]
+  );
+
   return (
-    <ScheduleContext.Provider value={{ savedIds, isSaved, toggleSession, checkConflict }}>
+    <ScheduleContext.Provider value={value}>
       {children}
     </ScheduleContext.Provider>
   );

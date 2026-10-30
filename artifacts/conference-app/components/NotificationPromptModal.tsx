@@ -35,18 +35,22 @@ export default function NotificationPromptModal() {
 
   const handleEnable = async () => {
     setLoading(true);
-    const result = await enablePushNotificationsAsync();
+    let result: Awaited<ReturnType<typeof enablePushNotificationsAsync>>;
+    try {
+      // Resolves as soon as the permission choice is known; the token is
+      // registered with the server in the background afterwards.
+      result = await enablePushNotificationsAsync();
+    } catch (err) {
+      result = { status: "failed", error: String(err) };
+    }
     setLoading(false);
+    setVisible(false);
     // Only stop showing the prompt once the user has actually made a choice.
-    // If permission was granted but the server could not be reached
-    // ("registration_pending"), the token is re-registered automatically on
-    // every launch, so the prompt is not needed again.
     if (result.status === "failed") {
       console.warn("Notification setup failed; the prompt will be offered again next launch:", result.error);
     } else {
-      await markShown();
+      await markShown().catch(() => {});
     }
-    setVisible(false);
   };
 
   const handleDismiss = async () => {

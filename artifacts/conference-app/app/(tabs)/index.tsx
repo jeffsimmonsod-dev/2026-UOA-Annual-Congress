@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { Image as ExpoImage } from "expo-image";
 import React, { useRef, useState } from "react";
 import {
   Image,
@@ -85,7 +86,7 @@ const QUICK_TILES = [
     icon: "business-outline" as const,
     color: "#f59e0b",
     bg: "rgba(245,158,11,0.10)",
-    route: "/(tabs)/venue",
+    route: "/venue",
   },
   {
     label: "Speakers",
@@ -93,7 +94,7 @@ const QUICK_TILES = [
     icon: "person-circle-outline" as const,
     color: "#0ea5e9",
     bg: "rgba(14,165,233,0.10)",
-    route: "/(tabs)/speakers",
+    route: "/speakers",
   },
 ];
 
@@ -359,10 +360,11 @@ export default function HomeScreen() {
             ]}
           >
             <View style={[styles.sponsorLogoWrap, { backgroundColor: colors.muted }]}>
-              <Image
+              <ExpoImage
                 source={{ uri: sponsor.logo }}
                 style={styles.sponsorLogo}
-                resizeMode="contain"
+                contentFit="contain"
+                cachePolicy="memory-disk"
               />
             </View>
             <Text style={[styles.sponsorName, { color: colors.foreground }]} numberOfLines={2}>
@@ -391,7 +393,7 @@ export default function HomeScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
               <View style={[styles.sheetLogoWrap, { backgroundColor: "#ffffff" }]}>
-                <Image source={{ uri: selectedSponsor.logo }} style={styles.sheetLogo} resizeMode="contain" />
+                <ExpoImage source={{ uri: selectedSponsor.logo }} style={styles.sheetLogo} contentFit="contain" cachePolicy="memory-disk" />
               </View>
               <View style={styles.sheetHeader}>
                 <Text style={[styles.sheetName, { color: colors.foreground }]}>{selectedSponsor.name}</Text>

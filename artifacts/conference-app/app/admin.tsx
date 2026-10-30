@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -22,8 +22,12 @@ import { useColors } from "@/hooks/useColors";
 import { sendPushNotification } from "@/services/pushNotifications";
 
 import conferenceConfig from "@/conference.config";
-import { apiFetch } from "@/services/apiFetch";
+import { apiFetch, apiFetchWithTimeout, RequestTimeoutError } from "@/services/apiFetch";
 const API_BASE = conferenceConfig.apiBaseUrl || `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+/** Generous enough for a server cold start, but never an endless spinner. */
+const PIN_VERIFY_TIMEOUT_MS = 25_000;
+/** After this long, tell the user the server is probably waking up. */
+const SLOW_SERVER_HINT_MS = 3_000;
 
 type Step = "pin" | "dashboard";
 type AdminTab = "notifications" | "booths" | "analytics" | "photos" | "voting";
@@ -93,6 +97,15 @@ export default function AdminScreen() {
   const [verifiedPin, setVerifiedPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [pinVerifying, setPinVerifying] = useState(false);
+  const [pinSlow, setPinSlow] = useState(false);
+  const [pinCanRetry, setPinCanRetry] = useState(false);
+  const pinRequestActive = useRef(false);
+
+  // Wake the server while the PIN is being typed, so a cold start overlaps
+  // with typing instead of happening after "Continue" is tapped.
+  useEffect(() => {
+    apiFetchWithTimeout(`${API_BASE}/api/healthz`, {}, PIN_VERIFY_TIMEOUT_MS).catch(() => {});
+  }, []);
   const [activeTab, setActiveTab] = useState<AdminTab>("notifications");
 
   const [title, setTitle] = useState("");
@@ -139,15 +152,19 @@ export default function AdminScreen() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handlePinSubmit = async () => {
-    if (!pin.trim()) return;
+    if (!pin.trim() || pinRequestActive.current) return;
+    pinRequestActive.current = true;
     setPinVerifying(true);
+    setPinSlow(false);
+    setPinCanRetry(false);
     setPinError("");
+    const slowTimer = setTimeout(() => setPinSlow(true), SLOW_SERVER_HINT_MS);
     try {
-      const res = await apiFetch(`${API_BASE}/api/admin/verify`, {
+      const res = await apiFetchWithTimeout(`${API_BASE}/api/admin/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
-      });
+      }, PIN_VERIFY_TIMEOUT_MS);
       if (res.ok) {
         const data = await res.json();
         if (data.valid) {
@@ -168,11 +185,20 @@ export default function AdminScreen() {
         setPinError("Admin access is not set up on the server yet.");
       } else {
         setPinError("Could not verify PIN. Please try again.");
+        setPinCanRetry(true);
       }
-    } catch {
-      setPinError("Could not reach the server. Check your connection.");
+    } catch (err) {
+      // The PIN stays in the field so Retry can resend it.
+      setPinError(err instanceof RequestTimeoutError
+        ? "The server didn't respond in time. It may still be starting up. Tap Retry."
+        : "Could not reach the server. Check your connection and tap Retry.");
+      setPinCanRetry(true);
+    } finally {
+      clearTimeout(slowTimer);
+      pinRequestActive.current = false;
+      setPinSlow(false);
+      setPinVerifying(false);
     }
-    setPinVerifying(false);
   };
 
   const handleSend = async () => {
@@ -516,23 +542,30 @@ export default function AdminScreen() {
     ]);
   };
 
+  const qrRequested = useRef(new Set<number>());
   const fetchStaticQr = useCallback(async (boothId: number) => {
-    if (liveQrState[boothId]?.dataUrl) return;
+    // Track requests in a ref rather than reading liveQrState here: depending on
+    // that state re-created this callback on every QR update and re-ran the
+    // expand effect, which re-requested failed QR codes in a loop.
+    if (qrRequested.current.has(boothId)) return;
+    qrRequested.current.add(boothId);
     setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: true } }));
     try {
       const qrRes = await apiFetch(`${API_BASE}/api/booths/admin/${boothId}/qr`, {
         headers: { "x-admin-pin": verifiedPin },
       });
       if (!qrRes.ok) {
+        qrRequested.current.delete(boothId); // collapse and expand again to retry
         setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: false } }));
         return;
       }
       const { dataUrl } = await qrRes.json();
       setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl, loading: false } }));
     } catch {
+      qrRequested.current.delete(boothId);
       setLiveQrState((prev) => ({ ...prev, [boothId]: { dataUrl: null, loading: false } }));
     }
-  }, [verifiedPin, liveQrState]);
+  }, [verifiedPin]);
 
   useEffect(() => {
     if (expandedBoothId === null) return;
@@ -566,13 +599,16 @@ export default function AdminScreen() {
               placeholder="Enter PIN"
               placeholderTextColor={colors.mutedForeground}
               value={pin}
-              onChangeText={setPin}
+              onChangeText={(value) => { setPin(value); setPinCanRetry(false); }}
               secureTextEntry
               returnKeyType="go"
               onSubmitEditing={handlePinSubmit}
               autoFocus
             />
             {pinError ? <Text style={styles.errorText}>{pinError}</Text> : null}
+            {pinVerifying && pinSlow ? (
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>Waking up the server… this can take a few seconds.</Text>
+            ) : null}
             <Pressable
               onPress={handlePinSubmit}
               disabled={pinVerifying}
@@ -581,7 +617,7 @@ export default function AdminScreen() {
               {pinVerifying
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <>
-                    <Text style={styles.buttonText}>Continue</Text>
+                    <Text style={styles.buttonText}>{pinCanRetry ? "Retry" : "Continue"}</Text>
                     <Ionicons name="arrow-forward" size={16} color="#fff" />
                   </>
               }

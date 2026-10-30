@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import { useColorScheme } from "react-native";
 
 import colors from "@/constants/colors";
@@ -17,10 +17,12 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = useColorScheme();
   const palette = scheme === "dark" ? colors.dark : colors.light;
-  const value: ThemeContextValue = {
+  // Every screen reads this through useColors(); a new object on each render
+  // would re-render all of them whenever the root re-renders.
+  const value = useMemo<ThemeContextValue>(() => ({
     colors: { ...palette, radius: colors.radius },
     conference: conferenceConfig,
-  };
+  }), [palette]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

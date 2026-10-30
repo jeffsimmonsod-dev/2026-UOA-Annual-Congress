@@ -4,7 +4,7 @@ import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import conferenceConfig from "@/conference.config";
-import { apiFetch } from "./apiFetch";
+import { apiFetch, apiFetchWithTimeout, withTimeout } from "./apiFetch";
 
 // Expo Go on Android SDK 53+ removed push notification native support.
 // Any expo-notifications API call throws in that environment.
@@ -18,6 +18,8 @@ const pushSupported = !isWeb && !isExpoGoAndroid;
 const REGISTERED_TOKEN_KEY = "@uoa_push_registered_token";
 /** Must match the channelId the server sends with (see api-server lib/push.ts). */
 export const ANDROID_CHANNEL_ID = "default";
+/** Neither getting the Expo token nor the register call may hang a registration attempt. */
+const PUSH_STEP_TIMEOUT_MS = 10_000;
 
 if (pushSupported) {
   try {
@@ -68,7 +70,11 @@ function getProjectId(): string | null {
 async function getExpoToken(): Promise<string> {
   const projectId = getProjectId();
   if (!projectId) throw new Error("EAS projectId is not configured");
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+  // getExpoPushTokenAsync can stall (e.g. APNs/FCM not answering); treat that as a retryable failure.
+  const tokenData = await withTimeout(
+    Notifications.getExpoPushTokenAsync({ projectId }),
+    PUSH_STEP_TIMEOUT_MS,
+  );
   return tokenData.data;
 }
 
@@ -76,11 +82,11 @@ async function getExpoToken(): Promise<string> {
 async function registerTokenWithServer(token: string): Promise<void> {
   const apiBase = getApiBase();
   if (!apiBase) throw new Error("API server not configured");
-  const response = await apiFetch(`${apiBase}/api/push/register`, {
+  const response = await apiFetchWithTimeout(`${apiBase}/api/push/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, platform: Platform.OS }),
-  });
+  }, PUSH_STEP_TIMEOUT_MS);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const error = new Error(`Push registration failed: HTTP ${response.status} ${text.slice(0, 200)}`);
@@ -93,8 +99,20 @@ async function registerTokenWithServer(token: string): Promise<void> {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const RETRY_DELAYS_MS = [2_000, 10_000, 30_000, 120_000];
 
-/** Gets the Expo token and registers it, retrying with backoff on network/server errors. */
-async function registerWithRetry(delays: number[] = RETRY_DELAYS_MS): Promise<boolean> {
+let registrationInFlight: Promise<boolean> | null = null;
+
+/**
+ * Gets the Expo token and registers it, retrying with backoff on network/server
+ * errors. If a registration is already running (e.g. the launch sync), callers
+ * share it instead of starting a second one.
+ */
+function registerWithRetry(delays: number[] = RETRY_DELAYS_MS): Promise<boolean> {
+  if (registrationInFlight) return registrationInFlight;
+  registrationInFlight = runRegistration(delays).finally(() => { registrationInFlight = null; });
+  return registrationInFlight;
+}
+
+async function runRegistration(delays: number[]): Promise<boolean> {
   for (let attempt = 0; ; attempt++) {
     try {
       const token = await getExpoToken();
@@ -112,16 +130,17 @@ async function registerWithRetry(delays: number[] = RETRY_DELAYS_MS): Promise<bo
 }
 
 export type EnableResult =
-  | { status: "registered" }
+  /** Permission granted. The token is being registered in the background (with retries, and again on every launch). */
+  | { status: "granted" }
   | { status: "denied" }
   | { status: "unsupported" }
-  /** Permission granted, but the server did not confirm the token yet; retried on next launch. */
-  | { status: "registration_pending" }
   | { status: "failed"; error: string };
 
 /**
  * Called when the user taps "Enable Notifications": creates the Android
- * channel, asks for permission, then registers the token with the server.
+ * channel and asks for permission. Returns as soon as the permission result is
+ * known; token registration then continues in the background so the prompt
+ * never waits on the network.
  */
 export async function enablePushNotificationsAsync(): Promise<EnableResult> {
   if (!pushSupported || !Device.isDevice) return { status: "unsupported" };
@@ -134,22 +153,14 @@ export async function enablePushNotificationsAsync(): Promise<EnableResult> {
       finalStatus = status;
     }
     if (finalStatus !== "granted") return { status: "denied" };
-    // One quick retry while the prompt is on screen, then keep retrying in the background.
-    const ok = await registerWithRetry([2_000]);
-    if (ok) return { status: "registered" };
-    void registerWithRetry();
-    return { status: "registration_pending" };
+    void registerWithRetry().then((ok) => {
+      if (!ok) console.warn("Push registration did not succeed yet; will retry next launch.");
+    });
+    return { status: "granted" };
   } catch (err) {
     console.warn("Enabling push notifications failed:", err);
     return { status: "failed", error: String(err) };
   }
-}
-
-/** @deprecated kept for older callers; prefer enablePushNotificationsAsync. */
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  const result = await enablePushNotificationsAsync();
-  if (result.status !== "registered") return null;
-  return AsyncStorage.getItem(REGISTERED_TOKEN_KEY);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { goBackOrMore } from "@/services/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Pressable,
@@ -42,7 +42,7 @@ export default function ParaScreen() {
         ]}
       >
         <View style={styles.headerRow}>
-          <Pressable onPress={() => router.navigate("/(tabs)/more")} style={styles.backBtn}>
+          <Pressable onPress={goBackOrMore} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>
           <View style={{ flex: 1 }}>

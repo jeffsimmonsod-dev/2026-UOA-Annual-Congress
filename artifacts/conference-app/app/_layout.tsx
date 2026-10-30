@@ -44,6 +44,12 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="exhibit-hall" options={{ headerShown: false }} />
+      {/* Opened from Home/More. They live outside (tabs) so the swipeable tab
+          pager only contains the five bottom-bar tabs, and so the venue map's
+          pan/zoom can never be mistaken for a tab swipe. URLs are unchanged. */}
+      <Stack.Screen name="para" options={{ headerShown: false }} />
+      <Stack.Screen name="speakers" options={{ headerShown: false }} />
+      <Stack.Screen name="venue" options={{ headerShown: false }} />
       <Stack.Screen name="session/[id]" options={{ title: "Session" }} />
       <Stack.Screen name="speaker/[id]" options={{ title: "Speaker" }} />
       <Stack.Screen name="my-notes" options={{ headerShown: false }} />

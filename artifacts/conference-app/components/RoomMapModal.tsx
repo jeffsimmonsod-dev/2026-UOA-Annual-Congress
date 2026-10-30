@@ -7,6 +7,7 @@ import {
   Pressable,
   Text,
   View,
+  type ImageSourcePropType,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import { Rect, Svg } from "react-native-svg";
@@ -84,7 +85,7 @@ function ZoomableImageWithOverlays({
   nativeH,
   highlightRoom,
 }: {
-  source: ReturnType<typeof require>;
+  source: ImageSourcePropType;
   overlays: RoomOverlay[];
   nativeW: number;
   nativeH: number;

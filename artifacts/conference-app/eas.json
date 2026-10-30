@@ -45,11 +45,21 @@
         "EVENT": "sample-event",
         "EXPO_PUBLIC_DOMAIN": "expo-conference-hub.replit.app"
       }
+    },
+    "uoa-2026-apk": {
+      "extends": "uoa-2026",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
     "production": {
-      "ios": {},
+      "ios": {
+        "ascAppId": "6762055147"
+      },
       "android": {
         "track": "internal"
       }
@@ -58,7 +68,10 @@
       "extends": "production"
     },
     "sample-event": {
-      "extends": "production"
+      "android": {
+        "track": "internal"
+      },
+      "ios": {}
     }
   }
 }
